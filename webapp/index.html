@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>r2-compiler — catalogue preview</title>
+    <link rel="stylesheet" href="styles/main.css">
+  </head>
+  <body>
+    <header>
+      <div class="header-inner">
+        <h1>r2-compiler</h1>
+        <p class="tagline">Visual composer for Reality2 firmware — catalogue preview</p>
+        <div class="project-pill" title="Projects concept (open / resume / git-repo) captured in memory; switcher implemented in Phase 2-full.">
+          <span class="project-label">Project</span>
+          <span class="project-name">(none open)</span>
+        </div>
+        <p class="stats" id="stats">Loading…</p>
+      </div>
+    </header>
+
+    <main>
+      <!-- LEFT: carrier boards -->
+      <aside class="panel panel-boards">
+        <header class="panel-header">
+          <h2>Carrier boards</h2>
+          <span class="count" id="boards-count">0</span>
+        </header>
+        <ul class="entry-list" id="boards-list"></ul>
+      </aside>
+
+      <!-- CENTRE: workspace -->
+      <section class="workspace">
+        <div class="workspace-placeholder" id="workspace-placeholder">
+          <h2>Workspace</h2>
+          <p>
+            Drag-and-drop canvas will appear here in Phase 2. For now,
+            click an entry on the left or right to inspect it — the
+            entry's structured artefact, narrative, and source files
+            open in the viewer below.
+          </p>
+          <p class="hint">
+            Once you've chosen a board + an ensemble, the canvas will
+            serialise the composition to an R2-DEF §7 score and dispatch
+            <code>claude -p</code> to produce per-carrier firmware.
+          </p>
+        </div>
+
+        <div class="entry-detail hidden" id="entry-detail">
+          <header class="detail-header">
+            <div>
+              <span class="kind-chip" id="detail-kind"></span>
+              <h2 id="detail-title"></h2>
+              <p id="detail-desc"></p>
+            </div>
+            <button class="close" id="detail-close" title="Close">×</button>
+          </header>
+
+          <div class="detail-meta" id="detail-meta"></div>
+
+          <div class="file-pane">
+            <div class="file-tree">
+              <h3>Files</h3>
+              <ul id="file-tree-list"></ul>
+            </div>
+            <div class="file-viewer">
+              <div class="file-viewer-header">
+                <span id="viewer-path">— select a file —</span>
+              </div>
+              <pre class="file-viewer-body" id="viewer-body"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: ensembles -->
+      <aside class="panel panel-ensembles">
+        <header class="panel-header">
+          <h2>Ensembles</h2>
+          <span class="count" id="ensembles-count">0</span>
+        </header>
+        <ul class="entry-list" id="ensembles-list"></ul>
+      </aside>
+    </main>
+
+    <footer>
+      <span>
+        Static preview — no WASM hive, no R2 events, no compile yet.
+        See <a href="https://github.com/reality2-ai/r2-compiler/blob/main/plan/PLAN.md">PLAN.md</a>
+        for the full architecture.
+      </span>
+    </footer>
+
+    <script src="ui/app.js"></script>
+  </body>
+</html>

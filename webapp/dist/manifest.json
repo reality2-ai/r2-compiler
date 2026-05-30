@@ -1,0 +1,397 @@
+{
+  "schema_version": "0.1",
+  "tool": "r2-compiler",
+  "tool_repo": "https://github.com/reality2-ai/r2-compiler",
+  "boards": [
+    {
+      "kind": "board",
+      "slug": "esp32-c6-dfr1117",
+      "path": "catalogue/boards/esp32-c6-dfr1117",
+      "display_name": "DFRobot Beetle ESP32-C6 (DFR1117) \u2014 coin-sized board around the ESP32-C6-FH4 (single-core 160 MHz RISC-V, WiFi 6, BLE 5",
+      "name": "esp32-c6-dfr1117",
+      "version": "0.2.0",
+      "description": "DFRobot Beetle ESP32-C6 (DFR1117) \u2014 coin-sized board around the ESP32-C6-FH4 (single-core 160 MHz RISC-V, WiFi 6, BLE 5.0, 802.15.4). 4 MB flash, no PSRAM. Native USB-Serial-JTAG over USB-C (flash + console on one cable). On-board single-colour user LED at GPIO15 and a TP4057 LiPo charger. r2-workshop's RISC-V-family reference carrier (peer to the Xtensa esp32-s3 devkitc / xiao carriers).",
+      "arch": "esp32",
+      "chip": "esp32c6",
+      "carrier": "dfr1117",
+      "target_triple": "riscv32imac-esp-espidf",
+      "compile_target_tag": "esp32-c6",
+      "flash_size_mb": 4,
+      "psram": false,
+      "compulsory_capabilities": [
+        "ai.reality2.deploy.ota"
+      ],
+      "files": [
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/BOARD.md",
+          "name": "BOARD.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/board.toml",
+          "name": "board.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/datasheets/HARDWARE-WIRING-DFR1117.md",
+          "name": "HARDWARE-WIRING-DFR1117.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/templates/.cargo/config.toml",
+          "name": "config.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/templates/Cargo.toml.tera",
+          "name": "Cargo.toml.tera",
+          "kind": "tera"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/templates/build.rs",
+          "name": "build.rs",
+          "kind": "rs"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/templates/partitions.csv",
+          "name": "partitions.csv",
+          "kind": "csv"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/templates/rust-toolchain.toml",
+          "name": "rust-toolchain.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/templates/sdkconfig.defaults",
+          "name": "sdkconfig.defaults",
+          "kind": "defaults"
+        },
+        {
+          "path": "catalogue/boards/esp32-c6-dfr1117/templates/wifi_config.toml.example",
+          "name": "wifi_config.toml.example",
+          "kind": "example"
+        }
+      ]
+    },
+    {
+      "kind": "board",
+      "slug": "esp32-s3-devkitc",
+      "path": "catalogue/boards/esp32-s3-devkitc",
+      "display_name": "Espressif ESP32-S3-DevKitC-1 \u2014 Espressif's reference development board for the ESP32-S3 family",
+      "name": "esp32-s3-devkitc",
+      "version": "0.2.0",
+      "description": "Espressif ESP32-S3-DevKitC-1 \u2014 Espressif's reference development board for the ESP32-S3 family. Xtensa LX7 dual-core (240 MHz), WiFi + BLE 5. Reference variant is the N8R8: 8 MB flash + 8 MB octal PSRAM. Two USB ports: native USB-OTG (USB-Serial-JTAG console + flash) and a CP2102 UART. On-board addressable RGB LED (WS2812) on GPIO38 (v1.1) or GPIO48 (v1.0). 45 broken-out GPIOs \u2014 the high-GPIO-count Xtensa carrier in r2-workshop, current default per ADR-002.",
+      "arch": "esp32",
+      "chip": "esp32s3",
+      "carrier": "devkitc",
+      "target_triple": "xtensa-esp32s3-espidf",
+      "compile_target_tag": "esp32-s3",
+      "flash_size_mb": 8,
+      "psram": true,
+      "compulsory_capabilities": [
+        "ai.reality2.deploy.ota"
+      ],
+      "files": [
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/BOARD.md",
+          "name": "BOARD.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/board.toml",
+          "name": "board.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/datasheets/HARDWARE-WIRING-DEVKITC.md",
+          "name": "HARDWARE-WIRING-DEVKITC.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/templates/.cargo/config.toml",
+          "name": "config.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/templates/Cargo.toml.tera",
+          "name": "Cargo.toml.tera",
+          "kind": "tera"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/templates/build.rs",
+          "name": "build.rs",
+          "kind": "rs"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/templates/partitions.csv",
+          "name": "partitions.csv",
+          "kind": "csv"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/templates/rust-toolchain.toml",
+          "name": "rust-toolchain.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/templates/sdkconfig.defaults",
+          "name": "sdkconfig.defaults",
+          "kind": "defaults"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-devkitc/templates/wifi_config.toml.example",
+          "name": "wifi_config.toml.example",
+          "kind": "example"
+        }
+      ]
+    },
+    {
+      "kind": "board",
+      "slug": "esp32-s3-xiao",
+      "path": "catalogue/boards/esp32-s3-xiao",
+      "display_name": "Seeed Studio XIAO ESP32-S3 (Pre-Soldered SKU) \u2014 coin-sized 21 \u00d7 17",
+      "name": "esp32-s3-xiao",
+      "version": "0.2.0",
+      "description": "Seeed Studio XIAO ESP32-S3 (Pre-Soldered SKU) \u2014 coin-sized 21 \u00d7 17.5 mm ESP32-S3 board around the ESP32-S3R8 die (Xtensa LX7 dual-core, 8 MB flash + 8 MB octal PSRAM). USB-C with native USB-Serial-JTAG. On-board LiPo charger + buck regulator with BAT+/BAT\u2212 solder pads on the back (no JST-PH). Only 11 broken-out GPIOs (D0\u2013D10). FSM status LED is the on-board mono yellow LED on GPIO21 (LEDC PWM driven) \u2014 same mono-LED pattern as the dfr1117 carrier, no external WS2812 required. r2-workshop's alternative Xtensa carrier (ADR-001 promoted it briefly, ADR-002 reverted default to DevKitC); fully supported.",
+      "arch": "esp32",
+      "chip": "esp32s3",
+      "carrier": "xiao",
+      "target_triple": "xtensa-esp32s3-espidf",
+      "compile_target_tag": "esp32-s3",
+      "flash_size_mb": 8,
+      "psram": true,
+      "compulsory_capabilities": [
+        "ai.reality2.deploy.ota"
+      ],
+      "files": [
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/BOARD.md",
+          "name": "BOARD.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/board.toml",
+          "name": "board.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/datasheets/HARDWARE-WIRING-XIAO.md",
+          "name": "HARDWARE-WIRING-XIAO.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/templates/.cargo/config.toml",
+          "name": "config.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/templates/Cargo.toml.tera",
+          "name": "Cargo.toml.tera",
+          "kind": "tera"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/templates/build.rs",
+          "name": "build.rs",
+          "kind": "rs"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/templates/partitions.csv",
+          "name": "partitions.csv",
+          "kind": "csv"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/templates/rust-toolchain.toml",
+          "name": "rust-toolchain.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/templates/sdkconfig.defaults",
+          "name": "sdkconfig.defaults",
+          "kind": "defaults"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-xiao/templates/wifi_config.toml.example",
+          "name": "wifi_config.toml.example",
+          "kind": "example"
+        }
+      ]
+    }
+  ],
+  "ensembles": [
+    {
+      "kind": "ensemble",
+      "slug": "rocker-sensor",
+      "path": "catalogue/ensembles/rocker-sensor",
+      "name": "rocker-sensor",
+      "class": "nz.ac.auckland.rocker          # shared deployment class",
+      "version": "0.2.0",
+      "description": "Sensor role-ensemble: the ESP32 sample pipeline on each rig device. Reads calibrated triaxial acceleration, writes it to an SD ring, streams it to the controller, and owns the on-device capture state machine + event-mark sidecar. Deployment-specific in exactly two places \u2014 the sensing plugin and the domain (accelerometer) sentant.",
+      "compile_target": "[esp32-s3]            # candidate: esp32-c6",
+      "plugins": [
+        {
+          "kind": "plugin",
+          "category": "sensor",
+          "slug": "lis2dh",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh",
+          "name": "lis2dh",
+          "version": "0.1.0",
+          "description": "STMicroelectronics LIS2DH 3-axis MEMS accelerometer over I\u00b2C. Provides the generic triaxial-accel capability for r2-workshop's dfr1117 carrier (sourced via DFRobot SEN0224 Gravity I\u00b2C module). 10-bit data, \u00b12/4/8/16 g, ODR up to 5.3 kHz. Capability-aligned peer to adxl355 (SPI, 20-bit, higher precision) \u2014 same capability provided, different chip + bus per R2-PLUGIN \u00a710 swap lever.",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.cap.accel.triaxial",
+            "ai.reality2.cap.accel.triaxial.10bit"
+          ],
+          "requires": [
+            "r2.hw.i2c"
+          ],
+          "commands": [
+            "init",
+            "read",
+            "read_burst",
+            "set_odr",
+            "set_range",
+            "set_offset",
+            "sleep"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/README.md",
+              "name": "README.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
+            }
+          ]
+        }
+      ],
+      "sentants": [
+        {
+          "kind": "sentant",
+          "slug": "Identity",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Identity",
+          "name": "Identity",
+          "class": "ai.reality2.workshop.sensor.identity",
+          "description": "One-shot at boot. Loads or creates the device's persistent Ed25519 keypair + the persistent RBID (R2-FNV(device_pk)) from NVS, sets them in the hive context, then enters idle. Mirrors the R2-HIVE device-identity contract \u2014 every subsequent sentant (Bootstrap, Beacon, Uplink, \u2026) consumes the keypair from the hive context. Compilable subset (R2-COMPILE \u00a73.1).",
+          "storage": "durable",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        }
+      ],
+      "files": [
+        {
+          "path": "catalogue/ensembles/rocker-sensor/ensemble.yaml",
+          "name": "ensemble.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/README.md",
+          "name": "README.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "boards": 3,
+    "ensembles": 1,
+    "plugins": 1,
+    "sentants": 1
+  }
+}
