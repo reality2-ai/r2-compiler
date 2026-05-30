@@ -5,8 +5,10 @@ Current phasing. This file is overwritten as work progresses (PROCESS.md §3); t
 ## Status (2026-05-31)
 
 **Phase 0 — scaffolding.** ✅ Complete.
+**Phase 0.5 — GitHub repo + initial push.** ✅ Complete — https://github.com/reality2-ai/r2-compiler
 **Phase 1.1 — `tools/sync-catalogue.sh`.** ✅ Complete.
 **Phase 1.2 — first sync run.** ✅ Complete — see `crates/_VERSIONS.toml` for the manifest.
+**Phase 1.3 — author all three board entries.** ✅ Complete — board.toml + BOARD.md + AI-CONTEXT.md for esp32-s3-devkitc, esp32-s3-xiao, esp32-c6-dfr1117.
 
 ```
 ✅ AGENTS.md / AI-CONTEXT.md / README.md / PROCESS.md
@@ -38,7 +40,7 @@ Goal: round-trip the three r2-workshop carriers per [`SPEC-R2-COMPILER.md`](../s
 |---|---|---|
 | 1.1 | `tools/sync-catalogue.sh` — script to populate `crates/`, `catalogue/boards/<each>/templates/`, `catalogue/ensembles/rocker-sensor/ensemble.yaml` from sibling repos | — | ✅ |
 | 1.2 | First sync run | 1.1 | ✅ |
-| 1.3 | `board.toml` + `BOARD.md` + completed `AI-CONTEXT.md` for the remaining two carriers (`esp32-s3-devkitc`, `esp32-s3-xiao`) — same manual pattern as `esp32-c6-dfr1117/board.toml` | 1.2 | ⏳ |
+| 1.3 | `board.toml` + `BOARD.md` + completed `AI-CONTEXT.md` for all three carriers (`esp32-c6-dfr1117`, `esp32-s3-devkitc`, `esp32-s3-xiao`) — same manual pattern across all three | 1.2 | ✅ |
 | 1.4 | `catalogue/ensembles/rocker-sensor/` per-plugin + per-sentant entries — extracted from `ensemble.yaml` declarations and the r2-workshop firmware code (each becomes a R2-PLUGIN §12 / R2-DEF §2 conformant directory) | 1.2 | ⏳ |
 | 1.5 | `testing/round-trip/<carrier>.expected.toml` — recorded R2-WIRE traffic from a running r2-workshop firmware, captured as the conformance baseline | 1.3, 1.4 | ⏳ |
 | 1.6 | `orchestrator/` scaffolding — axum WSS + static serve on port 21050; `CatalogueServer` + `Compiler` + `Sync` sentants stubbed | 1.2 | ⏳ |

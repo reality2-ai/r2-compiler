@@ -1,55 +1,85 @@
 # AI-CONTEXT.md — esp32-s3-devkitc
 
-> **Placeholder.** This entry has not been authored yet. Status: scaffolding only.
->
-> When this entry is brought live (via `tools/sync-catalogue.sh` or the **+ New Board** authoring flow), this file must be rewritten to match SPEC-CATALOGUE-LAYOUT §3.3.
+If you are a Claude Code session resuming work on this board entry cold, read this file first.
 
 ## Purpose
 
-Espressif ESP32-S3-DevKitC-1 carrier — the reference development board for the ESP32-S3 chip family. Xtensa LX7 dual-core, 8 MB flash, optional PSRAM, USB-Serial-JTAG.
+Espressif ESP32-S3-DevKitC-1 — Espressif's reference dev board for the ESP32-S3 family. r2-workshop's **current default carrier** per ADR-002. Xtensa LX7 dual-core, 8 MB flash + 8 MB octal PSRAM (N8R8 reference variant), two USB ports, on-board WS2812 RGB LED, 45 broken-out GPIOs.
 
-Currently used by `r2-workshop/firmware/esp32-s3/devkitc/` as one of three r2-workshop carriers. r2-compiler v0.1 must round-trip this carrier behaviourally (see [`../../../specifications/SPEC-R2-COMPILER.md`](../../../specifications/SPEC-R2-COMPILER.md) §6).
+The high-pin-count Xtensa option. Use when GPIO headroom matters more than form factor.
 
-## Class + target (provisional — verify against board.toml when authored)
+## Class + target
 
-- `<arch>-<chip>-<carrier>` = `esp32-s3-devkitc`
-- Target triple = `xtensa-esp32s3-espidf`
-- R2-DEF §7.7 compile_target tag = `esp32-s3`
+| | |
+|---|---|
+| Directory name | `esp32-s3-devkitc` |
+| Target triple | `xtensa-esp32s3-espidf` |
+| ESP-IDF version | `v5.2.5` |
+| R2-DEF §7.7 compile_target tag | `esp32-s3` (shared with esp32-s3-xiao) |
 
-## Where the canonical artefact will live
+## Where the canonical artefact lives
 
-`board.toml` (not yet written). See SPEC-CATALOGUE-LAYOUT §3.2 for the schema.
+[`board.toml`](board.toml) per SPEC-CATALOGUE-LAYOUT §3.2.
 
-## Vendor refs (to populate)
+[`BOARD.md`](BOARD.md) — narrative companion.
 
-- ESP32-S3-DevKitC-1 datasheet — pending download from https://docs.espressif.com/...
-- ESP32-S3 chip datasheet — pending download
-- ESP-IDF v5.x partition table reference — informative
+## Vendor refs
 
-## Authoring source
+On-disk under [`datasheets/`](datasheets/):
 
-When this board is authored, the agent should consult:
+- `HARDWARE-WIRING-DEVKITC.md` — the canonical 3-phase build guide (BoM, wiring tables, voltage-divider analysis, pre-power-up checklist).
 
-- `r2-workshop/firmware/esp32-s3/devkitc/` for the working per-carrier crate (pin assignments, sdkconfig, partitions).
-- `r2-workshop/specifications/HARDWARE-WIRING-DEVKITC.md` for the rocker-rig wiring (informative — most of it is rig-specific, but the chip pin functions are reusable).
-- `r2-core/platforms/esp32-s3/` for the Rust platform crate.
-- `r2-specifications/specs/r2-core/R2-COMPILE.md` §4 for the target's place in the compile model.
+Vendor URLs (cited; fetch + save before using as reference):
 
-## Known gotchas (from r2-workshop)
+- Vendor page: https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/
+- ESP32-S3 SoC: https://www.espressif.com/en/products/socs/esp32-s3
 
-- The first build under `esp-idf-sys` rebuilds the entire ESP-IDF SDK and takes 15–30 minutes. Subsequent incremental builds are fast.
-- `esp-idf-sys + custom partition table`: ESP-IDF resolves `CONFIG_PARTITION_TABLE_CUSTOM_FILENAME` relative to `esp-idf-sys`'s auto-generated build directory, not the crate root. `build.rs` walks up to find `esp-idf-sys-*/out/` and copies `partitions.csv` there. First-build chicken-and-egg solved by `tools/setup-firmware.sh`. May need a SECOND clean rebuild if the first produces the default 1-app layout.
-- `espflash v3.x` writes a header byte that breaks ESP-IDF v5.3+ bootloaders (R2-BUILD §5.1). **Use `esptool`** (Python, bundled with ESP-IDF) for flashing, not `espflash`.
+## Hive-shared plugins on this carrier
 
-## Read these files in this order (once authored)
+None scaffolded yet under `plugins/`. The carrier's BLE and WiFi singletons are provided by the vendored `r2-esp` crate when the firmware crate is rendered.
 
-1. `board.toml` — the contract.
-2. `BOARD.md` — narrative.
-3. `templates/Cargo.toml.tera` — what gets rendered into the per-build crate.
-4. `templates/sdkconfig.defaults` — ESP-IDF tuning.
-5. `templates/partitions.csv` — OTA layout.
-6. `templates/.cargo/config.toml` — target + linker.
+## Templates
+
+[`templates/`](templates/) holds the per-build seed files synced from `r2-workshop/firmware/esp32-s3/devkitc/`. See `BOARD.md` "Templates" section for the table.
+
+## Quick differences vs siblings
+
+| Versus | Difference |
+|---|---|
+| **esp32-s3-xiao** | Same chip, same target, same tag. DevKitC has 45 GPIOs vs XIAO's 11; on-board WS2812 vs external; CP2102 + USB-OTG vs USB-C-only; no on-board LiPo charging vs XIAO's on-board buck+charger. Choose DevKitC for GPIO headroom + diagnosable power chain; XIAO for size + USB-C convenience. |
+| **esp32-c6-dfr1117** | Different ISA (Xtensa vs RISC-V), different target triple. DevKitC has PSRAM + 8 MB flash; DFR1117 has neither PSRAM + only 4 MB. DevKitC uses ADXL355 over SPI; DFR1117 uses LIS2DH over I²C — capability-vs-chip swap lever (R2-PLUGIN §10). |
+
+## Known gotchas (quick read — full list in `board.toml [notes].gotchas`)
+
+- WS2812 GPIO: **38 on v1.1 (current production)**, 48 on v1.0. Check silkscreen.
+- Custom `partitions.csv` needs **two clean rebuilds** on a fresh checkout (esp-idf-sys CMake build dir doesn't exist on first build).
+- First install MUST be a USB flash; OTA only works after the table + both slots are written.
+- PSRAM claims GPIO35/36/37 — don't wire them.
+- ADC2 (GPIO11-20) is unusable while WiFi is active. Battery sense uses ADC1 (GPIO4) deliberately.
+- Use **`esptool`**, not `espflash` (R2-BUILD §5.1).
+
+## Read these files in this order (cold-start resume)
+
+1. [`board.toml`](board.toml) — the structured contract.
+2. [`BOARD.md`](BOARD.md) — narrative + template table.
+3. [`templates/Cargo.toml.tera`](templates/Cargo.toml.tera) — dependency baseline.
+4. [`templates/sdkconfig.defaults`](templates/sdkconfig.defaults) — ESP-IDF tuning.
+5. [`templates/partitions.csv`](templates/partitions.csv) — OTA layout.
+6. [`templates/.cargo/config.toml`](templates/.cargo/config.toml) — target + linker.
+7. [`datasheets/HARDWARE-WIRING-DEVKITC.md`](datasheets/HARDWARE-WIRING-DEVKITC.md) — full 3-phase wiring narrative.
+8. The local [`conversation/`](conversation/) directory — most recent authoring session.
+9. **Upstream contract:** `../../../specifications/SPEC-CATALOGUE-LAYOUT.md` §3.
+
+## Authoring status
+
+- ✅ `board.toml` (manually authored 2026-05-31)
+- ✅ `BOARD.md`
+- ✅ `AI-CONTEXT.md` (this file)
+- ✅ `templates/` (synced from r2-workshop)
+- ✅ `datasheets/HARDWARE-WIRING-DEVKITC.md`
+- ⏳ `pinout.svg` — Phase 4
+- ⏳ Vendor PDF datasheets — to fetch via AuthorPilot WebFetch when available
 
 ---
 
-*Created 2026-05-31 as a scaffold; needs full authoring before v0.1 success gate can be exercised.*
+*Created 2026-05-31, Phase 1.3.*
