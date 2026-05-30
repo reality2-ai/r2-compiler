@@ -54,13 +54,9 @@ toml       = "0.8"
 # Error handling.
 anyhow     = "1"
 
-# (Vendored R2 protocol crates wire in once the real hive is built —
-# Phase 1.7+. Phase 1.6 leaves them unwired so the binary can land
-# without a half-implemented hive.)
-# r2-engine    = { workspace = true }
-# r2-fnv       = { workspace = true }
-# r2-wire      = { workspace = true }
-# r2-trust     = { workspace = true }
+# Vendored R2 protocol crates (Phase 1.7a+ — engine + naming).
+r2-engine = { workspace = true, features = ["alloc", "std"] }
+r2-fnv    = { workspace = true, features = ["std"] }
 
 [profile.release]
 opt-level = "z"
