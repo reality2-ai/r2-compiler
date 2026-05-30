@@ -51,6 +51,7 @@ PROTOCOL_CRATES=(
   r2-trust
   r2-route
   r2-def
+  r2-dispatch
   r2-ensemble
   r2-wasm
 )

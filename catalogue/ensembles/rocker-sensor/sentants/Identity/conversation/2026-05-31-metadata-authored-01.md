@@ -10,7 +10,7 @@ Same session as the lis2dh plugin metadata. Phase 1.4-metadata = lightweight cat
 - It's the **first sentant to run at boot** in r2-workshop's rocker-sensor ensemble — every other sentant depends on it. Pinning it early lets later sentants reference it as a dependency they can rely on.
 - The FSM is small enough to write out completely (5 states) but exercises multiple R2-DEF §2/§3 features: plugin invocations (fire-and-forget), result-event handling (`event: nvs` / `event: crypto/software-ed25519`), the `test` conditional action, the `set` data pipeline, internal self-sends for FSM branching (`identity_ready` / `generate_identity`).
 - It demonstrates the **cross-plugin pattern** — uses both an ensemble-owned plugin (`nvs`) and a core plugin (`software-ed25519`), so the orchestrator's resolve step gets exercised against both lookup paths.
-- It introduces the `{{platform.random_seed_32}}` template-extension token, which the Compiler sentant resolves to `esp_random()` at code-gen time. This is the "core capability synthesised by the compiler" pattern that also shows up in OTA (compulsory plugins).
+- It introduces the `{{platform.random_seed_32}}` template-extension token, which the compiler plugin resolves to `esp_random()` at code-gen time. This is the "core capability synthesised by the compiler" pattern that also shows up in OTA (compulsory plugins).
 
 ## Decisions
 

@@ -78,7 +78,7 @@ None scaffolded yet under `plugins/`. The carrier's BLE and WiFi singletons are 
 - ✅ `templates/` (synced from r2-workshop)
 - ✅ `datasheets/HARDWARE-WIRING-DEVKITC.md`
 - ⏳ `pinout.svg` — Phase 4
-- ⏳ Vendor PDF datasheets — to fetch via AuthorPilot WebFetch when available
+- ⏳ Vendor PDF datasheets — to fetch via the authoring-flow WebFetch when available
 
 ---
 

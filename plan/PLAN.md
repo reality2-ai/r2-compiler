@@ -10,6 +10,7 @@ Current phasing. This file is overwritten as work progresses (PROCESS.md §3); t
 **Phase 1.2 — first sync run.** ✅ Complete — see `crates/_VERSIONS.toml` for the manifest.
 **Phase 1.3 — author all three board entries.** ✅ Complete — board.toml + BOARD.md + AI-CONTEXT.md for esp32-s3-devkitc, esp32-s3-xiao, esp32-c6-dfr1117.
 **Phase 1.4-metadata (first slice).** ✅ Complete — `[compulsory_plugins]` added to all three board.tomls; SPEC-R2-COMPILER §11 (TG management) + §12 (device lifecycle + deploy paths + compulsory plugins) added; SPEC-CATALOGUE-LAYOUT §4.3 amended with three modes (aot/nif/web); first worked-example plugin (`sensor/lis2dh`) and sentant (`Identity`) fully authored as metadata.
+**Phase 1.4-source (first slice).** ✅ Complete — `r2-plugin-sensor-lis2dh` Cargo crate authored from the r2-workshop reference: `no_std` for AOT, generic over `embedded_hal::i2c::I2c`, implements `r2_engine::plugin::Plugin`, **9 unit tests passing** via `embedded-hal-mock`. The vendored R2 crates (r2-engine, r2-fnv, r2-cbor, r2-wire, plus r2-dispatch added by sync) now form a host-buildable workspace. Conjecture **C-5 (the plugin authoring pattern produces a buildable crate) survives its first test.** Workspace deps tidied; terminology corrected throughout (compiler/author/flasher/sync are PLUGINS not sentants, per [[feedback-sentants-vs-plugins-terminology]]).
 
 ```
 ✅ AGENTS.md / AI-CONTEXT.md / README.md / PROCESS.md
@@ -31,7 +32,7 @@ Current phasing. This file is overwritten as work progresses (PROCESS.md §3); t
 ✅ conversation/2026-05-31-r2-compiler-design-01.md
 ```
 
-Two boards (devkitc, xiao) still need `board.toml` + `BOARD.md` — same pattern as the dfr1117 entry, manually-authored as practice runs before AuthorPilot exists. The rocker-sensor ensemble still needs per-plugin and per-sentant entries scaffolded under its own directory (Phase 1.3 below).
+Two boards (devkitc, xiao) still need `board.toml` + `BOARD.md` — same pattern as the dfr1117 entry, manually-authored as practice runs before the authoring flow exists. The rocker-sensor ensemble still needs per-plugin and per-sentant entries scaffolded under its own directory (Phase 1.3 below).
 
 ## Phase 1 — catalogue seed + spec-driven build path
 
@@ -45,7 +46,7 @@ Goal: round-trip the three r2-workshop carriers per [`SPEC-R2-COMPILER.md`](../s
 | 1.4-metadata-rest | Remaining plugins (adxl355, sd-card, battery-adc, led, nvs, clock, ble-beacon, ble-l2cap, data-tcp, reset-tcp, log-tcp) + remaining sentants (Accelerometer, WifiProv, Bootstrap, Beacon, Battery, Status, Sync, Recorder, Uplink, Ota, Reset, Health, Capture, Presence) — each gets plugin.toml/sentant.yaml + PLUGIN.md/SENTANT.md + AI-CONTEXT.md. Pattern proven by `sensor/lis2dh` + `sentants/Identity` (✅). | 1.4-metadata | ⏳ |
 | 1.4-source | Extract the Rust source for each ensemble plugin from r2-workshop's inline firmware modules into standalone Cargo crates. The heavy lift — requires reading + refactoring ~12 source files. | 1.4-metadata-rest | ⏳ |
 | 1.5 | `testing/round-trip/<carrier>.expected.toml` — recorded R2-WIRE traffic from a running r2-workshop firmware, captured as the conformance baseline | 1.3, 1.4 | ⏳ |
-| 1.6 | `orchestrator/` scaffolding — axum WSS + static serve on port 21050; `CatalogueServer` + `Compiler` + `Sync` sentants stubbed | 1.2 | ⏳ |
+| 1.6 | `orchestrator/` scaffolding — axum WSS + static serve on port 21050; `catalogue`, `compiler`, `sync` plugins stubbed (each with a minimal sentant front routing `r2.compiler.*` events) | 1.2 | ⏳ |
 | 1.7 | `orchestrator/prompts/compile.md` — Tera template for the Claude Code build brief (must emit direct-Rust FSMs per [[feedback-aot-optimisation-constraint]]) | 1.6 | ⏳ |
 | 1.8 | End-to-end: orchestrator reads `scores/rocker-sensor.yaml` + carrier choice → spawns `claude -p` → produces `out/<carrier>/` → `cargo build --release --target <triple>` exits 0 | 1.5, 1.7 | ⏳ |
 | 1.9 | Conformance gate: behavioural-equivalence test passes against `testing/round-trip/` vectors for all three carriers | 1.8 | ⏳ |

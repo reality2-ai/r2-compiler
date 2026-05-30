@@ -58,7 +58,7 @@ After the first USB flash, subsequent updates can go over WiFi via OTA (R2-DEPLO
 
 ## Templates
 
-`templates/` holds the per-build seed files copied by `tools/sync-catalogue.sh` from `r2-workshop/firmware/esp32-c6/dfr1117/`. The Compiler sentant renders `Cargo.toml.tera` per-build (substituting the vendored-crate paths into the deps section), and copies the others verbatim:
+`templates/` holds the per-build seed files copied by `tools/sync-catalogue.sh` from `r2-workshop/firmware/esp32-c6/dfr1117/`. The compiler plugin renders `Cargo.toml.tera` per-build (substituting the vendored-crate paths into the deps section), and copies the others verbatim:
 
 | File | Purpose |
 |---|---|
@@ -78,7 +78,7 @@ Spelled out in [`board.toml`](board.toml) `[notes].gotchas`. Re-read those befor
 
 The original DFR1117 firmware crate (`r2-workshop/firmware/esp32-c6/dfr1117/`) was authored over many r2-workshop sessions through May 2026 — see `r2-workshop/conversation/` for the trail.
 
-This `catalogue/boards/esp32-c6-dfr1117/` entry was scaffolded in r2-compiler design session 01 (2026-05-31) — see [`../../../conversation/2026-05-31-r2-compiler-design-01.md`](../../../conversation/2026-05-31-r2-compiler-design-01.md). The `board.toml` + this BOARD.md were manually authored (pre-AuthorPilot) by reading the synced template files and the wiring guide.
+This `catalogue/boards/esp32-c6-dfr1117/` entry was scaffolded in r2-compiler design session 01 (2026-05-31) — see [`../../../conversation/2026-05-31-r2-compiler-design-01.md`](../../../conversation/2026-05-31-r2-compiler-design-01.md). The `board.toml` + this BOARD.md were manually authored (pre-authoring-flow) by reading the synced template files and the wiring guide.
 
 ## See also
 

@@ -54,7 +54,7 @@ None scaffolded yet under `plugins/`. BLE / WiFi singletons come from the vendor
 - **Cell solders directly to BAT+/BAT− pads on the back** — no JST-PH connector. Hot-swap during a session means de-soldering.
 - **No over-discharge protection** on the on-board charger. Use protected 18650 cells; disconnect when idle for >24 h.
 - **FSM status LED is the on-board mono yellow LED on GPIO21** (LEDC PWM). No external WS2812 module is required; FSM uses blink rate / duty cycle (not colour) to distinguish states. Same mono-LED pattern as dfr1117 (GPIO15).
-- **Template lag (2026-05-31):** `templates/Cargo.toml.tera` still declares `ws2812-esp32-rmt-driver` because r2-workshop's xiao firmware hasn't yet been updated to the mono-LED design. The Compiler sentant must drop that dep and emit LEDC-PWM driver code. See `board.toml [notes].gotchas` last entry and `[[project-xiao-led-choice]]` in memory.
+- **Template lag (2026-05-31):** `templates/Cargo.toml.tera` still declares `ws2812-esp32-rmt-driver` because r2-workshop's xiao firmware hasn't yet been updated to the mono-LED design. The compiler plugin must drop that dep and emit LEDC-PWM driver code. See `board.toml [notes].gotchas` last entry and `[[project-xiao-led-choice]]` in memory.
 - **D2/GPIO3 is a strapping pin** (JTAG signal source select). Do not wire.
 - **D6/GPIO43, D7/GPIO44** are UART0 TX/RX — reserved unless adding an external UART console.
 - Same `esptool`-not-`espflash` rule per R2-BUILD §5.1.
@@ -81,7 +81,7 @@ None scaffolded yet under `plugins/`. BLE / WiFi singletons come from the vendor
 - ✅ `templates/` (synced from r2-workshop)
 - ✅ `datasheets/HARDWARE-WIRING-XIAO.md`
 - ⏳ `pinout.svg` — Phase 4
-- ⏳ Vendor PDF datasheets — to fetch via AuthorPilot WebFetch when available
+- ⏳ Vendor PDF datasheets — to fetch via the authoring-flow WebFetch when available
 
 ---
 

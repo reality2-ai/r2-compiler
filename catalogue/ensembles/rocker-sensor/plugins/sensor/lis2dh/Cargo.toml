@@ -1,0 +1,39 @@
+# r2-plugin-sensor-lis2dh — R2 plugin wrapping the ST LIS2DH triaxial
+# accelerometer over I²C. R2-PLUGIN §12 dual-mode (AOT + future NIF).
+#
+# Hardware abstraction is via `embedded-hal` 1.0 I²C traits — the plugin
+# itself is bus-agnostic. The firmware-rendering step (compiler plugin)
+# wraps esp-idf-svc::hal::i2c::I2cDriver to satisfy the trait at link time.
+
+[package]
+name        = "r2-plugin-sensor-lis2dh"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: ST LIS2DH triaxial accelerometer over I²C."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+# Mutually-exclusive build modes per R2-PLUGIN §12.5.
+# `default = []` — neither mode builds by default. The Compiler-plugin
+# enables `aot` for firmware builds; NIF support is deferred (false in
+# plugin.toml today).
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine    = { workspace = true }
+embedded-hal = { workspace = true }
+
+[dev-dependencies]
+# A mock I²C bus for unit-testing the decode + command-dispatch logic
+# without real hardware. embedded-hal-mock implements the traits.
+embedded-hal-mock = { version = "0.11", default-features = false, features = ["eh1"] }
+
+[lib]
+# `rlib` works for AOT linking (static), `cdylib` covers a future NIF
+# build. The crate stays a library — never a binary.
+crate-type = ["rlib"]

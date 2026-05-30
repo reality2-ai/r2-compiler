@@ -152,5 +152,5 @@ gotchas = [
     "Bootloader mode: if espflash can't detect the chip, hold BOOT button while pressing/releasing RESET. Most of the time not needed — USB-Serial-JTAG drops into bootloader automatically when espflash resets it.",
     "Use esptool, not espflash, per R2-BUILD §5.1.",
     "LED brightness should be capped (≤ 20% duty) — uncapped is harsh in a room.",
-    "DIVERGENCE FROM SYNCED TEMPLATES (2026-05-31): templates/Cargo.toml.tera still declares ws2812-esp32-rmt-driver and smart-leds (synced from r2-workshop, which currently uses the external WS2812 on D5). The Compiler sentant MUST drop those deps and emit LEDC-PWM driver code for GPIO21 instead, per this board.toml's pinout. This divergence resolves when r2-workshop's xiao firmware catches up to the mono-LED design — see [[project-xiao-led-choice]] in memory.",
+    "DIVERGENCE FROM SYNCED TEMPLATES (2026-05-31): templates/Cargo.toml.tera still declares ws2812-esp32-rmt-driver and smart-leds (synced from r2-workshop, which currently uses the external WS2812 on D5). The compiler plugin MUST drop those deps and emit LEDC-PWM driver code for GPIO21 instead, per this board.toml's pinout. This divergence resolves when r2-workshop's xiao firmware catches up to the mono-LED design — see [[project-xiao-led-choice]] in memory.",
 ]

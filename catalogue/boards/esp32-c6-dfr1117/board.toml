@@ -64,7 +64,7 @@ absent = [
 # fact that "GPIO15 hosts the user LED on this board" is a board fact, not
 # an ensemble fact. Ensembles bind their plugin requirements to these
 # capability names (e.g. an LED plugin requires "r2.hw.gpio.led") and the
-# Compiler sentant resolves the GPIO number from this table.
+# compiler plugin resolves the GPIO number from this table.
 
 [pinout.gpio.GPIO4]
 description = "ADC1 — battery cell sense (LP_RX silk pad)"

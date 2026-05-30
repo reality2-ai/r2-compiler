@@ -54,7 +54,7 @@ Full event payload schemas in [`PLUGIN.md`](PLUGIN.md) §3–4.
 
 ## Datasheet refs (to fetch + save under `datasheets/`)
 
-When AuthorPilot (Phase 2+) runs against this entry it should fetch:
+When the authoring flow (Phase 2+) runs against this entry it should fetch:
 
 - ST LIS2DH datasheet (PDF): from ST's product page or via direct PDF URL
 - DFRobot SEN0224 wiki: https://wiki.dfrobot.com/Gravity__I2C_Triple_Axis_Accelerometer_-_LIS2DH_SKU__SEN0224
@@ -106,7 +106,7 @@ See [`PLUGIN.md`](PLUGIN.md) §9. The big ones:
 - ✅ `AI-CONTEXT.md` (this file)
 - ⏳ `Cargo.toml` — Phase 1.4-source
 - ⏳ `src/lib.rs` + `src/plugin.rs` + `src/driver.rs` — Phase 1.4-source (refactor from r2-workshop)
-- ⏳ `datasheets/lis2dh-datasheet.pdf` — fetch via AuthorPilot WebFetch
+- ⏳ `datasheets/lis2dh-datasheet.pdf` — fetch via the authoring-flow WebFetch
 - ⏳ `datasheets/sen0224-wiki.html` (or snapshot PDF) — fetch
 - ⏳ `tests/` — native integration tests
 - ✅ `conversation/2026-05-31-metadata-authored-01.md` — placeholder for this session's transcript

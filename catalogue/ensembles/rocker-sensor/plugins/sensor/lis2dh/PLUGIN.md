@@ -121,7 +121,7 @@ None. Local hardware driver, no remote endpoints, no API keys.
 ## 9. Known Limitations
 
 - **Source not yet extracted.** This entry is metadata-only as of 2026-05-31. The working implementation lives inline at `../../../../../../r2-workshop/firmware/esp32-c6/dfr1117/src/lis2dh.rs`. Extraction into this standalone Cargo crate is pending — Phase 1.4-source in `plan/PLAN.md`.
-- **Datasheet PDF not yet fetched.** AuthorPilot (Phase 2+) will fetch ST's LIS2DH datasheet via WebFetch and save it under `datasheets/`.
+- **Datasheet PDF not yet fetched.** The authoring flow (Phase 2+) will fetch ST's LIS2DH datasheet via WebFetch and save it under `datasheets/`.
 - **FIFO mode unsupported in v0.1.** The driver polls per-sample. FIFO would reduce I²C bus contention at higher ODRs; deferred until needed.
 - **Interrupt-driven sampling unsupported.** INT1 / INT2 are wired-but-unused; v0.1 polls. The DFRobot SEN0224's 4-pin Gravity connector doesn't expose the interrupts anyway — they're on a separate header.
 - **Calibration is per-axis offset only.** No matrix calibration (the rocker dashboard does the matrix calibration server-side per `SPEC-R2-WORKSHOP-SENSOR` §9). Sufficient for the rocker rig's measurement model.

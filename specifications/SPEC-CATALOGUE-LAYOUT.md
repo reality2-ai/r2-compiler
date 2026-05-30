@@ -121,7 +121,7 @@ carrier_schematic = "dfr1117-schematic.pdf"
 
 [compulsory_plugins]
 # Plugins / capabilities that MUST be linked into every build for this carrier,
-# regardless of operator choice on the canvas. The Compiler sentant resolves
+# regardless of operator choice on the canvas. The compiler plugin resolves
 # these against the chosen ensemble's plugins/, this board's plugins/, and
 # the core crates under crates/r2-plugin-*. Build fails with
 # E_COMPULSORY_PLUGIN_MISSING if any capability is unsatisfied.
@@ -133,7 +133,7 @@ capabilities = ["ai.reality2.deploy.ota"]
 prefer = ["ota-tcp"]                              # plugin name to satisfy each capability
 ```
 
-Validation (orchestrator's `CatalogueServer` MUST enforce):
+Validation (orchestrator's `catalogue plugin` MUST enforce):
 
 | Rule | Error |
 |---|---|
@@ -264,9 +264,9 @@ assets/
   …
 ```
 
-`wasm-pack` (or the configured bundler) emits the .wasm + glue JS into a `dist/` subdirectory at build time, which the Compiler sentant copies alongside the `assets/` content into the bundle directory the orchestrator hands to R2-WEB.
+`wasm-pack` (or the configured bundler) emits the .wasm + glue JS into a `dist/` subdirectory at build time, which the compiler plugin copies alongside the `assets/` content into the bundle directory the orchestrator hands to R2-WEB.
 
-`assets/` MUST NOT contain symlinks that escape it (R2-PLUGIN §13.3). The Compiler sentant rejects such builds.
+`assets/` MUST NOT contain symlinks that escape it (R2-PLUGIN §13.3). The compiler plugin rejects such builds.
 
 #### 4.3.3 Conformance checks (run at sync + composition time)
 
@@ -319,13 +319,13 @@ Same layout as §4.3 (a plugin is a plugin). The orchestrator's compose-step res
 
 ## 6. Authoring flow (normative — referenced from SPEC-R2-COMPILER §7)
 
-When the operator initiates `r2.compiler.author.start{kind, description}`, the orchestrator's `AuthorPilot` MUST:
+When the operator initiates `r2.compiler.author.start{kind, description}`, the orchestrator's `the Author sentant (calling the `claude-code` plugin)` MUST:
 
 1. **Create the entry directory** per §3.1 / §4.1 — empty, just the shell.
 2. **Spawn `claude -p`** with the entry's parent directory as cwd + a system prompt template from `orchestrator/prompts/author-<kind>.md` that cites the relevant upstream spec.
 3. **Stream the agent's clarifying questions** via `r2.compiler.author.prompt` to the operator. Operator replies via `r2.compiler.author.reply`.
 4. **Allow the agent to use WebFetch** for vendor datasheets and Write for files under the new entry directory ONLY. Writes outside MUST be surfaced to the operator, not silently performed.
-5. **Inside an ensemble authoring session**, the operator MAY further request "add a new plugin/sentant to this ensemble" — the AuthorPilot spawns a nested authoring flow scoped to `catalogue/ensembles/<name>/plugins/...` or `.../sentants/...`.
+5. **Inside an ensemble authoring session**, the operator MAY further request "add a new plugin/sentant to this ensemble" — the the Author sentant (calling the `claude-code` plugin) spawns a nested authoring flow scoped to `catalogue/ensembles/<name>/plugins/...` or `.../sentants/...`.
 6. **On completion**, validate against §3.2 / §4.2 / §4.3 / §4.4. On failure, re-enter the loop with the validation error surfaced to the operator. On success, emit `r2.compiler.author.done`.
 7. **On error/abandonment**, run the §7 decommission flow before emitting `r2.compiler.author.error`.
 
@@ -358,7 +358,7 @@ A `catalogue/` tree conforms when:
 3. Every entry has a `conversation/` directory with at least one transcript.
 4. Every entry has an `AI-CONTEXT.md` matching §3.3 / §4.5.
 
-The orchestrator's `CatalogueServer` MUST report any non-conforming entry as `degraded` in catalogue listings — degraded entries cannot be selected on the canvas until repaired.
+The orchestrator's `catalogue plugin` MUST report any non-conforming entry as `degraded` in catalogue listings — degraded entries cannot be selected on the canvas until repaired.
 
 ---
 

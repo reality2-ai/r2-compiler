@@ -64,7 +64,7 @@ After the first USB flash, subsequent updates can go over WiFi via OTA.
 
 | File | Purpose |
 |---|---|
-| `templates/Cargo.toml.tera` | crate manifest synced from r2-workshop. ⚠ Currently declares `ws2812-esp32-rmt-driver` because r2-workshop's xiao firmware still uses the external WS2812 — the Compiler sentant MUST drop that dep and emit LEDC-PWM driver code per the GPIO21 pinout. See [`board.toml`](board.toml) `[notes].gotchas` last entry. |
+| `templates/Cargo.toml.tera` | crate manifest synced from r2-workshop. ⚠ Currently declares `ws2812-esp32-rmt-driver` because r2-workshop's xiao firmware still uses the external WS2812 — the compiler plugin MUST drop that dep and emit LEDC-PWM driver code per the GPIO21 pinout. See [`board.toml`](board.toml) `[notes].gotchas` last entry. |
 | `templates/.cargo/config.toml` | target = xtensa-esp32s3-espidf, MCU=esp32s3 |
 | `templates/sdkconfig.defaults` | 8 MB flash, octal PSRAM, NimBLE, FATFS LFN, USB-Serial-JTAG console |
 | `templates/partitions.csv` | identical to the DevKitC layout (both carriers have 8 MB flash) — two OTA slots × 3 MB + 1.875 MB FAT storage |
@@ -93,7 +93,7 @@ See [`board.toml`](board.toml) `[notes].gotchas`. The XIAO-specific ones:
 - **Cell solders directly to BAT+/BAT−** — there's no connector. Hot-swap during a session means de-soldering, so the workflow is "charge over USB-C while bench-debugging, run from cell in the field".
 - **No over-discharge protection** on-board. Use a protected 18650 cell, or disconnect when idle.
 - **FSM status LED is the on-board mono yellow on GPIO21** (LEDC PWM). The FSM does NOT surface colour on this carrier — states distinguished by blink rate, matching the dfr1117 pattern. No external WS2812 module required.
-- **Template lag (2026-05-31):** synced `templates/Cargo.toml.tera` still declares the old `ws2812-esp32-rmt-driver` dep because r2-workshop's xiao firmware hasn't yet caught up to this design. The Compiler sentant must reconcile.
+- **Template lag (2026-05-31):** synced `templates/Cargo.toml.tera` still declares the old `ws2812-esp32-rmt-driver` dep because r2-workshop's xiao firmware hasn't yet caught up to this design. The compiler plugin must reconcile.
 - **XIAO Plus is a different SKU** (16 MB flash, more GPIOs) — would be a separate board entry, sdkconfig differs.
 
 ## Authoring history

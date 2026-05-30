@@ -21,17 +21,24 @@ orchestrator/
 ├── src/
 │   ├── main.rs                 # axum WSS + static serve + R2 hive setup
 │   ├── hive.rs                 # TG membership, sentant registration
-│   ├── claude_code.rs          # claude -p subprocess driver, stream-json parsing
-│   ├── plugins/
-│   │   ├── cargo_runner.rs     # cargo build wrapper
-│   │   ├── git_runner.rs       # for catalogue sync
-│   │   └── webfetch.rs         # datasheet fetcher
-│   └── sentants/
-│       ├── catalogue_server.rs # r2.compiler.catalogue.*
-│       ├── compiler.rs         # r2.compiler.build.* — the central FSM
-│       ├── author_pilot.rs     # r2.compiler.author.* — catalogue authoring
-│       ├── flasher.rs          # r2.compiler.flash.*
-│       └── sync.rs             # tools/sync-catalogue.sh wrapper
+│   ├── plugins/                # plugins do the actual work (subprocess, I/O, network)
+│   │   ├── claude_code.rs      # `claude -p` subprocess driver, stream-json parsing
+│   │   ├── compiler.rs         # materialises per-carrier crate, drives claude-code + cargo, returns artefact
+│   │   ├── cargo_runner.rs     # `cargo build` wrapper
+│   │   ├── flasher.rs          # `esptool write_flash`
+│   │   ├── ota_push.rs         # TCP push to device port 21043
+│   │   ├── webfetch.rs         # datasheet fetcher
+│   │   ├── git_runner.rs       # git wrapper (for sync)
+│   │   ├── sync.rs             # wraps tools/sync-catalogue.sh
+│   │   ├── catalogue.rs        # watches catalogue/ tree on disk
+│   │   └── keyholder.rs        # TG private-key + cert issuance
+│   └── sentants/               # sentants are thin FSMs routing events to plugins
+│       ├── catalogue.rs        # routes r2.compiler.catalogue.*
+│       ├── builder.rs          # per-build FSM; routes r2.compiler.build.*
+│       ├── author.rs           # authoring-session FSM; routes r2.compiler.author.*
+│       ├── deploy.rs           # per-device deploy FSM; routes r2.compiler.deploy.*
+│       ├── sync.rs             # routes r2.compiler.sync.*
+│       └── tg.rs               # TG management; routes r2.compiler.tg.*
 └── prompts/
     ├── compile.md              # Tera template — the build brief for claude -p
     ├── author-board.md

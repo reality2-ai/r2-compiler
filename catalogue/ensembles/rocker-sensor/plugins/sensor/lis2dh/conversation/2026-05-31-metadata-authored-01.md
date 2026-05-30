@@ -27,7 +27,7 @@ Roy directed (2026-05-31): "1.4. Something to consider also, how might we do a s
 ## Open items
 
 - Source extraction (Phase 1.4-source). The reference `r2-workshop/firmware/esp32-c6/dfr1117/src/lis2dh.rs` already works on real hardware; the extraction is a refactor not a rewrite.
-- Datasheet PDFs — to fetch via AuthorPilot WebFetch when that exists.
+- Datasheet PDFs — to fetch via the authoring-flow WebFetch when that exists.
 - Capability-peer plugin (`adxl355`) — same metadata pattern, deferred for now since one worked example is enough to validate the layout.
 
 ## Next session

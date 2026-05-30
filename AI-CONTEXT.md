@@ -15,10 +15,10 @@ The compile work is delegated to Claude Code (`claude -p '<brief>' --output-form
 ```
 Browser tab (WASM R2 hive)                       Workstation (Rust orchestrator hive)
 ─────────────────────────                        ───────────────────────────────────
-catalogue browser                  R2-WIRE       Compiler sentant
-visual canvas (drag-and-drop)   ─── over ────►   Author sentant     ──► claude -p ...
-source viewer (Rust read-only)    WSS            Flasher sentant    ──► esptool ...
-score-preview pane                               Sync sentant       ──► git pull r2-core
+catalogue browser                  R2-WIRE       compiler plugin
+visual canvas (drag-and-drop)   ─── over ────►   claude-code plugin ──► claude -p ...
+source viewer (Rust read-only)    WSS            flasher plugin    ──► esptool ...
+score-preview pane                               sync plugin       ──► git pull r2-core
 build-progress console
                                                  Hosts: catalogue/, scores/, crates/, out/
 ```

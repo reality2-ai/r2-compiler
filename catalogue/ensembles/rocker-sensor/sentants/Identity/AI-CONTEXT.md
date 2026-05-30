@@ -32,7 +32,7 @@ Full FSM diagram in [`SENTANT.md`](SENTANT.md) §"FSM".
 | `nvs` | `../../plugins/storage/nvs/` (ensemble-owned) | ⏳ not yet scaffolded |
 | `software-ed25519` | `crates/r2-plugin-crypto-software-ed25519/` (core, always linked) | ✅ vendored |
 
-When the orchestrator's `CatalogueServer` validates this sentant per SPEC-CATALOGUE-LAYOUT §4.4 `E_SENT_PLUGIN_UNRESOLVED`, the `nvs` reference will be unresolved until the storage/nvs plugin entry is authored. That's a Phase 1.4-metadata follow-up.
+When the orchestrator's `catalogue plugin` validates this sentant per SPEC-CATALOGUE-LAYOUT §4.4 `E_SENT_PLUGIN_UNRESOLVED`, the `nvs` reference will be unresolved until the storage/nvs plugin entry is authored. That's a Phase 1.4-metadata follow-up.
 
 ## Events emitted / consumed
 
@@ -60,7 +60,7 @@ None of these are scaffolded yet (Phase 1.4-metadata for them is pending). The c
 
 ## Working reference
 
-`r2-workshop/firmware/esp32-c6/dfr1117/src/identity.rs` — the canonical implementation. The Compiler sentant's job (Phase 1.7+) is to reproduce this file's behaviour from `sentant.yaml`. When extracting:
+`r2-workshop/firmware/esp32-c6/dfr1117/src/identity.rs` — the canonical implementation. The compiler plugin's job (Phase 1.7+) is to reproduce this file's behaviour from `sentant.yaml`. When extracting:
 
 1. The state machine in this YAML maps cleanly to a Rust `enum State { Start, Loading, Generating, Writing, Ready }`.
 2. Each transition becomes a `match (state, event) { ... }` arm.

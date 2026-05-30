@@ -92,19 +92,20 @@ Both hives are **members of the operator's trust group**. The webapp obtains its
 | `Builder` | On operator "Compile", emits `r2.compiler.build.start{score, target}` and consumes `r2.compiler.build.*` progress events. | Yes |
 | `Author` | On operator "+ New Board/Plugin/Sentant", emits `r2.compiler.author.start{kind, description}` and surfaces the resulting agent dialog in the UI. | Yes |
 
-**orchestrator-hive** SHALL perform at least the following sentants:
+**orchestrator-hive** SHALL perform at least the following sentants. These are thin event-routers; **the actual work happens in plugins** (§3.3) — sentants here are FSMs that receive events, dispatch to a plugin, and emit result events. See `[[feedback-sentants-vs-plugins-terminology]]` in memory for the discipline.
 
 | Sentant | Purpose |
 |---|---|
-| `CatalogueServer` | Watches the `catalogue/` tree on disk; emits `r2.compiler.catalogue.entry` events on demand and on file-system change. |
-| `Compiler` | Owns the build FSM (`idle → preparing → generating → compiling → done|error`). On `r2.compiler.build.start`, materialises the per-carrier crate, invokes `claude -p`, runs `cargo build`, streams progress. |
-| `AuthorPilot` | Owns the catalogue-authoring FSM. On `r2.compiler.author.start`, opens a Claude Code session scoped to the target catalogue directory and forwards prompts/responses between the operator (via the UI) and the agent. |
-| `Flasher` | On `r2.compiler.flash.start`, runs `esptool` against the built artefact (NEVER `espflash` — see R2-BUILD §5.1). Optional; not part of v0.1's success gate. |
-| `Sync` | Pulls upstream `r2-core/plugins/` and `r2-workshop/ensemble/` into the local catalogue. Manual-invocation only in v0.1; CI-driven in later versions. |
+| `Catalogue` | Routes `r2.compiler.catalogue.*` events; tracks loaded entries. The actual filesystem watching is the `catalogue` plugin (§3.3). |
+| `Builder` | Owns the per-build FSM (`idle → preparing → generating → compiling → done|error`). On `r2.compiler.build.start`, dispatches to the `compiler` plugin and emits progress events as the plugin reports them. |
+| `Author` | Owns the catalogue-authoring session FSM. On `r2.compiler.author.start`, dispatches to the `claude-code` plugin scoped to the target catalogue directory; routes prompts/replies between the plugin and the UI. |
+| `Deploy` | On `r2.compiler.deploy.start`, dispatches to the `flasher` plugin (USB) or the OTA-push variant of the `claude-code` / direct-TCP path. Tracks per-device deploy state per §12. |
+| `Sync` | On `r2.compiler.sync.start`, dispatches to the `sync` plugin (which wraps `tools/sync-catalogue.sh`). |
+| `Tg` | Routes `r2.compiler.tg.*` events; dispatches to the `keyholder` plugin for issuing/revoking certs per §11. |
 
 ### 3.3 Plugins (per hive)
 
-Plugins are ensemble-owned (R2-ENSEMBLE §2.1.2) unless noted otherwise.
+**The plugins do the actual work.** Per R2-PLUGIN §1, plugins are "anything that runs on a hive and provides capabilities" — subprocess management, network I/O, file I/O, hardware drivers. They're invoked by the sentants in §3.2.
 
 **webapp-hive:**
 
@@ -117,10 +118,16 @@ Plugins are ensemble-owned (R2-ENSEMBLE §2.1.2) unless noted otherwise.
 
 | Plugin | Purpose |
 |---|---|
-| `claude-code` | Subprocess driver for `claude -p '<brief>' --output-format=stream-json`. Translates between R2 events and JSON-lines on stdin/stdout. Reuses existing local `claude` CLI auth. |
-| `cargo-runner` | Shells out to `cargo build --target <triple> --release`. Parses output, surfaces diagnostics as events. |
-| `git-runner` | Used by `Sync` for upstream pulls. |
-| `webfetch` | Used by `AuthorPilot` to retrieve datasheets when authoring new catalogue entries. Maps to Claude Code's existing WebFetch tool. |
+| `compiler` | Materialises the per-carrier crate from the score, invokes `claude -p` (via the `claude-code` plugin) to fill in generated code, runs `cargo build`, parses output, returns the artefact path. The plugin that the `Builder` sentant calls. |
+| `claude-code` | Subprocess driver for `claude -p '<brief>' --output-format=stream-json`. Translates between R2 events and JSON-lines on stdin/stdout. Reuses existing local `claude` CLI auth. Used by both `compiler` (for build code-gen) and `Author` sentant (for catalogue authoring). |
+| `cargo-runner` | Shells out to `cargo build --target <triple> --release`. Parses output, surfaces diagnostics. Used by `compiler`. |
+| `flasher` | Runs `esptool` (NEVER `espflash` — see R2-BUILD §5.1) to write firmware to a USB-connected device. Used by `Deploy` sentant. |
+| `ota-push` | TCP push to a device's OTA receiver on port 21043 (R2-DEPLOY). Used by `Deploy` sentant. |
+| `webfetch` | Retrieves datasheets / vendor docs from the web during catalogue authoring. Used by the `Author` sentant via `claude-code`. Maps to Claude Code's existing WebFetch tool. |
+| `git-runner` | Subprocess wrapper around `git`. Used by `sync`. |
+| `sync` | Wraps `tools/sync-catalogue.sh`. Vendors upstream crates and refreshes catalogue templates. Used by `Sync` sentant. |
+| `catalogue` | Watches the `catalogue/` tree on disk and serves entry-listing queries. Used by `Catalogue` sentant. |
+| `keyholder` | Holds the TG private key, issues `DeviceCertificate`s, manages revocation lists. Used by `Tg` sentant per §11. KeyHolder material lives off-tree per §8. |
 | **R2-WEB (hive-shared singleton)** | Serves the webapp bundle + the `/r2` WS endpoint. Same R2-WEB instance as the rest of the hive. |
 
 ### 3.4 Registrations with hive-shared singletons
@@ -233,14 +240,14 @@ The tool conforms to v0.1 when, for each of the three target carriers below, giv
 
 ## 7. Catalogue authoring (`r2.compiler.author.*` flow)
 
-The authoring flow is the central feature of r2-compiler beyond static composition. Detailed in [`SPEC-CATALOGUE-LAYOUT.md`](SPEC-CATALOGUE-LAYOUT.md) §6. Summary of the normative obligations on the orchestrator's `AuthorPilot` sentant:
+The authoring flow is the central feature of r2-compiler beyond static composition. Detailed in [`SPEC-CATALOGUE-LAYOUT.md`](SPEC-CATALOGUE-LAYOUT.md) §6. Summary of the normative obligations on the orchestrator's `Author` sentant + the `claude-code` plugin it dispatches to:
 
-1. On `r2.compiler.author.start`, AuthorPilot SHALL open a fresh `claude -p` session with the catalogue directory as the working directory.
+1. On `r2.compiler.author.start`, the Author sentant SHALL dispatch to the `claude-code` plugin to open a fresh `claude -p` session with the catalogue directory as the working directory.
 2. The agent SHALL ask clarifying questions through `r2.compiler.author.prompt` events; the operator's replies arrive via `r2.compiler.author.reply`.
 3. The agent SHALL fetch any referenced datasheets via WebFetch and save them under the entry's `datasheets/` directory before referencing them.
 4. The agent SHALL produce, at minimum, the five artefacts required by PROCESS.md §4 (canonical artefact, narrative markdown, AI-CONTEXT.md, datasheets, conversation transcript).
 5. The agent SHALL validate the produced canonical artefact against its upstream spec (R2-PLUGIN §12.3 for `plugin.toml`, R2-DEF §2 for `sentant.yaml`, this spec §3.1 for `board.toml`) BEFORE emitting `r2.compiler.author.done`.
-6. AuthorPilot SHALL emit `r2.compiler.author.error` if validation fails AND remove the partial entry directory — the catalogue MUST NOT contain half-authored entries.
+6. The Author sentant SHALL emit `r2.compiler.author.error` if validation fails AND remove the partial entry directory — the catalogue MUST NOT contain half-authored entries.
 
 ---
 
@@ -309,7 +316,7 @@ OTA-receiver-on-device is **compulsory** per §12.1 below — every build for an
 
 ### 12.1 Compulsory plugins
 
-Per [[project-compulsory-plugins-and-virgin-boards]], some capabilities are non-negotiable for any deployable build. Each `board.toml` carries a `[compulsory_plugins]` table (see `SPEC-CATALOGUE-LAYOUT` §3.2) listing the capabilities that MUST be satisfied at build time. The Compiler sentant's resolve step (§5 step 3) MUST verify each compulsory capability is provided by a plugin in scope. Otherwise the build fails with `E_COMPULSORY_PLUGIN_MISSING`.
+Per [[project-compulsory-plugins-and-virgin-boards]], some capabilities are non-negotiable for any deployable build. Each `board.toml` carries a `[compulsory_plugins]` table (see `SPEC-CATALOGUE-LAYOUT` §3.2) listing the capabilities that MUST be satisfied at build time. The compiler plugin's resolve step (§5 step 3) MUST verify each compulsory capability is provided by a plugin in scope. Otherwise the build fails with `E_COMPULSORY_PLUGIN_MISSING`.
 
 Initial v0.1 compulsory capabilities:
 - `ai.reality2.deploy.ota` — declared per-carrier in each `board.toml`.

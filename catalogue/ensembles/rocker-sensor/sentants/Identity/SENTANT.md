@@ -88,13 +88,13 @@ This sentant is in the R2-COMPILE §3.1 compilable subset:
 - States: enum (zero-cost). 5 states → 3 bits.
 - Vars: fixed-size struct (`[u8; 32]` × 2 + `u32` = 68 B + alignment padding).
 - Action pipeline: each transition compiles to a `match` arm; plugin calls inline as `Plugin::execute(opcode, &data)`.
-- Template expressions: simple substitution + the `fnv32(...)` helper, which the Compiler sentant maps to a call to `r2_fnv::fnv1a_32`.
+- Template expressions: simple substitution + the `fnv32(...)` helper, which the compiler plugin maps to a call to `r2_fnv::fnv1a_32`.
 
-One non-template-expression in `sentant.yaml`: `{{platform.random_seed_32}}`. R2-DEF templates don't natively support platform calls; the Compiler sentant recognises this token and substitutes `esp_random()` (or the platform-appropriate TRNG) at code-gen time. This is a documented extension — see `[[project-compulsory-plugins-and-virgin-boards]]` for the broader pattern of "core capability synthesised by the compiler" (alongside the OTA receiver).
+One non-template-expression in `sentant.yaml`: `{{platform.random_seed_32}}`. R2-DEF templates don't natively support platform calls; the compiler plugin recognises this token and substitutes `esp_random()` (or the platform-appropriate TRNG) at code-gen time. This is a documented extension — see `[[project-compulsory-plugins-and-virgin-boards]]` for the broader pattern of "core capability synthesised by the compiler" (alongside the OTA receiver).
 
 ## Working reference
 
-`r2-workshop/firmware/esp32-c6/dfr1117/src/identity.rs` is the authoritative implementation. The Compiler sentant's first proof of work is reproducing that file's behaviour from this `sentant.yaml`.
+`r2-workshop/firmware/esp32-c6/dfr1117/src/identity.rs` is the authoritative implementation. The compiler plugin's first proof of work is reproducing that file's behaviour from this `sentant.yaml`.
 
 ## Authoring status
 
@@ -103,4 +103,4 @@ One non-template-expression in `sentant.yaml`: `{{platform.random_seed_32}}`. R2
 - ✅ `AI-CONTEXT.md`
 - ⏳ `examples/` — example event sequences for testing
 - ✅ `conversation/2026-05-31-metadata-authored-01.md`
-- ⏳ **R2-DEF §8.1 schema validation** — needs the orchestrator's CatalogueServer (Phase 1.6+) to actually run; this file is asserted-conformant but not machine-verified yet
+- ⏳ **R2-DEF §8.1 schema validation** — needs the orchestrator's catalogue plugin (Phase 1.6+) to actually run; this file is asserted-conformant but not machine-verified yet

@@ -41,7 +41,7 @@ None scaffolded yet under `plugins/`. The carrier's transport singletons (BLE ra
 
 [`templates/`](templates/) holds the per-build seed files. See `BOARD.md` "Templates" section for the table.
 
-The Compiler sentant (Phase 1.5+) renders `Cargo.toml.tera` per-build, substituting the vendored-crate paths. The other files are copied verbatim.
+The compiler plugin (Phase 1.5+) renders `Cargo.toml.tera` per-build, substituting the vendored-crate paths. The other files are copied verbatim.
 
 ## Known gotchas (quick read — full list in `board.toml [notes].gotchas`)
 
@@ -71,7 +71,7 @@ The Compiler sentant (Phase 1.5+) renders `Cargo.toml.tera` per-build, substitut
 - ✅ `templates/` (synced from `r2-workshop/firmware/esp32-c6/dfr1117/`)
 - ✅ `datasheets/HARDWARE-WIRING-DFR1117.md`
 - ⏳ `pinout.svg` — Phase 4 (deferred per `plan/PLAN.md`)
-- ⏳ Vendor PDF datasheets — to fetch via the AuthorPilot WebFetch flow when it exists
+- ⏳ Vendor PDF datasheets — to fetch via the authoring-flow WebFetch when it exists
 - ✅ `conversation/2026-05-31-board-toml-authored-01.md` — this session's transcript (placeholder; will be filled by the design conversation when written)
 
 ---

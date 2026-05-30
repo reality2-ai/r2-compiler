@@ -33,8 +33,8 @@ Every score in this directory MUST be a valid R2-DEF §7 ensemble — name, desc
 Two paths:
 
 - **Through the visual UI** — compose on the canvas, hit Compile, the orchestrator writes the score under `scores/<auto-name>-<timestamp>.yaml` and uses it for the build.
-- **By hand** — author a score in YAML that validates against R2-DEF §7, drop it here. The orchestrator's `CatalogueServer` picks it up immediately. Useful for round-trip vectors and reproducibility.
+- **By hand** — author a score in YAML that validates against R2-DEF §7, drop it here. The orchestrator's catalogue plugin picks it up immediately. Useful for round-trip vectors and reproducibility.
 
 ## Conformance
 
-Scores in this directory MUST pass R2-DEF §7.10 validation. The orchestrator's `Compiler` sentant refuses to build a non-conforming score and emits `r2.compiler.build.error{phase: "preparing"}` instead.
+Scores in this directory MUST pass R2-DEF §7.10 validation. The orchestrator's compiler plugin refuses to build a non-conforming score and emits `r2.compiler.build.error{phase: "preparing"}` instead.

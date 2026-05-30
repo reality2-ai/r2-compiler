@@ -1,25 +1,38 @@
 # Cargo workspace root for r2-compiler.
 #
-# Members will be added as they exist:
-# - crates/* — R2 protocol crates vendored from r2-core (see crates/_SYNC.md)
-# - catalogue/plugins/*/*  — plugin crates (each is a standalone Cargo crate per R2-PLUGIN §12.5)
-# - orchestrator — workstation Rust binary (the workstation R2 hive + Claude Code driver)
-# - webapp/crate — Rust crate compiled to wasm32-unknown-unknown for the browser hive
+# Members:
+# - crates/r2-*                              — protocol crates vendored from r2-core (host-buildable)
+# - crates/r2-plugin-*                       — core plugins vendored from r2-core (always-linked)
+# - catalogue/ensembles/<ens>/plugins/<…>/   — ensemble-owned plugin crates (added one-by-one per Phase 1.4-source)
 #
-# As of 2026-05-31 the workspace is empty — none of these crates exist yet. The
-# scaffolding phase per plan/PLAN.md is complete; Phase 1 will start populating
-# members.
+# Excluded:
+# - crates/r2-wasm                           — wasm32-only; wasm-bindgen + js-sys won't build for host
+# - webapp/crate                             — wasm32-only (when it exists)
+# - orchestrator                             — Rust binary; standalone build once it exists
+#
+# Vendoring policy: see crates/_SYNC.md. Re-run tools/sync-catalogue.sh to refresh.
 
 [workspace]
 resolver = "2"
-members = []
+members = [
+  # Vendored R2 protocol crates (host-buildable).
+  "crates/r2-engine",
+  "crates/r2-fnv",
+  "crates/r2-cbor",
+  "crates/r2-wire",
+  "crates/r2-trust",
+  "crates/r2-route",
+  "crates/r2-def",
+  "crates/r2-dispatch",
+  "crates/r2-ensemble",
+  # Vendored core plugins (always-linked into every build).
+  "crates/r2-plugin-crypto-software-ed25519",
+  # Ensemble-owned plugin crates inside the catalogue. Added per Phase 1.4-source.
+  "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh",
+]
 exclude = [
-  # Catalogue plugin crates compile only with their own (aot|nif) feature set
-  # and may target no_std / specific MCU triples; they MUST NOT be built as
-  # part of the host workspace by default.
-  "catalogue/plugins/*/*",
-  # The webapp crate is wasm32-only.
-  "webapp/crate",
+  # wasm32-only.
+  "crates/r2-wasm",
 ]
 
 [workspace.package]
@@ -29,4 +42,18 @@ repository    = "https://github.com/reality2-ai/r2-compiler"
 rust-version  = "1.75"
 
 [workspace.dependencies]
-# Pinned versions go here once the first crate lands. Intentionally empty for v0.0.
+# Vendored R2 protocol crates (paths into ./crates/) — declared here so that
+# vendored crate manifests using `workspace = true` for their internal deps
+# inherit through this table instead of breaking.
+r2-engine    = { path = "crates/r2-engine", default-features = false }
+r2-fnv       = { path = "crates/r2-fnv", default-features = false }
+r2-cbor      = { path = "crates/r2-cbor", default-features = false }
+r2-wire      = { path = "crates/r2-wire", default-features = false }
+r2-trust     = { path = "crates/r2-trust", default-features = false }
+r2-route     = { path = "crates/r2-route", default-features = false }
+r2-def       = { path = "crates/r2-def", default-features = false }
+r2-dispatch  = { path = "crates/r2-dispatch", default-features = false }
+r2-ensemble  = { path = "crates/r2-ensemble", default-features = false }
+# Embedded HAL 1.0 — abstract I²C/SPI/GPIO traits that hardware-driver
+# plugins target so the plugin crate stays portable across platform HALs.
+embedded-hal = { version = "1.0", default-features = false }
