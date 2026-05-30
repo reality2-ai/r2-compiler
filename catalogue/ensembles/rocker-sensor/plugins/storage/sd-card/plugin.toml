@@ -1,0 +1,48 @@
+[plugin]
+name        = "sd-card"
+category    = "storage"
+version     = "0.1.0"
+description = "FATFS-mounted microSD card on a shared SPI bus, plus the 20-byte fixed-record acceleration ring (r2-workshop CAPTURE §6). Provides durable sample storage + capture-file management + boot recovery (replay-on-reconnect). Two-CS sharing with the accel plugin: only one chip-select is asserted per transaction."
+
+[modes]
+aot = { targets = ["esp32-s3"], no_std = true }
+nif = false
+web = false
+
+[commands]
+init        = 0x01
+ring_push   = 0x02  # append a 20-byte record to the acceleration ring
+ring_pop    = 0x03  # consume + free up to N records (after cumulative ack)
+file_open   = 0x04
+file_write  = 0x05
+file_close  = 0x06
+file_list   = 0x07
+file_get    = 0x08
+file_delete = 0x09
+sync        = 0x0A  # fsync the FATFS
+
+[capabilities]
+provides = [
+    "ai.reality2.workshop.cap.sd-ring",
+    "r2.hw.storage.fatfs",
+]
+requires = [
+    "r2.hw.sdspi",
+]
+
+[events]
+handled = [
+    "r2.hw.sd.init",
+    "r2.hw.sd.ring.push",
+    "r2.hw.sd.ring.pop",
+    "r2.hw.sd.file.open",
+    "r2.hw.sd.file.write",
+    "r2.hw.sd.file.close",
+    "r2.hw.sd.file.list",
+    "r2.hw.sd.file.get",
+    "r2.hw.sd.file.delete",
+    "r2.hw.sd.sync",
+]
+emitted = ["storage/sd-card"]
+
+[credentials]

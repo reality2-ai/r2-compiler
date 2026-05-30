@@ -1,0 +1,42 @@
+sentant:
+  name: Reset
+  class: ai.reality2.workshop.sensor.reset
+  description: >
+    Handles remote-reset requests. Two paths: r2.dash.reset over R2-WIRE
+    (preferred), or a TCP byte 0x52 to port 21044 via the reset-tcp plugin
+    (fallback when R2-WIRE is silent). Both lead to esp_restart() after
+    a brief LED blink to signal pending reboot.
+  storage: ephemeral
+  plugins:
+    - name: reset-tcp
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: armed
+          actions:
+            - plugin: reset-tcp
+              command: listen
+
+        - from: "*"
+          event: r2.dash.reset
+          actions:
+            - command: send
+              parameters: { event: set_status_state, state: "Boot" }
+            - command: debug
+              parameters: { message: "Remote reset requested" }
+            - command: send
+              parameters: { event: reboot_now, delay: 500 }
+
+        - from: "*"
+          event: comms/reset-tcp
+          actions:
+            - command: send
+              parameters: { event: r2.dash.reset, delay: 0 }
+
+        - from: "*"
+          event: reboot_now
+          actions:
+            - command: debug
+              parameters: { message: "{{platform.esp_restart()}}" }   # platform extension — calls esp_restart()

@@ -1,0 +1,45 @@
+sentant:
+  name: Ota
+  class: ai.reality2.workshop.sensor.ota
+  description: >
+    Owns the OTA update flow. Subscribes r2.dash.fw.update; delegates
+    to the core ota-tcp plugin (port 21043). On successful image swap,
+    sets status to Ota (LED → white strobe) until reboot. The
+    mark_app_valid step is the responsibility of the Uplink sentant
+    (after the first frame round-trips post-reboot — SENSOR §12.2).
+  storage: ephemeral
+  plugins:
+    - name: ota-tcp     # CORE (crates/r2-plugin-comms-ota-tcp)
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: idle
+          actions:
+            - plugin: ota-tcp
+              command: init
+
+        - from: idle
+          event: r2.dash.fw.update
+          to: receiving
+          actions:
+            - command: send
+              parameters: { event: set_status_state, state: "Ota" }
+            - plugin: ota-tcp
+              command: start
+
+        - from: receiving
+          event: comms/ota-tcp
+          actions:
+            - command: test
+              parameters:
+                condition: "{{params.data.phase}} == 'reboot'"
+                true:
+                  - command: debug
+                    parameters: { message: "OTA complete — rebooting in 1 s" }
+                  - command: send
+                    parameters: { event: r2.dash.reset, delay: 1000 }
+                false:
+                  - command: send
+                    parameters: { event: r2.dash.fw.progress, phase: "{{params.data.phase}}", bytes: "{{params.data.bytes_written | default(0)}}" }

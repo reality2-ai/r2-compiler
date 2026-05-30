@@ -1,0 +1,75 @@
+sentant:
+  name: WifiProv
+  class: ai.reality2.workshop.sensor.wifi-prov
+  description: >
+    One-shot at boot. Reads WiFi credentials from NVS (set by Bootstrap)
+    or wifi_config.toml (dev fallback) and drives the WiFi STA singleton
+    to associate. On failure (no creds, or association timeout), yields
+    to Bootstrap (sets LED to Advertising and starts BLE listening).
+  storage: durable
+  plugins:
+    - name: nvs
+    - name: led
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: reading_nvs
+          actions:
+            - plugin: nvs
+              command: read
+              parameters: { key: wifi_ssid }
+
+        - from: reading_nvs
+          event: nvs
+          actions:
+            - command: test
+              parameters:
+                condition: "{{params.status}} == 'ok' and {{params.data}} != null"
+                true:
+                  - command: set
+                    parameters: { key: ssid, value: "{{params.data.value}}" }
+                  - command: send
+                    parameters: { event: read_psk }
+                false:
+                  - command: send
+                    parameters: { event: no_creds }
+
+        - from: reading_nvs
+          event: read_psk
+          to: associating
+          actions:
+            - plugin: nvs
+              command: read
+              parameters: { key: wifi_psk }
+
+        - from: associating
+          event: nvs
+          actions:
+            - command: set
+              parameters: { key: psk, value: "{{params.data.value}}" }
+            # Platform extension — call esp_wifi_connect with creds.
+            - command: test
+              parameters:
+                condition: "{{platform.wifi_associate(vars.ssid, vars.psk, timeout_ms=20000)}}"
+                true:
+                  - plugin: led
+                    command: set_state
+                    parameters: { state: "Streaming" }
+                  - command: send
+                    parameters: { event: associated, public: true }
+                false:
+                  - command: send
+                    parameters: { event: no_creds }
+
+        # Creds missing or association failed — flip to Bootstrap mode.
+        - from: "*"
+          event: no_creds
+          to: yielded_to_bootstrap
+          actions:
+            - plugin: led
+              command: set_state
+              parameters: { state: "Advertising" }
+            - command: debug
+              parameters: { message: "WifiProv yielding to Bootstrap" }

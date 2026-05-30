@@ -1,0 +1,38 @@
+sentant:
+  name: Beacon
+  class: ai.reality2.workshop.sensor.beacon
+  description: >
+    Drives the BLE R2-BEACON advertiser. Starts after Identity reaches
+    ready (rbid populated); calls `ble-beacon` plugin to emit the 28-byte
+    legacy AD with class hash + RBID + state. Updates the AD on power-state
+    changes (low battery, OTA in progress).
+  storage: ephemeral
+  plugins:
+    - name: ble-beacon
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: identity         # emitted by Identity sentant once ready
+          to: advertising
+          actions:
+            - plugin: ble-beacon
+              command: start
+              parameters:
+                class_hash: "{{params.class_hash}}"
+                rbid: "{{params.rbid}}"
+
+        - from: advertising
+          event: power_state_changed
+          actions:
+            - plugin: ble-beacon
+              command: update
+              parameters:
+                power_state: "{{params.power_state}}"
+
+        - from: advertising
+          event: stop
+          to: stopped
+          actions:
+            - plugin: ble-beacon
+              command: stop

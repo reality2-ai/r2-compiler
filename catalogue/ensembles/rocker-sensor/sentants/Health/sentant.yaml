@@ -1,0 +1,43 @@
+sentant:
+  name: Health
+  class: ai.reality2.workshop.sensor.health
+  description: >
+    Watches for a stuck data source per SPEC-R2-WORKSHOP-SENSOR-HEALTH §6.
+    Tracks the last-arrived sample timestamp; if no acceleration arrives
+    for > 2 s while in real-data-source mode, flags data_source="sim" via
+    a set_data_source event (Status sentant catches + propagates).
+  storage: ephemeral
+  data:
+    last_sample_ts: 0
+    expected_period_ms: 10   # 100 Hz default
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: watching
+          actions:
+            - command: send
+              parameters: { event: watchdog_tick, delay: 2000 }
+
+        - from: watching
+          event: r2.sensor.acceleration
+          actions:
+            - command: set
+              parameters: { key: last_sample_ts, value: "{{params.ts_ms}}" }
+
+        - from: watching
+          event: watchdog_tick
+          actions:
+            - command: test
+              parameters:
+                # If we haven't seen a sample in 2 s, the source is stuck.
+                condition: "{{platform.monotonic_ms() - vars.last_sample_ts}} > 2000"
+                true:
+                  - command: send
+                    parameters: { event: set_data_source, source: "sim" }
+                  - command: debug
+                    parameters: { message: "Health: data source stuck — flagging sim" }
+                false: []
+            - command: send
+              parameters: { event: watchdog_tick, delay: 2000 }

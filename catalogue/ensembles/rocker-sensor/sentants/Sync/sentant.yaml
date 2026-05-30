@@ -1,0 +1,32 @@
+sentant:
+  name: Sync
+  class: ai.reality2.workshop.sensor.sync
+  description: >
+    Time-sync per SPEC-R2-WORKSHOP-TIMESYNC §2 (Cristian's algorithm).
+    On r2.dash.sync_pulse, immediately emits r2.sensor.sync_pong. On
+    r2.dash.set_clock_offset, writes the new offset to the clock plugin.
+    Wall-clock accuracy ~5 ms (network-jitter-bound).
+  storage: durable-state
+  plugins:
+    - name: clock
+  automations:
+    - name: main
+      transitions:
+        - from: "*"
+          event: r2.dash.sync_pulse
+          actions:
+            - plugin: clock
+              command: monotonic_ms
+            - command: send
+              parameters:
+                event: r2.sensor.sync_pong
+                public: true
+                pulse_id: "{{params.pulse_id}}"
+                ts_ms_local: "{{params.data.ms}}"
+
+        - from: "*"
+          event: r2.dash.set_clock_offset
+          actions:
+            - plugin: clock
+              command: set_offset
+              parameters: { offset_ms: "{{params.offset_ms}}" }

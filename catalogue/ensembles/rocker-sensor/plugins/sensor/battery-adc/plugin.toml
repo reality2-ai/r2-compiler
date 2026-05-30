@@ -1,0 +1,29 @@
+[plugin]
+name        = "battery-adc"
+category    = "sensor"
+version     = "0.1.0"
+description = "Single-channel ADC reading the LiPo cell voltage through a 100 kΩ/100 kΩ divider. Converts raw ADC counts → millivolts at the cell terminal; consuming sentants compute charge state from voltage curves. ESP32-family ADC1 (ADC2 is unusable while WiFi is active)."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
+nif = false
+web = false
+
+[commands]
+init     = 0x01
+read_mv  = 0x02
+calibrate = 0x03
+
+[capabilities]
+provides = ["ai.reality2.workshop.cap.battery", "r2.hw.adc.battery"]
+requires = ["r2.hw.adc"]
+
+[events]
+handled = [
+    "r2.hw.adc.battery.init",
+    "r2.hw.adc.battery.read",
+    "r2.hw.adc.battery.calibrate",
+]
+emitted = ["sensor/battery-adc"]
+
+[credentials]

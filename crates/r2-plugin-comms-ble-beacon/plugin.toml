@@ -1,0 +1,26 @@
+[plugin]
+name        = "ble-beacon"
+category    = "comms"
+version     = "0.1.0"
+description = "R2-BEACON legacy-mode BLE advertiser. Encodes a 28-byte AD payload (class hash + RBID + power state + provisioning flag) per R2-BEACON spec. Used by every sensor to broadcast its identity for the controller's BLE-scan-driven bootstrap loop."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }   # NimBLE host stack via esp_idf
+nif = false
+web = false
+
+[commands]
+init    = 0x01
+start   = 0x02
+stop    = 0x03
+update  = 0x04   # refresh the AD payload (e.g. on provisioning state change)
+
+[capabilities]
+provides = ["ai.reality2.cap.beacon.advertise"]
+requires = ["r2.hw.ble"]
+
+[events]
+handled = ["r2.beacon.start", "r2.beacon.stop", "r2.beacon.update"]
+emitted = ["comms/ble-beacon"]
+
+[credentials]

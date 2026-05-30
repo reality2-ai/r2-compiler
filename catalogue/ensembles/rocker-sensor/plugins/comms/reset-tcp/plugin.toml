@@ -1,0 +1,24 @@
+[plugin]
+name        = "reset-tcp"
+category    = "comms"
+version     = "0.1.0"
+description = "TCP listener on port 21044 accepting a single CMD_RESET byte (0x52). On receipt, calls esp_restart(). Implements SPEC-R2-WORKSHOP-SENSOR-REMOTE-RESET; used by the dashboard's `r2.dash.cmd.reset` flow."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }
+nif = false
+web = false
+
+[commands]
+init   = 0x01
+listen = 0x02   # idempotent start
+
+[capabilities]
+provides = ["ai.reality2.workshop.cap.reset-tcp"]
+requires = ["r2.net.tcp"]
+
+[events]
+handled = ["r2.dash.reset"]
+emitted = ["comms/reset-tcp"]
+
+[credentials]

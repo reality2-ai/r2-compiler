@@ -1,0 +1,70 @@
+sentant:
+  name: Uplink
+  class: ai.reality2.workshop.sensor.uplink
+  description: >
+    Single TCP session to the controller (port 21042). Sends the
+    announce frame on connect (with cert + device_pk + class_hash),
+    then forwards subscribed events as R2-WIRE compact frames.
+    Reconnects with exponential backoff.
+  storage: ephemeral
+  plugins:
+    - name: led
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: associated         # from WifiProv
+          to: connecting
+          actions:
+            - command: test
+              parameters:
+                condition: "{{platform.tcp_connect('192.168.4.1', 21042, timeout_ms=5000)}}"
+                true:
+                  - command: send
+                    parameters: { event: send_announce }
+                false:
+                  - command: send
+                    parameters: { event: reconnect_after, delay: 2000 }
+
+        - from: connecting
+          event: send_announce
+          to: streaming
+          actions:
+            - plugin: led
+              command: set_state
+              parameters: { state: "Streaming" }
+            # Build + send the r2.sensor.announce compact frame.
+            # The compiler synthesises this at code-gen using the hive context's
+            # device_pk + rbid + class_hash, signed with device_sk.
+            - command: send
+              parameters:
+                event: r2.sensor.announce
+                public: true
+
+        - from: streaming
+          event: r2.sensor.acceleration
+          actions:
+            # Forward sample over the TCP socket as an R2-WIRE compact frame.
+            - command: test
+              parameters:
+                condition: "{{platform.tcp_send_compact_frame(params)}}"
+                true: []
+                false:
+                  - command: send
+                    parameters: { event: link_lost }
+
+        - from: streaming
+          event: link_lost
+          to: connecting
+          actions:
+            - plugin: led
+              command: set_state
+              parameters: { state: "Advertising" }      # downgrade indicator
+            - command: send
+              parameters: { event: reconnect_after, delay: 2000 }
+
+        - from: "*"
+          event: reconnect_after
+          actions:
+            - command: send
+              parameters: { event: associated, delay: 0 }

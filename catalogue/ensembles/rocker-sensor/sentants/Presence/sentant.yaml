@@ -1,0 +1,41 @@
+sentant:
+  name: Presence
+  class: ai.reality2.workshop.sensor.presence
+  description: >
+    One-shot at boot: 5× UDP broadcast to 255.255.255.255:21044 carrying
+    {rbid, ip}. Drives the controller's RBID-based bootstrap reconciliation —
+    after a sensor reboot, the controller knows the device's new IP within
+    a few hundred ms without waiting for the next BLE scan cycle.
+  storage: ephemeral
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: associated     # from WifiProv
+          to: announcing
+          actions:
+            - command: set
+              parameters: { key: count, value: 0 }
+            - command: send
+              parameters: { event: tick, delay: 0 }
+
+        - from: announcing
+          event: tick
+          actions:
+            - command: debug
+              parameters: { message: "{{platform.udp_broadcast(255.255.255.255:21044, vars.rbid, vars.ip)}}" }
+            - command: set
+              parameters: { key: count, value: "{{vars.count + 1}}" }
+            - command: test
+              parameters:
+                condition: "{{vars.count}} < 5"
+                true:
+                  - command: send
+                    parameters: { event: tick, delay: 200 }
+                false:
+                  - command: send
+                    parameters: { event: done }
+
+        - from: announcing
+          event: done
+          to: idle

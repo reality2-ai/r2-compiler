@@ -1,0 +1,40 @@
+[plugin]
+name        = "nvs"
+category    = "storage"
+version     = "0.1.0"
+description = "ESP-IDF NVS (Non-Volatile Storage) key/value store. Holds WiFi credentials, the persistent RBID, the device Ed25519 keypair, the clock offset, and the last-acked sequence number — anything that must survive reboot but is too small for SD. Single 24 KB partition slot on the ESP32 internal flash."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
+nif = false
+web = false
+
+[commands]
+init   = 0x01
+read   = 0x02   # key → value
+write  = 0x03   # key + value
+erase  = 0x04   # key
+list   = 0x05   # all keys with prefix
+commit = 0x06   # flush
+
+[capabilities]
+provides = [
+    "ai.reality2.workshop.cap.nvs",
+    "r2.hw.storage.kv",
+]
+requires = [
+    "r2.hw.flash",
+]
+
+[events]
+handled = [
+    "r2.hw.nvs.init",
+    "r2.hw.nvs.read",
+    "r2.hw.nvs.write",
+    "r2.hw.nvs.erase",
+    "r2.hw.nvs.list",
+    "r2.hw.nvs.commit",
+]
+emitted = ["storage/nvs"]
+
+[credentials]

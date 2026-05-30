@@ -1,0 +1,110 @@
+sentant:
+  name: Capture
+  class: ai.reality2.workshop.sensor.capture
+  description: >
+    Owns the Idle / Calibrating / Recording state machine per
+    SPEC-R2-WORKSHOP-CAPTURE §2. On r2.dash.capture.start, opens a
+    named capture file on the SD card and starts duplicating every
+    r2.sensor.acceleration to it. On r2.dash.capture.stop, closes the
+    file. Event marks (r2.dash.capture.event_mark) are written to a
+    sidecar file (§7.5). Calibration samples (r2.dash.cal.sample.req)
+    handled in the Calibrating state.
+  storage: durable-state
+  data:
+    state: "idle"
+    current_capture_file: null
+    capture_handle: null
+  plugins:
+    - name: sd-card
+    - name: clock
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: idle
+
+        - from: idle
+          event: r2.dash.capture.start
+          to: recording
+          actions:
+            - plugin: clock
+              command: now_ms
+            # ts16 + dash-name filename — synthesised at compile time via platform helper
+            - plugin: sd-card
+              command: file_open
+              parameters:
+                name: "{{platform.capture_filename(params.session_name)}}"
+                mode: "w"
+            - command: send
+              parameters: { event: set_status_state, state: "Recording" }
+
+        - from: recording
+          event: storage/sd-card
+          actions:
+            # Captures the file_open result — store the handle.
+            - command: test
+              parameters:
+                condition: "{{params.data.handle}} != null"
+                true:
+                  - command: set
+                    parameters: { key: capture_handle, value: "{{params.data.handle}}" }
+
+        - from: recording
+          event: r2.sensor.acceleration
+          actions:
+            - plugin: sd-card
+              command: file_write
+              parameters:
+                handle: "{{vars.capture_handle}}"
+                data: "{{platform.csv_line(params)}}"
+
+        - from: recording
+          event: r2.dash.capture.event_mark
+          actions:
+            # Sidecar event-mark per §7.5
+            - plugin: sd-card
+              command: file_write
+              parameters:
+                handle: "{{vars.capture_handle}}"
+                data: "{{platform.event_mark_csv(params)}}"
+
+        - from: recording
+          event: r2.dash.capture.stop
+          to: idle
+          actions:
+            - plugin: sd-card
+              command: file_close
+              parameters: { handle: "{{vars.capture_handle}}" }
+            - command: set
+              parameters: { key: capture_handle }
+            - command: send
+              parameters: { event: set_status_state, state: "Streaming" }
+
+        # Calibration: a short Calibrating sub-state for two-position rest method.
+        - from: idle
+          event: r2.dash.cal.sample.req
+          to: calibrating
+          actions:
+            - command: send
+              parameters: { event: set_status_state, state: "Calibrating" }
+
+        - from: calibrating
+          event: r2.sensor.acceleration
+          actions:
+            - command: send
+              parameters:
+                event: r2.sensor.cal.sample.resp
+                public: true
+                x: "{{params.x}}"
+                y: "{{params.y}}"
+                z: "{{params.z}}"
+            - command: send
+              parameters: { event: cal_done, delay: 0 }
+
+        - from: calibrating
+          event: cal_done
+          to: idle
+          actions:
+            - command: send
+              parameters: { event: set_status_state, state: "Streaming" }

@@ -1,0 +1,26 @@
+[plugin]
+name        = "led"
+category    = "indicator"   # NEW category claim — see [[feedback-plugin-category-claims]] in memory
+version     = "0.1.0"
+description = "Status LED driver — abstracts over WS2812 (RMT-driven RGB on devkitc) and mono LEDC PWM (xiao GPIO21 + dfr1117 GPIO15). The plugin exposes a small FSM-state-to-colour-or-blink mapping; the consuming Status sentant calls set_state(<state>) and the plugin handles the per-carrier rendering."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }
+nif = false
+web = false
+
+[commands]
+init      = 0x01
+set_state = 0x02   # one of: Boot, Advertising, ConnectingWifi, Calibrating, Streaming, CatchingUp, LowBattery, Error, Ota
+set_color = 0x03   # raw RGB override (advanced)
+off       = 0x04
+
+[capabilities]
+provides = ["ai.reality2.workshop.cap.status-led"]
+requires = ["r2.hw.gpio"]  # plus r2.hw.rmt OR r2.hw.ledc depending on carrier — resolved at compile time
+
+[events]
+handled = ["r2.led.set_state", "r2.led.set_color", "r2.led.off"]
+emitted = ["indicator/led"]
+
+[credentials]

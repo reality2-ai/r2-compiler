@@ -1,0 +1,73 @@
+sentant:
+  name: Bootstrap
+  class: ai.reality2.workshop.sensor.bootstrap
+  description: >
+    Owns the BLE L2CAP `#wifi_offer` reception. On a valid TG-signed offer,
+    decodes the FrameHeader byte (R2-WIRE) + compact frame, verifies the
+    TG signature using the baked-in TG public key, persists WiFi creds to
+    NVS, receives the KeyHolder-signed DeviceCertificate, then triggers a
+    reboot to pick up the new credentials. Per R2-BOOTSTRAP §4.
+  storage: ephemeral
+  plugins:
+    - name: ble-l2cap     # core (transient networking)
+    - name: nvs
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: listening
+          actions:
+            - plugin: ble-l2cap
+              command: listen
+
+        # A frame arrived on the L2CAP CoC.
+        - from: listening
+          event: ble-l2cap
+          actions:
+            - command: test
+              parameters:
+                condition: "{{params.event}} == 'frame_received'"
+                true:
+                  # FrameHeader byte at data[0]; compact frame at data[1..]
+                  - command: send
+                    parameters:
+                      event: decode_wifi_offer
+                      raw: "{{params.raw}}"
+                false:
+                  - command: debug
+                    parameters: { message: "L2CAP non-frame event: {{params.event}}" }
+
+        - from: listening
+          event: decode_wifi_offer
+          actions:
+            # Decode + verify TG signature handled by the AOT codegen
+            # for this transition — Roy's `{{platform.*}}` extension pattern.
+            - command: test
+              parameters:
+                condition: "{{platform.verify_tg_signature(params.raw[1:])}}"
+                true:
+                  - plugin: nvs
+                    command: write
+                    parameters: { key: wifi_ssid, value: "{{platform.parse_wifi_offer(params.raw[1:]).ssid}}" }
+                  - plugin: nvs
+                    command: write
+                    parameters: { key: wifi_psk, value: "{{platform.parse_wifi_offer(params.raw[1:]).psk}}" }
+                  - plugin: nvs
+                    command: write
+                    parameters: { key: tg_cert, value: "{{platform.parse_wifi_offer(params.raw[1:]).cert}}" }
+                  - plugin: nvs
+                    command: commit
+                  - command: send
+                    parameters: { event: bootstrap_complete }
+                false:
+                  - command: debug
+                    parameters: { message: "TG signature verification FAILED — ignoring offer" }
+
+        - from: listening
+          event: bootstrap_complete
+          to: done
+          actions:
+            # Trigger a clean reboot so WifiProv re-runs at boot
+            - command: send
+              parameters: { event: r2.dash.reset }    # routed to Reset sentant

@@ -1,0 +1,110 @@
+# Accelerometer sentant — THE domain sentant of rocker-sensor.
+# Reads triaxial acceleration via the capability-bound sensing plugin
+# (adxl355 OR lis2dh; resolved by board.toml + carrier), stamps each
+# sample with clock-now-ms, emits onto the bus.
+# Falls back to built-in simulator if the sensing plugin fails to enumerate
+# (SPEC-R2-WORKSHOP-SENSOR-HEALTH). DEPLOYMENT-SPECIFIC — a sibling
+# deployment replaces this sentant with its own domain logic.
+
+sentant:
+  name: Accelerometer
+  class: nz.ac.auckland.rocker.accelerometer
+  description: >
+    Domain sentant. Binds the generic accel.triaxial capability (NOT a
+    specific chip), reads samples at the configured ODR, applies the
+    calibration offset baked into vars, stamps with clock.now_ms, emits
+    r2.sensor.acceleration. The sensing-element swap lever (lis2dh vs
+    adxl355) keeps this sentant chip-agnostic.
+  storage: durable-state
+  data:
+    cal_offset: { x: 0, y: 0, z: 0 }
+    odr_hz: 100
+    data_source: "real"        # toggles to "sim" when sensing plugin fails (SENSOR-HEALTH)
+  plugins:
+    - capability: ai.reality2.cap.accel.triaxial
+    - name: clock
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: configuring
+          actions:
+            - plugin: "@capability:ai.reality2.cap.accel.triaxial"
+              command: init
+              parameters:
+                odr_hz: "{{vars.odr_hz}}"
+                range_g: 2
+
+        - from: configuring
+          event: "@capability:ai.reality2.cap.accel.triaxial"
+          actions:
+            - command: test
+              parameters:
+                condition: "{{params.status}} == 'ok'"
+                true:
+                  - command: set
+                    parameters: { key: data_source, value: "real" }
+                  - command: send
+                    parameters: { event: tick }
+                false:
+                  - command: set
+                    parameters: { key: data_source, value: "sim" }
+                  - command: debug
+                    parameters: { message: "Sensing plugin failed — falling back to simulator" }
+                  - command: send
+                    parameters: { event: tick }
+
+        - from: configuring
+          event: tick
+          to: running
+          actions:
+            - command: send
+              parameters: { event: sample_tick, delay: "{{1000 / vars.odr_hz}}" }
+
+        - from: running
+          event: sample_tick
+          actions:
+            - plugin: "@capability:ai.reality2.cap.accel.triaxial"
+              command: read
+            - command: send
+              parameters: { event: sample_tick, delay: "{{1000 / vars.odr_hz}}" }   # self-tick at ODR
+
+        - from: running
+          event: "@capability:ai.reality2.cap.accel.triaxial"
+          actions:
+            - command: test
+              parameters:
+                condition: "{{params.status}} == 'ok'"
+                true:
+                  - plugin: clock
+                    command: now_ms
+                  - command: set
+                    parameters: { key: x, value: "{{params.data.x - vars.cal_offset.x}}" }
+                  - command: set
+                    parameters: { key: y, value: "{{params.data.y - vars.cal_offset.y}}" }
+                  - command: set
+                    parameters: { key: z, value: "{{params.data.z - vars.cal_offset.z}}" }
+                  # ts_ms set after clock plugin returns — see next transition
+
+        # Receive the clock result, then emit the public acceleration event.
+        - from: running
+          event: clock
+          actions:
+            - command: set
+              parameters: { key: ts_ms, value: "{{params.data.ms}}" }
+            - command: send
+              parameters:
+                event: r2.sensor.acceleration
+                public: true
+                x: "{{vars.x}}"
+                y: "{{vars.y}}"
+                z: "{{vars.z}}"
+                ts_ms: "{{vars.ts_ms}}"
+
+        # Allow operator-driven calibration update (event from the Capture sentant).
+        - from: "*"
+          event: set_calibration
+          actions:
+            - command: set
+              parameters: { key: cal_offset, value: "{{params.offset}}" }

@@ -1,0 +1,47 @@
+# plugin.toml — Analog Devices ADXL355 precision triaxial accelerometer over SPI.
+# Schema: R2-PLUGIN §12.3. Companion: PLUGIN.md (10 sections per §12.8).
+# Authored 2026-05-31 — metadata-first; source extraction pending (Phase 1.4-source).
+
+[plugin]
+name        = "adxl355"
+category    = "sensor"
+version     = "0.1.0"
+description = "Analog Devices ADXL355 precision triaxial MEMS accelerometer over SPI. 20-bit native resolution, low-noise, SHM-grade. r2-workshop's primary sensing element on the ESP32-S3 carriers (DevKitC + XIAO); capability-paired with `lis2dh` (I²C, 10-bit) — same `ai.reality2.cap.accel.triaxial`, different bus + precision, swappable per R2-PLUGIN §10."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6", "linux-embedded"], no_std = true }
+nif = false
+web = false
+
+[commands]
+init        = 0x01
+read        = 0x02
+read_burst  = 0x03
+set_odr     = 0x04
+set_range   = 0x05
+set_offset  = 0x06
+sleep       = 0x07
+
+[capabilities]
+provides = [
+    "ai.reality2.cap.accel.triaxial",
+    "ai.reality2.cap.accel.triaxial.20bit",
+]
+requires = [
+    "r2.hw.spi",
+    # DRDY input (GPIO14 on devkitc, D1 on xiao) — optional; v0.1 polls.
+]
+
+[events]
+handled = [
+    "ai.reality2.cap.accel.init",
+    "ai.reality2.cap.accel.read",
+    "ai.reality2.cap.accel.read-burst",
+    "ai.reality2.cap.accel.set-odr",
+    "ai.reality2.cap.accel.set-range",
+    "ai.reality2.cap.accel.set-offset",
+    "ai.reality2.cap.accel.sleep",
+]
+emitted = ["sensor/adxl355"]
+
+[credentials]

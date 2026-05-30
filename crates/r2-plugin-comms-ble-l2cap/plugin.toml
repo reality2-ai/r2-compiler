@@ -1,0 +1,25 @@
+[plugin]
+name        = "ble-l2cap"
+category    = "comms"
+version     = "0.1.0"
+description = "L2CAP Connection-Oriented Channel (CoC) server on PSM 0x00D2. Receives the controller's `#wifi_offer` payload during bootstrap — TG-signed WiFi credentials + DeviceCertificate. Per R2-BLE + R2-BOOTSTRAP. Once provisioned, the listener stays open for re-bootstrap if the WiFi link drops permanently."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }
+nif = false
+web = false
+
+[commands]
+init   = 0x01
+listen = 0x02   # idempotent
+stop   = 0x03
+
+[capabilities]
+provides = ["ai.reality2.cap.bootstrap.l2cap"]
+requires = ["r2.hw.ble"]
+
+[events]
+handled = ["r2.bootstrap.l2cap.listen", "r2.bootstrap.l2cap.stop"]
+emitted = ["comms/ble-l2cap"]    # delivers received frames on this event name
+
+[credentials]

@@ -1,0 +1,77 @@
+sentant:
+  name: Status
+  class: ai.reality2.workshop.sensor.status
+  description: >
+    Emits r2.sensor.status every 2 s — FSM state, data_source (real/sim),
+    seq watermark, uptime. Drives the dashboard's virtual LED + diagnostics.
+    Also sets the physical LED state via the led plugin on every FSM
+    transition received.
+  storage: ephemeral
+  data:
+    current_state: "Boot"
+    data_source: "real"
+    seq_high_water: 0
+    uptime_ms: 0
+  plugins:
+    - name: led
+    - name: clock
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: running
+          actions:
+            - plugin: led
+              command: set_state
+              parameters: { state: "Boot" }
+            - command: send
+              parameters: { event: tick, delay: 0 }
+
+        - from: running
+          event: tick
+          actions:
+            - plugin: clock
+              command: monotonic_ms
+            - command: send
+              parameters: { event: tick, delay: 2000 }
+
+        - from: running
+          event: clock
+          actions:
+            - command: set
+              parameters: { key: uptime_ms, value: "{{params.data.ms}}" }
+            - command: send
+              parameters:
+                event: r2.sensor.status
+                public: true
+                state: "{{vars.current_state}}"
+                data_source: "{{vars.data_source}}"
+                seq_high_water: "{{vars.seq_high_water}}"
+                uptime_ms: "{{vars.uptime_ms}}"
+
+        # Generic state-change event from other sentants
+        - from: "*"
+          event: set_status_state
+          actions:
+            - command: set
+              parameters: { key: current_state, value: "{{params.state}}" }
+            - plugin: led
+              command: set_state
+              parameters: { state: "{{params.state}}" }
+
+        - from: "*"
+          event: set_data_source
+          actions:
+            - command: set
+              parameters: { key: data_source, value: "{{params.source}}" }
+
+        - from: "*"
+          event: r2.sensor.acceleration
+          actions:
+            - command: test
+              parameters:
+                condition: "{{params.seq}} > {{vars.seq_high_water}}"
+                true:
+                  - command: set
+                    parameters: { key: seq_high_water, value: "{{params.seq}}" }

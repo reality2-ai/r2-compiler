@@ -1,0 +1,33 @@
+[plugin]
+name        = "ota-tcp"
+category    = "comms"
+version     = "0.1.0"
+description = "TCP listener on port 21043 that receives a new firmware image, stages it to the inactive OTA partition, verifies SHA-256, and triggers a reboot. R2-DEPLOY's first-plugin pattern (R2-PLUGIN §9.1). COMPULSORY for every MCU build per SPEC-R2-COMPILER §12.1 — without it the device is unmanageable after first install."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }   # uses esp-idf-svc OTA APIs + TCP — std needed
+nif = false
+web = false
+
+[commands]
+init   = 0x01
+start  = 0x02   # begin a new OTA session (server-side init triggered on first byte)
+abort  = 0x03
+
+[capabilities]
+provides = [
+    "ai.reality2.deploy.ota",
+]
+requires = [
+    "r2.net.tcp",
+    "r2.hw.flash.ota",
+]
+
+[events]
+handled = [
+    "r2.dash.fw.update",
+    "r2.deploy.ota.abort",
+]
+emitted = ["comms/ota-tcp"]
+
+[credentials]

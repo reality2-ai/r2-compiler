@@ -1,0 +1,23 @@
+[plugin]
+name        = "log-tcp"
+category    = "comms"
+version     = "0.1.0"
+description = "TCP fan-out of the device's log::info!/warn!/error! stream on port 21046. Multiple dashboard clients can `nc <ip> 21046` to tail the live log (SPEC-R2-WORKSHOP-SENSOR-LIVE-LOGS). Read-only; ignores any data sent by the client."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }
+nif = false
+web = false
+
+[commands]
+init = 0x01
+
+[capabilities]
+provides = ["ai.reality2.workshop.cap.log-tcp"]
+requires = ["r2.net.tcp"]
+
+[events]
+handled = ["r2.log.line"]    # internal — every log line is delivered here for broadcast
+emitted = ["comms/log-tcp"]
+
+[credentials]

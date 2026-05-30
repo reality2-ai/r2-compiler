@@ -1,0 +1,26 @@
+[plugin]
+name        = "data-tcp"
+category    = "comms"
+version     = "0.1.0"
+description = "TCP server on port 21047 implementing LIST / GET / DEL / DEL_ALL over the captures directory on the SD card. Used by the dashboard to download named capture files and to free SD space remotely (SPEC-R2-WORKSHOP-CAPTURE §6)."
+
+[modes]
+aot = { targets = ["esp32-s3"], no_std = false }   # depends on sd-card
+nif = false
+web = false
+
+[commands]
+init     = 0x01
+
+[capabilities]
+provides = ["ai.reality2.workshop.cap.data-tcp"]
+requires = [
+    "r2.net.tcp",
+    "ai.reality2.workshop.cap.sd-ring",   # provided by storage/sd-card
+]
+
+[events]
+handled = ["r2.dash.data.list", "r2.dash.data.get", "r2.dash.data.delete"]
+emitted = ["comms/data-tcp"]
+
+[credentials]

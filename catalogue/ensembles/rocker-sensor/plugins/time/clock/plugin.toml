@@ -1,0 +1,27 @@
+[plugin]
+name        = "clock"
+category    = "time"     # NEW category claim — see [[feedback-plugin-category-claims]] in memory
+version     = "0.1.0"
+description = "Monotonic + offset wall-clock for r2-workshop. `monotonic_ms()` returns ESP-IDF's tick counter; `now_ms()` adds the persisted offset (`clock_offset_ms` from NVS) for wall-clock-relative timestamps. The Sync sentant runs Cristian's algorithm and writes the offset; this plugin exposes the read + write surface."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
+nif = false
+web = false
+
+[commands]
+init             = 0x01
+monotonic_ms     = 0x02
+now_ms           = 0x03   # monotonic + offset
+set_offset       = 0x04
+get_offset       = 0x05
+
+[capabilities]
+provides = ["ai.reality2.workshop.cap.clock"]
+requires = ["ai.reality2.workshop.cap.nvs"]   # persists offset
+
+[events]
+handled = ["r2.clock.now", "r2.clock.monotonic", "r2.clock.set_offset", "r2.clock.get_offset"]
+emitted = ["time/clock"]
+
+[credentials]

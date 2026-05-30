@@ -1,0 +1,51 @@
+sentant:
+  name: Battery
+  class: ai.reality2.workshop.sensor.battery
+  description: >
+    Polls the battery-adc plugin every 30 s and emits r2.sensor.battery.
+    Also flips low-battery state to the LED + a power_state_changed event
+    so Beacon updates the BLE AD.
+  storage: ephemeral
+  plugins:
+    - name: battery-adc
+    - name: led
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: polling
+          actions:
+            - plugin: battery-adc
+              command: init
+              parameters: { gpio: 4, attenuation: "12dB" }
+            - command: send
+              parameters: { event: poll, delay: 0 }
+
+        - from: polling
+          event: poll
+          actions:
+            - plugin: battery-adc
+              command: read_mv
+            - command: send
+              parameters: { event: poll, delay: 30000 }
+
+        - from: polling
+          event: sensor/battery-adc
+          actions:
+            - command: send
+              parameters:
+                event: r2.sensor.battery
+                public: true
+                millivolts: "{{params.data.millivolts}}"
+                percent: "{{platform.lipo_mv_to_percent(params.data.millivolts)}}"
+                charging: false
+            - command: test
+              parameters:
+                condition: "{{params.data.millivolts}} < 3300"
+                true:
+                  - plugin: led
+                    command: set_state
+                    parameters: { state: "LowBattery" }
+                  - command: send
+                    parameters: { event: power_state_changed, power_state: "low" }

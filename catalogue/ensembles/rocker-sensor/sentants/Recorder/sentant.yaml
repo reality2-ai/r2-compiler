@@ -1,0 +1,60 @@
+sentant:
+  name: Recorder
+  class: ai.reality2.workshop.sensor.recorder
+  description: >
+    Writes every r2.sensor.acceleration record to the SD ring buffer
+    (CAPTURE §6). On r2.dash.ack {through_seq}, frees ring records up
+    to that sequence. Stores last-acked-seq in NVS so cold boots can
+    resume catch-up from the right place.
+  storage: durable-state
+  data:
+    last_acked_seq: 0
+  plugins:
+    - name: sd-card
+    - name: nvs
+  automations:
+    - name: main
+      transitions:
+        - from: start
+          event: init
+          to: running
+          actions:
+            - plugin: nvs
+              command: read
+              parameters: { key: last_acked_seq }
+
+        - from: running
+          event: nvs
+          actions:
+            - command: set
+              parameters: { key: last_acked_seq, value: "{{params.data.value | default(0)}}" }
+            - plugin: sd-card
+              command: init
+              parameters: { resume_from_seq: "{{vars.last_acked_seq}}" }
+
+        - from: running
+          event: r2.sensor.acceleration
+          actions:
+            - plugin: sd-card
+              command: ring.push
+              parameters:
+                record:
+                  seq: "{{params.seq}}"
+                  ts_ms: "{{params.ts_ms}}"
+                  x: "{{params.x}}"
+                  y: "{{params.y}}"
+                  z: "{{params.z}}"
+
+        - from: running
+          event: r2.dash.ack
+          actions:
+            - plugin: sd-card
+              command: ring.pop
+              parameters: { through_seq: "{{params.through_seq}}" }
+            - command: set
+              parameters: { key: last_acked_seq, value: "{{params.through_seq}}" }
+            - plugin: nvs
+              command: write
+              parameters: { key: last_acked_seq, value: "{{vars.last_acked_seq}}" }
+            - plugin: nvs
+              command: commit
