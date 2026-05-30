@@ -1,0 +1,28 @@
+# r2-plugin-storage-nvs — R2 core plugin providing persistent key/value
+# storage. ESP-IDF NVS is the canonical platform back-end; the plugin
+# itself is generic over a `KvStore` trait so other platforms (Linux
+# flat-file, browser IndexedDB) plug in their own implementations.
+
+[package]
+name        = "r2-plugin-storage-nvs"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 always-on core plugin: persistent key/value storage. Generic over a `KvStore` trait — ESP-IDF NVS is one platform back-end."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+# Mutually-exclusive build modes per R2-PLUGIN §12.5.
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+# No mandatory platform deps — the plugin is generic over `KvStore`.
+# A future EspNvsKvStore wrapper crate (separate) provides the ESP-IDF impl.
+
+[lib]
+crate-type = ["rlib"]

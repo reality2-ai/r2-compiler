@@ -29,10 +29,10 @@ Full FSM diagram in [`SENTANT.md`](SENTANT.md) §"FSM".
 
 | Plugin | Lookup | Status |
 |---|---|---|
-| `nvs` | `../../plugins/storage/nvs/` (ensemble-owned) | ⏳ not yet scaffolded |
+| `nvs` | `crates/r2-plugin-storage-nvs/` (core, always linked — second-pass classification) | ✅ vendored + buildable (12 tests passing) |
 | `software-ed25519` | `crates/r2-plugin-crypto-software-ed25519/` (core, always linked) | ✅ vendored |
 
-When the orchestrator's `catalogue plugin` validates this sentant per SPEC-CATALOGUE-LAYOUT §4.4 `E_SENT_PLUGIN_UNRESOLVED`, the `nvs` reference will be unresolved until the storage/nvs plugin entry is authored. That's a Phase 1.4-metadata follow-up.
+Both plugin references now resolve — `E_SENT_PLUGIN_UNRESOLVED` is clear for this sentant.
 
 ## Events emitted / consumed
 
