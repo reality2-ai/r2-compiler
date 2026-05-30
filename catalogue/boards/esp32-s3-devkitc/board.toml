@@ -150,6 +150,11 @@ vendor_url        = "https://docs.espressif.com/projects/esp-dev-kits/en/latest/
 chip_vendor_url   = "https://www.espressif.com/en/products/socs/esp32-s3"
 wiring_guide      = "HARDWARE-WIRING-DEVKITC.md"
 
+[compulsory_plugins]
+# Per SPEC-R2-COMPILER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
+capabilities = ["ai.reality2.deploy.ota"]
+prefer       = ["ota-tcp"]                         # esp_ota_*-based, runs over TCP port 21043 on the WiFi STA
+
 [notes]
 gotchas = [
     "Custom partitions.csv requires a second clean rebuild on a fresh checkout — esp-idf-sys's CMake build dir doesn't exist on first build; build.rs walks up to find it and copies partitions.csv there.",

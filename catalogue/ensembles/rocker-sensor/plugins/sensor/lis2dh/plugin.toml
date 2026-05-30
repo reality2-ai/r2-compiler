@@ -1,0 +1,64 @@
+# plugin.toml — ST LIS2DH triaxial accelerometer, I²C interface.
+#
+# Schema: R2-PLUGIN §12.3 (canonical).
+# Companion: PLUGIN.md (§12.8 — 10 sections mandatory).
+# Validation: SPEC-CATALOGUE-LAYOUT §4.3 conformance checks.
+#
+# Authored 2026-05-31 (metadata-first; source extraction pending — see AI-CONTEXT.md).
+
+[plugin]
+name        = "lis2dh"
+category    = "sensor"
+version     = "0.1.0"
+description = "STMicroelectronics LIS2DH 3-axis MEMS accelerometer over I²C. Provides the generic triaxial-accel capability for r2-workshop's dfr1117 carrier (sourced via DFRobot SEN0224 Gravity I²C module). 10-bit data, ±2/4/8/16 g, ODR up to 5.3 kHz. Capability-aligned peer to adxl355 (SPI, 20-bit, higher precision) — same capability provided, different chip + bus per R2-PLUGIN §10 swap lever."
+
+[modes]
+# AOT mode: linked into MCU firmware. Primary target is esp32-c6 (the dfr1117
+# carrier). Could compile for esp32-s3 too (the chip-to-bus mapping is generic;
+# only the i2c pin assignment changes per carrier).
+aot = { targets = ["esp32-c6", "esp32-s3"], no_std = true }
+# NIF mode: for development / testing on a Linux SBC with an I²C bus (e.g. a
+# Raspberry Pi with the SEN0224 wired to its I²C pins). Optional.
+nif = false
+# Web mode: hardware sensor driver — no meaning in the browser.
+web = false
+
+[commands]
+# String → u8 mapping per R2-PLUGIN §12.4.1. Plugin author chooses opcodes.
+init        = 0x01    # configure ODR + range + offset; check WHO_AM_I
+read        = 0x02    # read one (x, y, z) sample, blocking
+read_burst  = 0x03    # read FIFO contents (up to 32 samples per fetch)
+set_odr     = 0x04    # change output data rate
+set_range   = 0x05    # change ±g range
+set_offset  = 0x06    # write calibration offsets (per-axis i16)
+sleep       = 0x07    # low-power mode (no sampling)
+
+[capabilities]
+provides = [
+    "ai.reality2.cap.accel.triaxial",          # generic triaxial accel (the swap lever)
+    "ai.reality2.cap.accel.triaxial.10bit",    # 10-bit specifier — distinguishes from 20-bit adxl355
+]
+requires = [
+    "r2.hw.i2c",                               # primary bus
+    # INT1 / INT2 are optional (firmware polls in v0.1). When wired, request
+    # an input GPIO for interrupt-driven sampling.
+    # "r2.hw.gpio.in:int1",
+    # "r2.hw.gpio.in:int2",
+]
+
+[events]
+handled = [
+    "ai.reality2.cap.accel.init",
+    "ai.reality2.cap.accel.read",
+    "ai.reality2.cap.accel.read-burst",
+    "ai.reality2.cap.accel.set-odr",
+    "ai.reality2.cap.accel.set-range",
+    "ai.reality2.cap.accel.set-offset",
+    "ai.reality2.cap.accel.sleep",
+]
+emitted = [
+    "sensor/lis2dh",                           # default result-event name per R2-PLUGIN §2.4
+]
+
+[credentials]
+# None — local hardware driver, no remote endpoints.

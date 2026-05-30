@@ -147,6 +147,12 @@ arduino_variant   = "https://github.com/espressif/arduino-esp32/tree/master/vari
 # These files MUST exist under ./datasheets/ — checked by SPEC-CATALOGUE-LAYOUT §3.2 E_BOARD_DS.
 wiring_guide      = "HARDWARE-WIRING-DFR1117.md"
 
+[compulsory_plugins]
+# Capabilities every build for this carrier MUST satisfy, regardless of
+# operator canvas selection. Per SPEC-R2-COMPILER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
+capabilities = ["ai.reality2.deploy.ota"]
+prefer       = ["ota-tcp"]                         # esp_ota_*-based, runs over TCP port 21043 on the WiFi STA — matches r2-workshop's pattern
+
 [notes]
 # Per AGENTS.md §3, anything quirky enough to surprise a future operator
 # belongs here.

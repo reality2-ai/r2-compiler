@@ -118,6 +118,19 @@ provides = [
 vendor_url        = "https://wiki.dfrobot.com/..."
 chip_datasheet    = "esp32-c6-datasheet.pdf"
 carrier_schematic = "dfr1117-schematic.pdf"
+
+[compulsory_plugins]
+# Plugins / capabilities that MUST be linked into every build for this carrier,
+# regardless of operator choice on the canvas. The Compiler sentant resolves
+# these against the chosen ensemble's plugins/, this board's plugins/, and
+# the core crates under crates/r2-plugin-*. Build fails with
+# E_COMPULSORY_PLUGIN_MISSING if any capability is unsatisfied.
+#
+# OTA is universally compulsory per [[project-compulsory-plugins-and-virgin-boards]];
+# the specific OTA plugin chosen here is carrier-appropriate (e.g. esp_ota_*-based
+# for ESP32 family, MCUboot-based for nRF / RP2 once those carriers are added).
+capabilities = ["ai.reality2.deploy.ota"]
+prefer = ["ota-tcp"]                              # plugin name to satisfy each capability
 ```
 
 Validation (orchestrator's `CatalogueServer` MUST enforce):
@@ -130,6 +143,7 @@ Validation (orchestrator's `CatalogueServer` MUST enforce):
 | Every `references.*` file exists under `datasheets/` | `E_BOARD_DS` |
 | `templates/Cargo.toml.tera` and `.cargo/config.toml` exist | `E_BOARD_TPL` |
 | Every plugin under `plugins/` validates per §5 | propagated |
+| Every capability in `compulsory_plugins.capabilities` is provided by a plugin in scope when a build runs (composition-time check, not sync-time) | `E_COMPULSORY_PLUGIN_MISSING` |
 
 ### 3.3 `AI-CONTEXT.md` (per board)
 
@@ -181,27 +195,89 @@ Per R2-PLUGIN §12 — same layout as the upstream catalogue at `r2-core/plugins
 
 ```
 plugins/<category>/<name>/
-  plugin.toml                 # REQUIRED — R2-PLUGIN §12.3
+  plugin.toml                 # REQUIRED — R2-PLUGIN §12.3, with [modes] table
   PLUGIN.md                   # REQUIRED — R2-PLUGIN §12.8 — all 10 sections mandatory
   README.md                   # REQUIRED — crate-level doc
-  Cargo.toml                  # REQUIRED — features: aot, nif (mutually exclusive per §12.5)
+  Cargo.toml                  # REQUIRED — feature flags one per declared mode
   AI-CONTEXT.md               # REQUIRED — fresh-CC brief
   src/                        # REQUIRED — lib.rs + plugin.rs + driver.rs (as applicable)
-  datasheets/                 # REQUIRED if the plugin wraps a specific chip
+  assets/                     # REQUIRED for category=webapp — static bundle content (§4.3.1)
+  datasheets/                 # REQUIRED if the plugin wraps a specific chip / SDK
   tests/                      # OPTIONAL — native integration tests
   conversation/               # REQUIRED — authoring transcripts
 ```
 
 Category MUST be one of R2-PLUGIN §12.2's categories. Crate name in `Cargo.toml` MUST be `r2-plugin-<category>-<name>` per R2-PLUGIN §12.5.
 
-Conformance checks (run at sync + composition time):
+#### 4.3.1 Modes — `aot`, `nif`, `web`
+
+A plugin declares which build modes it supports via `plugin.toml [modes]`. Three modes are defined:
+
+| Mode | Target hive | Cargo target | Output | Toolchain |
+|---|---|---|---|---|
+| `aot` | MCU (firmware) | `xtensa-esp32s3-espidf`, `riscv32imac-esp-espidf`, `thumbv8m.main-none-eabihf`, … (per R2-COMPILE §4) | `no_std` static lib linked into a flashed .bin | `cargo build --release --target=<triple>` |
+| `nif` | BEAM (workstation) | host triple | `std` cdylib via `r2-nif` wrapper | `cargo build --release` |
+| `web` | Browser (WASM hive) | `wasm32-unknown-unknown` | Static bundle directory (HTML + CSS + JS + .wasm + assets) served by R2-WEB per R2-PLUGIN §13 | `wasm-pack build --target web` (or Trunk / esbuild equivalent) |
+
+`web` mode generalises R2-PLUGIN §11's future-work WASM mode + §13's web-plugin runtime contract. A plugin MAY declare multiple modes; modes are NOT mutually-exclusive at the manifest level (only at the Cargo build level, where mode-specific feature flags ARE mutually exclusive per R2-PLUGIN §12.5).
+
+Example `[modes]` declarations:
+
+```toml
+# A sensor driver — MCU only.
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
+nif = false
+web = false
+
+# A crypto primitive — works everywhere.
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6", "linux-embedded"], no_std = true }
+nif = { targets = ["linux-embedded", "server"] }
+web = { targets = ["wasm32-unknown-unknown"] }
+
+# A webapp dashboard — browser only.
+[modes]
+aot = false
+nif = false
+web = { targets = ["wasm32-unknown-unknown"], bundler = "wasm-pack", graphql_fragment = "graphql/schema.graphql" }
+```
+
+For webapp plugins (category `webapp`), `[modes.web]` MAY carry extra keys:
+
+| Key | Purpose |
+|---|---|
+| `bundler` | Which build tool emits the bundle (`wasm-pack`, `trunk`, `esbuild`, …). Default `wasm-pack`. |
+| `graphql_fragment` | Path (relative to plugin dir) of a GraphQL schema fragment per R2-PLUGIN §13.7. |
+| `mount` | Default URL mount; can be overridden per R2-PLUGIN §13.2. Default: `/plugin/<plugin-name>`. |
+
+#### 4.3.2 The `assets/` directory (webapp plugins only)
+
+Required when `[modes.web]` is declared. Holds the static bundle content per R2-PLUGIN §13.3:
+
+```
+assets/
+  index.html                  # REQUIRED — bundle root
+  app.js                      # JS entry (loads the .wasm)
+  styles.css
+  images/                     # optional
+  …
+```
+
+`wasm-pack` (or the configured bundler) emits the .wasm + glue JS into a `dist/` subdirectory at build time, which the Compiler sentant copies alongside the `assets/` content into the bundle directory the orchestrator hands to R2-WEB.
+
+`assets/` MUST NOT contain symlinks that escape it (R2-PLUGIN §13.3). The Compiler sentant rejects such builds.
+
+#### 4.3.3 Conformance checks (run at sync + composition time)
 
 1. `plugin.toml` parses cleanly with all REQUIRED fields per R2-PLUGIN §12.3.
-2. `Cargo.toml` declares `aot` and `nif` mutually-exclusive features per R2-PLUGIN §12.5.
-3. `src/lib.rs` exports a type implementing `r2_engine::plugin::Plugin`.
+2. `Cargo.toml` declares feature flags matching every declared mode (e.g. `[features] aot = []`, `web = []`, `nif = ["std"]`); they MUST be mutually exclusive per R2-PLUGIN §12.5.
+3. `src/lib.rs` exports a type implementing `r2_engine::plugin::Plugin` (for `aot` and `nif`) and/or `wasm-bindgen` entry points (for `web`).
 4. `PLUGIN.md` contains all 10 mandatory sections per R2-PLUGIN §12.8.
 5. Every command listed in `plugin.toml` `[commands]` has a matching opcode constant in `src/lib.rs`.
 6. Every datasheet referenced in `PLUGIN.md` §7 exists under `datasheets/`.
+7. For `web` mode: `assets/index.html` exists (R2-PLUGIN §13.3).
+8. No symlinks escape `assets/`.
 
 ### 4.4 Nested sentants (`catalogue/ensembles/<name>/sentants/`)
 

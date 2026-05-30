@@ -265,8 +265,75 @@ A repository conforms to this spec when:
 
 ---
 
-## 10. Change log
+## 11. Trust Group management
+
+The operator's Trust Group is a first-class surface in the UI. r2-compiler's orchestrator hive holds the KeyHolder role for the operator's TG; the canvas state tracks TG membership.
+
+**Implicit operations** (driven by canvas actions, no explicit "enrol" dialog):
+
+| Canvas action | TG effect |
+|---|---|
+| Drag a carrier board onto canvas AND successfully compile + deploy firmware to a physical device | Implicit ADD: KeyHolder issues a `DeviceCertificate` for the device's freshly-minted Ed25519 keypair; cert is delivered with the firmware (USB sideload first install, L2CAP `#wifi_offer` for re-enrolment); orchestrator's device roster updated. |
+| Remove a board from the canvas | Implicit REVOKE: the physical device's cert is added to the KeyHolder's revocation list. The board entry stays in the catalogue. |
+
+**Explicit operations** (TG-pane surface, separate from the canvas):
+
+| Action | Event | Notes |
+|---|---|---|
+| Inspect TG status | `r2.compiler.tg.status` | Headline: name, class_hash, KeyHolder fingerprint, member count |
+| List members | `r2.compiler.tg.list_members` → `r2.compiler.tg.member` ×N + `done: true` | Streamed device roster |
+| Revoke a member directly | `r2.compiler.tg.revoke_device { device_pk, reason }` | When the physical device is lost but the carrier entry stays |
+| Rotate KeyHolder | `r2.compiler.tg.rotate_keyholder { new_keyholder_target }` | Per R2-TRUST §5.5 |
+| Export / import KeyHolder material | `r2.compiler.tg.export_keyholder` / `r2.compiler.tg.import_keyholder` | Operator-managed backup of `tg_priv.bin` |
+| **Reset TG** | `r2.compiler.tg.reset { confirm: "I-understand-this-invalidates-all-devices" }` | DESTRUCTIVE: generates a new TG keypair + class hash, invalidates every existing device cert. UI MUST require exact-string confirmation. Per r2-workshop's class-rotation procedure (`SPEC-R2-WORKSHOP-ENSEMBLE` §2.3). |
+
+**Storage:** TG public material at `trust_keys/` in the repo (`tg_pub.bin`, `tg_cert.bin`, device roster). TG private material off-tree at `~/.config/r2-compiler/tg_signer/` (`tg_priv.bin`).
+
+Full design detail in `[[project-tg-management-workflow]]` (memory).
+
+---
+
+## 12. Device lifecycle and deploy paths
+
+Two distinct deploy paths per device, gated by the device's current state in the orchestrator's per-device roster:
+
+| Device state | UI label | Deploy mechanism |
+|---|---|---|
+| Never built | "Compile" | Compile only; produce artefact; no deploy. |
+| Built but never flashed | "First install (USB)" | `Flasher` sentant runs `esptool --chip <chip> --port <port> write_flash 0x0 bootloader 0x8000 partition-table 0x10000 app` (offsets per partitions.csv for the carrier — 0x20000 for ESP32-C6). Operator picks the USB serial port from `r2.compiler.flash.devices`. |
+| Flashed once, currently reachable | "OTA update" | Compile produces app-only `.bin`; orchestrator pushes to the device's TCP port 21043 over WiFi; device's compulsory OTA plugin writes the inactive slot, swaps, reboots. Bootloader rollback protects against bricks. |
+| Flashed but unreachable | "OTA update (offline — will retry)" | Compile + queue; retry on reachability events. Fall back to USB on operator override. |
+| Operator override | "Force USB flash" | Always USB regardless of state. |
+
+OTA-receiver-on-device is **compulsory** per §12.1 below — every build for an MCU carrier MUST include an OTA plugin provider, otherwise the device becomes unmanageable.
+
+### 12.1 Compulsory plugins
+
+Per [[project-compulsory-plugins-and-virgin-boards]], some capabilities are non-negotiable for any deployable build. Each `board.toml` carries a `[compulsory_plugins]` table (see `SPEC-CATALOGUE-LAYOUT` §3.2) listing the capabilities that MUST be satisfied at build time. The Compiler sentant's resolve step (§5 step 3) MUST verify each compulsory capability is provided by a plugin in scope. Otherwise the build fails with `E_COMPULSORY_PLUGIN_MISSING`.
+
+Initial v0.1 compulsory capabilities:
+- `ai.reality2.deploy.ota` — declared per-carrier in each `board.toml`.
+- `r2.crypto.ed25519.*` — implicitly satisfied by `crates/r2-plugin-crypto-software-ed25519` (always linked).
+
+Compulsory plugins are NOT surfaced as opt-in catalogue items on the canvas. The UI may display them as greyed-out / pre-checked to indicate their presence, but operators cannot deselect them.
+
+### 12.2 Deploy events (extending §4.5)
+
+The earlier `r2.compiler.flash.*` set is generalised to a `r2.compiler.deploy.*` namespace that supports both USB and OTA modes:
+
+| Event | Direction | Payload | Purpose |
+|---|---|---|---|
+| `r2.compiler.flash.devices` | orchestrator → webapp | `[{port, chip_guess}]` | List detected USB serial devices for First-install |
+| `r2.compiler.deploy.start` | webapp → orchestrator | `{ artefact_path, target_ip?, port?, mode: "usb"\|"ota"\|"auto" }` | Unified deploy entry; orchestrator dispatches based on `mode` + per-device state |
+| `r2.compiler.deploy.progress` | orchestrator → webapp | `{ phase, message, bytes_sent, bytes_total }` | Streaming progress |
+| `r2.compiler.deploy.done` | orchestrator → webapp | `{ device_pk, duration_ms, bytes }` | Update per-device deploy state to "Flashed". TRIGGERS implicit TG add per §11. |
+| `r2.compiler.deploy.error` | orchestrator → webapp | `{ phase, message }` | Deploy failed |
+
+---
+
+## 13. Change log
 
 | Date | Version | Change |
 |---|---|---|
 | 2026-05-31 | 0.1 | Initial draft. Establishes the two-hive ensemble, the `r2.compiler.*` event vocabulary, the v0.1 success gate (round-trip the three r2-workshop carriers), and the catalogue authoring obligations. |
+| 2026-05-31 | 0.2 | Added §11 Trust Group management (implicit add/revoke from canvas + explicit `r2.compiler.tg.*` events). Added §12 Device lifecycle and deploy paths (USB First-install vs OTA update flows; compulsory plugins; `r2.compiler.deploy.*` event set generalising the earlier flash-only events). |

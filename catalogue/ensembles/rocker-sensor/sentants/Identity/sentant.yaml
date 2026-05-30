@@ -1,0 +1,145 @@
+# sentant.yaml — Identity sentant for the rocker-sensor ensemble.
+#
+# Schema: R2-DEF §2.
+# Validation: R2-DEF §8.1 load-time + R2-COMPILE §3.1 compilable subset (AOT carriers).
+#
+# Authored 2026-05-31 (metadata-first; the working reference is
+# r2-workshop/firmware/esp32-c6/dfr1117/src/identity.rs — extraction
+# into a generated-FSM implementation is Phase 1.4-source).
+
+sentant:
+  name: Identity
+  class: ai.reality2.workshop.sensor.identity
+  description: >
+    One-shot at boot. Loads or creates the device's persistent Ed25519
+    keypair + the persistent RBID (R2-FNV(device_pk)) from NVS, sets them
+    in the hive context, then enters idle. Mirrors the R2-HIVE
+    device-identity contract — every subsequent sentant (Bootstrap,
+    Beacon, Uplink, …) consumes the keypair from the hive context.
+    Compilable subset (R2-COMPILE §3.1).
+  storage: durable
+  data:
+    device_pk: null              # 32 bytes (set after init)
+    device_sk: null              # 32 bytes (set after init; never emitted on the wire)
+    rbid: 0                      # u32 (FNV-1a-32 of device_pk)
+  plugins:
+    - name: nvs
+    - name: software-ed25519     # core crypto plugin from crates/r2-plugin-crypto-software-ed25519
+
+  automations:
+    - name: main
+      description: Boot-time identity bring-up — read NVS first, generate + persist on cache miss.
+      transitions:
+
+        # 1. Boot.  start → loading
+        - from: start
+          event: init
+          to: loading
+          actions:
+            - plugin: nvs
+              command: read
+              parameters:
+                key: device_keypair
+
+        # 2. NVS read returned.  Test whether a stored keypair was present.
+        # The plugin result envelope arrives as event = plugin-name per
+        # R2-PLUGIN §2.4. We test the status/data and either accept or
+        # request fresh generation.
+        - from: loading
+          event: nvs
+          actions:
+            - command: test
+              parameters:
+                condition: "{{params.status}} == 'ok' and {{params.data}} != null"
+                true:
+                  - command: set
+                    parameters:
+                      key: device_pk
+                      value: "{{params.data.pk}}"
+                  - command: set
+                    parameters:
+                      key: device_sk
+                      value: "{{params.data.sk}}"
+                  - command: set
+                    parameters:
+                      key: rbid
+                      value: "{{fnv32(vars.device_pk)}}"
+                  - command: send
+                    parameters:
+                      event: identity_ready
+                false:
+                  - command: send
+                    parameters:
+                      event: generate_identity
+
+        # 3a. Found in NVS — transition to ready.
+        - from: loading
+          event: identity_ready
+          to: ready
+          actions:
+            - command: debug
+              parameters:
+                message: "Identity loaded from NVS (rbid={{vars.rbid}})"
+
+        # 3b. Not in NVS — generate a fresh keypair via the core crypto plugin.
+        # Seed comes from the hive's TRNG (provided by the platform; outside
+        # the compilable subset's template expressions). The Compiler sentant
+        # synthesises this call to esp_random() or equivalent at code-gen time.
+        - from: loading
+          event: generate_identity
+          to: generating
+          actions:
+            - plugin: software-ed25519
+              command: generate
+              parameters:
+                seed: "{{platform.random_seed_32}}"
+
+        # 4. Crypto returned a fresh keypair — stash it + persist to NVS.
+        - from: generating
+          event: crypto/software-ed25519
+          to: writing
+          actions:
+            - command: set
+              parameters:
+                key: device_pk
+                value: "{{params.data.pk}}"
+            - command: set
+              parameters:
+                key: device_sk
+                value: "{{params.data.sk}}"
+            - command: set
+              parameters:
+                key: rbid
+                value: "{{fnv32(vars.device_pk)}}"
+            - plugin: nvs
+              command: write
+              parameters:
+                key: device_keypair
+                value:
+                  pk: "{{vars.device_pk}}"
+                  sk: "{{vars.device_sk}}"
+
+        # 5. NVS write completed — enter ready.
+        - from: writing
+          event: nvs
+          to: ready
+          actions:
+            - command: debug
+              parameters:
+                message: "Fresh identity persisted to NVS (rbid={{vars.rbid}})"
+
+        # 6. Once ready, expose identity to peers via a synthetic event other
+        # sentants can subscribe to. The Compiler sentant maps this to setting
+        # the global hive context at code-gen time — no event actually traverses
+        # the bus, per the comment in r2-workshop/ensemble/sensor.yaml's
+        # "populates context at boot; no events".
+        - from: ready
+          event: get_identity
+          actions:
+            - command: send
+              parameters:
+                event: identity
+                public: true
+                device_pk: "{{vars.device_pk}}"
+                rbid: "{{vars.rbid}}"
+                # NOTE: device_sk is INTENTIONALLY not exposed — never emitted on the wire.

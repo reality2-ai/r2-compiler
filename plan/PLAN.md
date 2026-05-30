@@ -9,6 +9,7 @@ Current phasing. This file is overwritten as work progresses (PROCESS.md §3); t
 **Phase 1.1 — `tools/sync-catalogue.sh`.** ✅ Complete.
 **Phase 1.2 — first sync run.** ✅ Complete — see `crates/_VERSIONS.toml` for the manifest.
 **Phase 1.3 — author all three board entries.** ✅ Complete — board.toml + BOARD.md + AI-CONTEXT.md for esp32-s3-devkitc, esp32-s3-xiao, esp32-c6-dfr1117.
+**Phase 1.4-metadata (first slice).** ✅ Complete — `[compulsory_plugins]` added to all three board.tomls; SPEC-R2-COMPILER §11 (TG management) + §12 (device lifecycle + deploy paths + compulsory plugins) added; SPEC-CATALOGUE-LAYOUT §4.3 amended with three modes (aot/nif/web); first worked-example plugin (`sensor/lis2dh`) and sentant (`Identity`) fully authored as metadata.
 
 ```
 ✅ AGENTS.md / AI-CONTEXT.md / README.md / PROCESS.md
@@ -41,7 +42,8 @@ Goal: round-trip the three r2-workshop carriers per [`SPEC-R2-COMPILER.md`](../s
 | 1.1 | `tools/sync-catalogue.sh` — script to populate `crates/`, `catalogue/boards/<each>/templates/`, `catalogue/ensembles/rocker-sensor/ensemble.yaml` from sibling repos | — | ✅ |
 | 1.2 | First sync run | 1.1 | ✅ |
 | 1.3 | `board.toml` + `BOARD.md` + completed `AI-CONTEXT.md` for all three carriers (`esp32-c6-dfr1117`, `esp32-s3-devkitc`, `esp32-s3-xiao`) — same manual pattern across all three | 1.2 | ✅ |
-| 1.4 | `catalogue/ensembles/rocker-sensor/` per-plugin + per-sentant entries — extracted from `ensemble.yaml` declarations and the r2-workshop firmware code (each becomes a R2-PLUGIN §12 / R2-DEF §2 conformant directory) | 1.2 | ⏳ |
+| 1.4-metadata-rest | Remaining plugins (adxl355, sd-card, battery-adc, led, nvs, clock, ble-beacon, ble-l2cap, data-tcp, reset-tcp, log-tcp) + remaining sentants (Accelerometer, WifiProv, Bootstrap, Beacon, Battery, Status, Sync, Recorder, Uplink, Ota, Reset, Health, Capture, Presence) — each gets plugin.toml/sentant.yaml + PLUGIN.md/SENTANT.md + AI-CONTEXT.md. Pattern proven by `sensor/lis2dh` + `sentants/Identity` (✅). | 1.4-metadata | ⏳ |
+| 1.4-source | Extract the Rust source for each ensemble plugin from r2-workshop's inline firmware modules into standalone Cargo crates. The heavy lift — requires reading + refactoring ~12 source files. | 1.4-metadata-rest | ⏳ |
 | 1.5 | `testing/round-trip/<carrier>.expected.toml` — recorded R2-WIRE traffic from a running r2-workshop firmware, captured as the conformance baseline | 1.3, 1.4 | ⏳ |
 | 1.6 | `orchestrator/` scaffolding — axum WSS + static serve on port 21050; `CatalogueServer` + `Compiler` + `Sync` sentants stubbed | 1.2 | ⏳ |
 | 1.7 | `orchestrator/prompts/compile.md` — Tera template for the Claude Code build brief (must emit direct-Rust FSMs per [[feedback-aot-optimisation-constraint]]) | 1.6 | ⏳ |

@@ -135,6 +135,11 @@ product_url       = "https://www.seeedstudio.com/Seeed-Studio-XIAO-ESP32S3-Pre-S
 chip_vendor_url   = "https://www.espressif.com/en/products/socs/esp32-s3"
 wiring_guide      = "HARDWARE-WIRING-XIAO.md"
 
+[compulsory_plugins]
+# Per SPEC-R2-COMPILER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
+capabilities = ["ai.reality2.deploy.ota"]
+prefer       = ["ota-tcp"]                         # esp_ota_*-based, runs over TCP port 21043 on the WiFi STA
+
 [notes]
 gotchas = [
     "Custom partitions.csv requires a second clean rebuild on a fresh checkout (same as DevKitC).",
