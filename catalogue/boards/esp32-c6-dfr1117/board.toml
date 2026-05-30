@@ -1,0 +1,159 @@
+# board.toml — DFRobot Beetle ESP32-C6 (DFR1117).
+#
+# Schema: SPEC-CATALOGUE-LAYOUT §3.2.
+# Source of truth for all r2-compiler decisions about this carrier. When
+# this file and Cargo.toml.tera / sdkconfig.defaults / partitions.csv
+# disagree, this file wins; treat the templates as bugs to repair.
+#
+# Authored 2026-05-31 by reading r2-workshop/firmware/esp32-c6/dfr1117/
+# and r2-workshop/specifications/HARDWARE-WIRING-DFR1117.md.
+
+[board]
+name        = "esp32-c6-dfr1117"
+arch        = "esp32"                              # R2-COMPILE §4 platform tag
+chip        = "esp32c6"                            # ESP-IDF chip-family slug
+carrier     = "dfr1117"                            # SPEC-R2-WORKSHOP-SENSOR §3.3.1 carrier slug
+version     = "0.2.0"                              # tracks r2-workshop firmware version on this carrier
+description = """\
+DFRobot Beetle ESP32-C6 (DFR1117) — coin-sized board around the \
+ESP32-C6-FH4 (single-core 160 MHz RISC-V, WiFi 6, BLE 5.0, 802.15.4). \
+4 MB flash, no PSRAM. Native USB-Serial-JTAG over USB-C (flash + console \
+on one cable). On-board single-colour user LED at GPIO15 and a TP4057 \
+LiPo charger. r2-workshop's RISC-V-family reference carrier (peer to the \
+Xtensa esp32-s3 devkitc / xiao carriers).\
+"""
+
+[build]
+target_triple   = "riscv32imac-esp-espidf"         # R2-BUILD §2 Table — RISC-V family
+toolchain       = "esp"                            # via `espup install`
+esp_idf_version = "v5.2.5"                         # quoted from templates/.cargo/config.toml
+flash_size_mb   = 4                                # CONFIG_ESPTOOLPY_FLASHSIZE_4MB
+psram           = false                            # ESP32-C6-FH4 has no PSRAM
+usb_serial_jtag = true                             # CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+[compile_target]
+tag = "esp32-c6"                                   # R2-DEF §7.7 — what scores match against
+
+[capabilities]
+# Hive-shared singletons this carrier exposes. Ensemble plugins'
+# `capabilities.requires` MUST be satisfiable from this list (or from
+# a hive-shared plugin under this board's plugins/ subdirectory).
+provides = [
+    "r2.hw.spi",          # 1 free SPI bus (SCK=23, MOSI=22, MISO=21)
+    "r2.hw.i2c",          # 1 free I²C bus (SDA=19, SCL=20)
+    "r2.hw.gpio",         # broken-out: 4, 5, 6, 7, 16, 17, 19, 20, 21, 22, 23
+    "r2.hw.adc",          # LP-domain GPIO0-7 are ADC-capable
+    "r2.hw.uart",         # primary on TX=16 / RX=17 (silk-labelled)
+    "r2.hw.ble",          # BLE 5.0, NimBLE host stack (sdkconfig.defaults)
+    "r2.hw.wifi",         # WiFi 6
+    "r2.hw.flash",        # 4 MB internal
+    "r2.hw.sdspi",        # SD card on shared SPI bus (CS=7)
+    "r2.hw.usb-serial-jtag", # native console / flash path
+]
+
+# Hardware features the carrier does NOT have, in case ensembles need to
+# know what's missing.
+absent = [
+    "r2.hw.psram",        # ESP32-C6-FH4 has no PSRAM
+    "r2.hw.ws2812",       # only a mono LED on this carrier
+    "r2.hw.rmt",          # not used by this firmware (LED via LEDC PWM)
+]
+
+[pinout]
+# Intrinsic GPIO map for the SoC + carrier. This is the SUBSTRATE — the
+# fact that "GPIO15 hosts the user LED on this board" is a board fact, not
+# an ensemble fact. Ensembles bind their plugin requirements to these
+# capability names (e.g. an LED plugin requires "r2.hw.gpio.led") and the
+# Compiler sentant resolves the GPIO number from this table.
+
+[pinout.gpio.GPIO4]
+description = "ADC1 — battery cell sense (LP_RX silk pad)"
+silk        = "LP_RX"
+functions   = ["digital", "adc", "rtc"]
+role_hint   = "battery-sense"
+
+[pinout.gpio.GPIO5]
+description = "Spare (LP_TX silk pad)"
+silk        = "LP_TX"
+functions   = ["digital", "rtc"]
+
+[pinout.gpio.GPIO6]
+description = "Spare (LP_SDA silk pad)"
+silk        = "LP_SDA"
+functions   = ["digital", "rtc"]
+
+[pinout.gpio.GPIO7]
+description = "Used in r2-workshop as SD card CS (LP_SCL silk pad — free pad next to MI)"
+silk        = "LP_SCL"
+functions   = ["digital", "rtc"]
+role_hint   = "sd-cs"
+
+[pinout.gpio.GPIO15]
+description = "On-board user LED (mono blue, LEDC PWM driven)"
+silk        = "(on-board, no header pad)"
+functions   = ["digital"]
+role_hint   = "status-led"
+
+[pinout.gpio.GPIO16]
+description = "Primary UART TX"
+silk        = "TX"
+functions   = ["digital", "uart"]
+
+[pinout.gpio.GPIO17]
+description = "Primary UART RX"
+silk        = "RX"
+functions   = ["digital", "uart"]
+
+[pinout.gpio.GPIO19]
+description = "I²C SDA"
+silk        = "SDA"
+functions   = ["digital", "i2c"]
+role_hint   = "i2c-sda"
+
+[pinout.gpio.GPIO20]
+description = "I²C SCL"
+silk        = "SCL"
+functions   = ["digital", "i2c"]
+role_hint   = "i2c-scl"
+
+[pinout.gpio.GPIO21]
+description = "SPI MISO"
+silk        = "MI"
+functions   = ["digital", "spi"]
+role_hint   = "spi-miso"
+
+[pinout.gpio.GPIO22]
+description = "SPI MOSI"
+silk        = "MO"
+functions   = ["digital", "spi"]
+role_hint   = "spi-mosi"
+
+[pinout.gpio.GPIO23]
+description = "SPI SCK"
+silk        = "SCK"
+functions   = ["digital", "spi"]
+role_hint   = "spi-sck"
+
+# Pins not broken out / unsafe to use:
+[pinout.reserved]
+"GPIO0"  = "BOOT button — strapping pin, avoid"
+"GPIO8"  = "Strapping pin, avoid"
+"GPIO9"  = "Strapping pin, avoid"
+
+[references]
+vendor_url        = "https://wiki.dfrobot.com/dfr1117/"
+chip_vendor_url   = "https://www.espressif.com/en/products/socs/esp32-c6"
+arduino_variant   = "https://github.com/espressif/arduino-esp32/tree/master/variants/dfrobot_beetle_esp32c6"
+# These files MUST exist under ./datasheets/ — checked by SPEC-CATALOGUE-LAYOUT §3.2 E_BOARD_DS.
+wiring_guide      = "HARDWARE-WIRING-DFR1117.md"
+
+[notes]
+# Per AGENTS.md §3, anything quirky enough to surprise a future operator
+# belongs here.
+gotchas = [
+    "Custom partitions.csv requires a second clean rebuild on a fresh checkout — esp-idf-sys's CMake build dir doesn't exist on the first build; build.rs walks up to find it and copies partitions.csv there. See r2-workshop's tools/setup-firmware.sh.",
+    "First install MUST be a USB flash via espflash/esptool to write the partition table + both OTA slots. OTA-over-WiFi only works after that initial flash.",
+    "Two-bus design on this carrier (I²C for accel + SPI for SD), unlike the ESP32-S3 carriers where ADXL355 + SD share one SPI bus.",
+    "ESP32-C6 console routes over native USB-Serial-JTAG (CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y) — same USB-C cable for flash and monitor.",
+    "Use esptool (Python, ESP-IDF-bundled) for flashing, NOT espflash, per R2-BUILD §5.1 — espflash v3.x writes a header byte that breaks ESP-IDF v5.3+ bootloaders.",
+]

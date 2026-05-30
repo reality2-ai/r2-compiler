@@ -1,0 +1,24 @@
+[plugin]
+name        = "software-ed25519"
+category    = "crypto"
+version     = "0.1.0"
+description = "Pure-software Ed25519 signing, verification, and seeded keypair derivation."
+
+[modes]
+aot = { targets = ["esp32-s3", "esp32-c6", "cortex-m4", "linux-embedded", "server"], no_std = true }
+nif = { targets = ["linux-embedded", "server"], features = ["std"] }
+
+[commands]
+sign     = 0x01
+verify   = 0x02
+generate = 0x03
+
+[capabilities]
+provides = ["r2.crypto.ed25519.sign", "r2.crypto.ed25519.verify", "r2.crypto.ed25519.generate"]
+requires = []
+
+[events]
+handled = ["r2.crypto.ed25519.sign", "r2.crypto.ed25519.verify", "r2.crypto.ed25519.generate"]
+emitted = ["crypto/software-ed25519"]
+
+[credentials]

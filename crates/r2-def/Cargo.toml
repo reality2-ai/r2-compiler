@@ -1,0 +1,25 @@
+[package]
+name = "r2-def"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "R2-DEF: parser for sentant, swarm, and ensemble definition files (YAML / JSON / TOML)"
+repository = "https://github.com/reality2-ai/r2-core"
+keywords = ["r2", "mesh", "sentant", "ensemble", "yaml"]
+categories = ["parser-implementations"]
+
+[features]
+default = ["yaml", "json", "toml"]
+yaml = ["dep:serde_yaml"]
+json = ["dep:serde_json"]
+toml = ["dep:toml"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = { version = "0.9", optional = true }
+serde_json = { version = "1", optional = true }
+toml = { version = "0.8", optional = true }
+thiserror = "1"
+
+[dev-dependencies]
+serde_json = "1"

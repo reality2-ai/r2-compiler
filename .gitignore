@@ -1,0 +1,42 @@
+# Build outputs
+/target/
+**/target/
+out/
+*.bin
+*.elf
+
+# Per-carrier build state (orchestrator output)
+/out/
+
+# Cargo
+Cargo.lock
+!/crates/**/Cargo.lock
+!/orchestrator/Cargo.lock
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local config & secrets — per PROCESS.md §5
+wifi_config.toml
+*.priv
+*.priv.bin
+**/tg_signer/
+.env
+.env.*
+!.env.example
+
+# Claude Code session artefacts
+.claude/
+*.claude_session
+
+# Logs
+*.log
+logs/
+
+# Local orchestrator data
+orchestrator/data/
+~/.config/r2-compiler/

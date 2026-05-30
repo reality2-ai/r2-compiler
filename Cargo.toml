@@ -1,0 +1,32 @@
+# Cargo workspace root for r2-compiler.
+#
+# Members will be added as they exist:
+# - crates/* — R2 protocol crates vendored from r2-core (see crates/_SYNC.md)
+# - catalogue/plugins/*/*  — plugin crates (each is a standalone Cargo crate per R2-PLUGIN §12.5)
+# - orchestrator — workstation Rust binary (the workstation R2 hive + Claude Code driver)
+# - webapp/crate — Rust crate compiled to wasm32-unknown-unknown for the browser hive
+#
+# As of 2026-05-31 the workspace is empty — none of these crates exist yet. The
+# scaffolding phase per plan/PLAN.md is complete; Phase 1 will start populating
+# members.
+
+[workspace]
+resolver = "2"
+members = []
+exclude = [
+  # Catalogue plugin crates compile only with their own (aot|nif) feature set
+  # and may target no_std / specific MCU triples; they MUST NOT be built as
+  # part of the host workspace by default.
+  "catalogue/plugins/*/*",
+  # The webapp crate is wasm32-only.
+  "webapp/crate",
+]
+
+[workspace.package]
+edition       = "2021"
+license       = "MIT OR Apache-2.0"
+repository    = "https://github.com/reality2-ai/r2-compiler"
+rust-version  = "1.75"
+
+[workspace.dependencies]
+# Pinned versions go here once the first crate lands. Intentionally empty for v0.0.

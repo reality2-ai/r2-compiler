@@ -1,0 +1,19 @@
+[package]
+name = "r2-plugin-crypto-software-ed25519"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "R2 dual-mode plugin: Ed25519 signing/verification/keygen in pure software."
+
+[features]
+default = []
+aot = []
+nif = ["std"]
+std = ["r2-engine/std", "ed25519-dalek/std"]
+
+[dependencies]
+r2-engine = { path = "../r2-engine", default-features = false }
+ed25519-dalek = { version = "=2.1.1", default-features = false }
+
+[dev-dependencies]
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std"] }

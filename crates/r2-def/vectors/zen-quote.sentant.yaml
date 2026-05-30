@@ -1,0 +1,29 @@
+# R2-DEF §8.1 simple sentant example.
+sentant:
+  name: Zen Quote
+  description: Get a quote for the day
+  plugins:
+    - name: io.zenquotes.api
+
+  automations:
+    - name: Zen Quote
+      description: Get quote
+      transitions:
+        - public: true
+          event: "Get Zenquote"
+          actions:
+            - plugin: io.zenquotes.api
+              command: fetch
+        - event: io.zenquotes.api
+          actions:
+            - command: set
+              parameters:
+                key: quote
+                value: "{{params.data.q}}"
+            - command: set
+              parameters:
+                key: author
+                value: "{{params.data.a}}"
+            - command: send
+              parameters:
+                event: "Zenquote Response"

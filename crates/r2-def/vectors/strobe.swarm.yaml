@@ -1,0 +1,46 @@
+# Tightened swarm form of R2-DEF §8.5 example.
+swarm:
+  name: Strobing Light and Switch
+  description: A swarm illustrating sending events between sentants.
+
+  sentants:
+    - name: Light Switch
+      description: Controls a strobe light.
+      data:
+        speed: 100
+      automations:
+        - name: switch
+          description: Switch automation.
+          transitions:
+            - event: Turn On Strobing
+              actions:
+                - command: send
+                  parameters:
+                    to: Strobe Light
+                    event: go
+            - event: Turn Off Strobing
+              actions:
+                - command: send
+                  parameters:
+                    to: Strobe Light
+                    event: stop
+
+    - name: Strobe Light
+      description: Strobe light bulb.
+      automations:
+        - name: bulb
+          description: Bulb automation.
+          transitions:
+            - from: start
+              event: init
+              to: stopped
+            - from: "*"
+              event: stop
+              to: stopped
+            - from: "*"
+              event: go
+              to: "off"
+              actions:
+                - command: send
+                  parameters:
+                    event: turn_on

@@ -1,0 +1,55 @@
+# R2-DEF §7.9 worked example.
+ensemble:
+  name: notekeeper
+  description: "Personal notes across trust group devices"
+  version: "0.5.0"
+  class: ai.reality2.ensemble.notekeeper
+  ensemble_version: "0.1"
+
+  sentants:
+    - name: Note
+      description: "Holds note content; LWW merge on incoming updates"
+      class: ai.reality2.sentant.note
+      storage: durable-state
+      data:
+        notes: {}
+        last_ts: 0
+      plugins:
+        - name: notekeeper.sync
+      automations:
+        - name: main
+          transitions:
+            - event: note.add
+              public: true
+              actions:
+                - command: set
+                  parameters:
+                    key: notes
+                    value: "{{merge(notes, params.note)}}"
+                - plugin: notekeeper.sync
+                  command: broadcast
+                  parameters:
+                    payload: "{{params.note}}"
+
+  plugins:
+    - name: notekeeper.sync
+      description: "Encrypted note event sync"
+      kind: inline
+      compile_target: [linux, esp32-s3]
+
+  registrations:
+    r2-web:
+      route_prefix: /notekeeper
+      static_bundle: ./web/
+      graphql:
+        schema: ./web/schema.graphql
+        resolvers: notekeeper.GraphqlResolvers
+      subscriptions:
+        - name: noteStream
+          event: note.changed
+
+  capabilities:
+    emits: [note.added, note.updated, note.deleted, note.changed]
+    consumes: [note.add, note.update, note.delete, note.query]
+
+  compile_target: [linux]
