@@ -28,6 +28,7 @@ members = [
   # Vendored core plugins (always-linked into every build).
   "crates/r2-plugin-crypto-software-ed25519",
   "crates/r2-plugin-storage-nvs",
+  "crates/r2-plugin-time-clock",
   # Ensemble-owned plugin crates inside the catalogue. Added per Phase 1.4-source.
   "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh",
 ]

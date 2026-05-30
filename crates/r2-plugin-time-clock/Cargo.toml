@@ -1,0 +1,25 @@
+# r2-plugin-time-clock — R2 always-on core plugin: monotonic + offset clock.
+# Generic over a `Clock` trait so the platform's tick source (ESP-IDF
+# `esp_timer_get_time`, Linux `CLOCK_MONOTONIC`, browser `performance.now`)
+# plugs in via one trait impl.
+
+[package]
+name        = "r2-plugin-time-clock"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 always-on core plugin: monotonic + offset wall-clock. Generic over a `Clock` trait — ESP-IDF / Linux / browser supply their own tick sources."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
