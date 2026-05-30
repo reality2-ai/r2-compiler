@@ -1,25 +1,47 @@
 // r2-compiler — minimal catalogue preview app.
 //
-// No framework, no build step. Fetches webapp/dist/manifest.json (built by
-// tools/build-catalogue-index.py from the catalogue/ tree) and renders the
-// boards + ensembles + nested plugins + sentants. Click an entry to see
-// its structured-artefact meta + a file viewer for AI-CONTEXT.md / TOML /
-// YAML / source.
+// Loads webapp/dist/manifest.json (built by tools/build-catalogue-index.py)
+// AND the WASM module built from webapp/crate/ (`webapp/build-wasm.sh`).
+// The WASM exposes class-hash computation + verification — every class
+// string shown in the UI gets its FNV-1a-32 hash rendered alongside it,
+// and pre-computed `class_hash` fields in the manifest are verified at
+// load time.
 //
-// Phase 2-preview: this is NOT the eventual WASM R2 hive (Phase 2-full).
-// It's a static catalogue browser meant to make the layout visible early.
+// Phase 2-preview: a static catalogue browser. The full WASM R2 hive
+// (Catalogue / Composition / SourceViewer / Builder / Author / Apiary
+// sentants) is Phase 2-full work; this commit lays the WASM-build
+// pipeline foundation those phases build on.
 
-"use strict";
+// ── WASM module — import bindings produced by wasm-pack ───────────────
+
+import init, {
+  fnv1a_32,
+  class_hash_hex,
+  verify_class_hash,
+  version as wasmVersion,
+} from "../dist/wasm/r2_compiler_webapp.js";
 
 const $ = (id) => document.getElementById(id);
 
 let manifest = null;
 let currentEntry = null;
 let currentFile = null;
+let wasmReady = false;
 
 // ── Boot ──────────────────────────────────────────────────────────────
 
 (async function boot() {
+  // Initialise the WASM module first so subsequent rendering can call
+  // class_hash_hex / verify_class_hash synchronously.
+  try {
+    await init();
+    wasmReady = true;
+    console.info(`r2-compiler-webapp WASM loaded — v${wasmVersion()}`);
+  } catch (err) {
+    console.warn(`WASM init failed — class hashing falls back to text-only display: ${err.message}`);
+    wasmReady = false;
+  }
+
   try {
     const res = await fetch("dist/manifest.json", { cache: "no-store" });
     if (!res.ok) throw new Error(`manifest fetch ${res.status}`);
@@ -41,9 +63,27 @@ let currentFile = null;
 // ── Header ────────────────────────────────────────────────────────────
 
 function renderHeader(stats) {
-  $("stats").textContent = `${stats.boards} boards · ${stats.ensembles} ensembles · ${stats.plugins} plugins · ${stats.sentants} sentants`;
+  const wasmTag = wasmReady ? ` · wasm v${wasmVersion()}` : "";
+  $("stats").textContent = `${stats.boards} boards · ${stats.ensembles} ensembles · ${stats.plugins} plugins · ${stats.sentants} sentants${wasmTag}`;
   $("boards-count").textContent = String(stats.boards);
   $("ensembles-count").textContent = String(stats.ensembles);
+}
+
+// Render a class string with its FNV-1a-32 hash appended (when WASM is loaded).
+// If the manifest carries a `pre_computed_hash` (e.g. `class_hash` in board.toml
+// or apiary.toml), verify it matches — flag mismatches with a red warning.
+function renderClass(klass, preComputedHash = null) {
+  if (!klass) return "";
+  if (!wasmReady) return escape(klass);
+  const hash = class_hash_hex(klass);
+  let warning = "";
+  if (preComputedHash) {
+    const ok = verify_class_hash(klass, preComputedHash);
+    if (!ok) {
+      warning = ` <span class="hash-warn" title="declared ${preComputedHash} but FNV-1a-32 computes ${hash}">⚠ hash mismatch</span>`;
+    }
+  }
+  return `${escape(klass)} <span class="class-hash" title="FNV-1a-32(${klass})">${hash}</span>${warning}`;
 }
 
 // ── Boards list ───────────────────────────────────────────────────────
@@ -80,7 +120,7 @@ function renderEnsembles(ensembles) {
     ensembleEl.innerHTML = `
       <div class="entry-name kind-ensemble">${e.name}</div>
       <div class="entry-desc">${escape(firstSentence(e.description))}</div>
-      <div class="entry-meta">${e.class || ""}</div>
+      <div class="entry-meta">${renderClass(e.class)}</div>
     `;
     ensembleEl.addEventListener("click", () => showEntry(e, ensembleEl));
     li.appendChild(ensembleEl);
@@ -129,7 +169,7 @@ function renderEnsembles(ensembles) {
           se.innerHTML = `
             <div class="entry-name kind-sentant">${s.name}</div>
             <div class="entry-desc">${escape(firstSentence(s.description))}</div>
-            <div class="entry-meta">${s.class || ""}</div>
+            <div class="entry-meta">${renderClass(s.class)}</div>
           `;
           se.addEventListener("click", (evt) => {
             evt.stopPropagation();
@@ -189,7 +229,7 @@ function renderMeta(entry) {
         ]);
       break;
     case "ensemble":
-      rows.push(["class", entry.class]);
+      rows.push(["class", renderClass(entry.class)]);
       rows.push(["version", entry.version]);
       rows.push(["compile_target", entry.compile_target]);
       rows.push(["plugins", String(entry.plugins.length)]);
@@ -212,7 +252,7 @@ function renderMeta(entry) {
         rows.push(["commands", entry.commands.map((c) => `<span class="tag">${c}</span>`).join("")]);
       break;
     case "sentant":
-      rows.push(["class", entry.class]);
+      rows.push(["class", renderClass(entry.class)]);
       rows.push(["storage", entry.storage]);
       break;
   }

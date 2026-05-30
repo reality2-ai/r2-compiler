@@ -34,6 +34,7 @@ members = [
 exclude = [
   # wasm32-only.
   "crates/r2-wasm",
+  "webapp/crate",
 ]
 
 [workspace.package]

@@ -261,6 +261,30 @@ main {
 .tag.ok  { background: rgba(167,232,122,0.15); color: var(--ensemble); }
 .tag.off { color: var(--fg-muted); }
 
+/* Class-hash badge — small monospace pill next to class strings.
+ * Computed via the webapp's WASM module (r2-fnv FNV-1a-32). */
+.class-hash {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--accent-dim);
+  background: rgba(74,122,200,0.10);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+.hash-warn {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: #ff8a8a;
+  background: rgba(255,138,138,0.10);
+  border-radius: 3px;
+}
+
 /* File pane */
 .file-pane {
   flex: 1;

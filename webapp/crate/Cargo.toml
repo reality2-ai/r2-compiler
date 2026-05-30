@@ -1,0 +1,54 @@
+# r2-compiler-webapp — Rust crate compiled to wasm32-unknown-unknown,
+# loaded by webapp/index.html. The browser-side foundation of the
+# r2-compiler ensemble (the future home of the browser R2 hive per
+# SPEC-R2-COMPILER §13 + [[project-r2-compiler-self-as-ensemble]] in
+# memory).
+#
+# Excluded from the host workspace (wasm32-only, wasm-bindgen). Build
+# via `webapp/build-wasm.sh` (wraps `wasm-pack build --target web`).
+#
+# v0.1 scope (this commit): a minimal wasm-bindgen-exposed surface that
+# proves the WASM path works end-to-end (browser → wasm → vendored
+# r2-fnv → back). The visible affordance is class-hash + capability-hash
+# computation rendered in the catalogue browser. Future commits expand
+# this into the full WASM R2 hive (Catalogue / Composition / SourceViewer /
+# Builder / Author / Apiary sentants) per Phase 2-full in plan/PLAN.md.
+
+[package]
+name        = "r2-compiler-webapp"
+version     = "0.1.0"
+edition     = "2021"
+license     = "MIT OR Apache-2.0"
+description = "r2-compiler browser-hive WASM module — class/capability hashing today; full R2 WASM hive in Phase 2-full."
+publish     = false
+
+[lib]
+# `cdylib` is what wasm-pack expects for the wasm32-unknown-unknown
+# target; `rlib` lets the crate be tested host-side.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Vendored R2 protocol crate — provides the FNV-1a-32 hashing used for
+# class strings + event-name interning. Path is relative to this Cargo.toml.
+r2-fnv = { path = "../../crates/r2-fnv", default-features = false }
+
+# wasm-bindgen exposes Rust functions to JS. Pinned to a recent stable.
+wasm-bindgen = "0.2"
+
+# js-sys gives us access to JS console for diagnostics during early
+# bring-up; can be removed when the panic-hook chain is in place.
+js-sys = "0.3"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "s"            # optimise for size — every kB of WASM costs first-load time
+lto       = true
+strip     = true
+
+# wasm-pack's bundled wasm-opt currently rejects bulk-memory features
+# emitted by Rust 1.95+. Disable until the wasm-pack toolchain catches
+# up; the bundle still gets profile.release size optimisation from rustc.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

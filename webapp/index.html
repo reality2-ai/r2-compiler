@@ -91,6 +91,8 @@
       </span>
     </footer>
 
-    <script src="ui/app.js"></script>
+    <!-- ES module — imports `init` + class-hash functions from the WASM bundle
+         produced by webapp/build-wasm.sh into webapp/dist/wasm/. -->
+    <script type="module" src="ui/app.js"></script>
   </body>
 </html>
