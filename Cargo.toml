@@ -31,6 +31,8 @@ members = [
   "crates/r2-plugin-time-clock",
   # Ensemble-owned plugin crates inside the catalogue. Added per Phase 1.4-source.
   "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh",
+  # Workstation orchestrator binary (Phase 1.6+).
+  "orchestrator",
 ]
 exclude = [
   # wasm32-only.

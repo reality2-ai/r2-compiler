@@ -1,0 +1,69 @@
+# orchestrator — r2-compiler's workstation-side R2 hive.
+#
+# Serves the webapp/ bundle on localhost:21050 + exposes /r2 as the
+# WebSocket entry point for the browser hive. Drives Claude Code via
+# subprocess for builds + catalogue authoring per SPEC-R2-COMPILER §5.
+#
+# Phase 1.6 scope (this commit): the minimum-viable shell — axum web
+# server, static-file serving, /r2 WebSocket endpoint accepting
+# connections, structured logging, CLI args for port + webapp root +
+# apiary path.
+#
+# Phase 1.7+ scope (later commits):
+# - Real R2 hive via r2-engine; TG attachment.
+# - Plugin stubs: claude-code (subprocess driver), cargo-runner,
+#   flasher, ota-push, webfetch, git-runner, sync, catalogue, keyholder.
+# - Sentant stubs: Builder / Author / Deploy / Sync / Tg / Catalogue /
+#   Apiary — thin event routers per [[feedback-sentants-vs-plugins-
+#   terminology]].
+# - Tera prompt templates under prompts/.
+
+[package]
+name        = "orchestrator"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "r2-compiler workstation orchestrator hive — serves the webapp + drives Claude Code"
+repository.workspace   = true
+rust-version.workspace = true
+
+[[bin]]
+name = "r2-compiler-orchestrator"
+path = "src/main.rs"
+
+[dependencies]
+# Web framework + async runtime.
+axum            = { version = "0.8", features = ["ws", "macros"] }
+tokio           = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "fs", "process", "io-util"] }
+tower-http      = { version = "0.6", features = ["fs", "trace", "cors"] }
+futures         = "0.3"
+
+# Logging.
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# CLI.
+clap = { version = "4", features = ["derive"] }
+
+# Serialisation. JSON for /r2 event payloads in v0.1 (CBOR via r2-cbor
+# comes when the real R2 hive lands).
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml       = "0.8"
+
+# Error handling.
+anyhow     = "1"
+
+# (Vendored R2 protocol crates wire in once the real hive is built —
+# Phase 1.7+. Phase 1.6 leaves them unwired so the binary can land
+# without a half-implemented hive.)
+# r2-engine    = { workspace = true }
+# r2-fnv       = { workspace = true }
+# r2-wire      = { workspace = true }
+# r2-trust     = { workspace = true }
+
+[profile.release]
+opt-level = "z"
+lto       = true
+strip     = true
+codegen-units = 1
