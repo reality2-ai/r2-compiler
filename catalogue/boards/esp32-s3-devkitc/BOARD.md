@@ -88,5 +88,5 @@ This `catalogue/boards/esp32-s3-devkitc/` entry was scaffolded in r2-compiler de
 - [`AI-CONTEXT.md`](AI-CONTEXT.md) — fresh-CC brief
 - [`datasheets/HARDWARE-WIRING-DEVKITC.md`](datasheets/HARDWARE-WIRING-DEVKITC.md) — full wiring narrative
 - `../../../specifications/SPEC-CATALOGUE-LAYOUT.md` §3 — board entry schema
-- `../esp32-s3-xiao/` — sibling Xtensa carrier (compact form factor, fewer GPIOs)
+- `../esp32-s3-xiao/` — sibling Xtensa carrier (compact form factor, fewer GPIOs, mono LED instead of on-board WS2812)
 - `../esp32-c6-dfr1117/` — sibling RISC-V carrier (different ISA, different sensor by capability swap)

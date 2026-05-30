@@ -14,7 +14,7 @@ The compact Xtensa carrier in r2-compiler's catalogue. Coin-sized 21 × 17.5 mm 
 | **USB** | Single USB-C, native USB-Serial-JTAG |
 | **Power** | USB-C; on-board buck regulator handles LiPo cell directly across full 3.0–4.2 V curve; on-board CC/CV LiPo charger |
 | **Cell connection** | BAT+ / BAT− solder pads on the BACK (no JST-PH) |
-| **On-board RGB LED** | none — external WS2812 module on D5/GPIO6 |
+| **On-board LED** | mono yellow on GPIO21 (LEDC PWM) — the FSM status indicator. No on-board addressable RGB; FSM doesn't surface colour on this carrier. |
 | **GPIO count** | 11 broken-out (D0–D10) |
 | **Form factor** | 21 × 17.5 mm |
 | **Vendor docs** | https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/ |
@@ -24,7 +24,7 @@ The compact Xtensa carrier in r2-compiler's catalogue. Coin-sized 21 × 17.5 mm 
 
 The XIAO is r2-workshop's **compact alternative** to the DevKitC. ADR-001 promoted it to default during a parts-availability window (USB-C + on-board charging + small form factor were big draws); ADR-002 reverted to DevKitC once the external buck-boost and SD breakout for the lab's existing kit had arrived. The XIAO build stays fully supported — a future student or operator who values size, USB-C convenience, or on-board LiPo handling may legitimately pick it. Same R2-WIRE traffic, same sentants, same firmware codebase as the DevKitC build.
 
-For r2-compiler's v0.1 success gate, this carrier exercises the **constrained-GPIO** path. The XIAO has only 11 broken-out pins to the DevKitC's 45 — every pin is allocated, no headroom, no on-board RGB LED. If r2-compiler can produce a working build for both this carrier and the DevKitC from the same score, the "carrier-as-substrate" abstraction is real.
+For r2-compiler's v0.1 success gate, this carrier exercises the **constrained-GPIO** path. The XIAO has only 11 broken-out pins to the DevKitC's 45 — every pin is allocated, no headroom. The status LED is the on-board mono yellow LED on GPIO21 (LEDC PWM) — same mono-LED pattern as the dfr1117 carrier (GPIO15). No external WS2812 module is required, and the FSM does not surface colour on this carrier; states are distinguished by blink rate. If r2-compiler can produce working builds for the DevKitC (on-board WS2812) AND the XIAO + dfr1117 (mono LED) from the same score, the "carrier-as-substrate" abstraction with per-carrier LED driver selection is real.
 
 ## Where to wire what
 
@@ -32,14 +32,16 @@ Wire by silkscreen label (`D0`–`D10`, `3V3`, `GND`), not by GPIO number. Full 
 
 | Function | XIAO silk | GPIO |
 |---|---|---|
+| Status LED (on-board mono yellow) | (on-board) | 21 |
 | ADXL355 CS | D0 | 1 |
 | ADXL355 DRDY (optional) | D1 | 2 |
 | Battery ADC | D3 | 4 |
 | SD CS | D4 | 5 |
-| External WS2812 DIN | D5 | 6 |
 | SPI SCK (shared) | D8 | 7 |
 | SPI MISO (shared) | D9 | 8 |
 | SPI MOSI (shared) | D10 | 9 |
+
+D5/GPIO6 is **spare** (the prior external-WS2812 pin assignment is no longer used).
 
 Full narrative (BoM, three-phase build, on-board-charger rationale, hot-swap notes) at [`datasheets/HARDWARE-WIRING-XIAO.md`](datasheets/HARDWARE-WIRING-XIAO.md).
 
@@ -62,7 +64,7 @@ After the first USB flash, subsequent updates can go over WiFi via OTA.
 
 | File | Purpose |
 |---|---|
-| `templates/Cargo.toml.tera` | crate manifest — same dependency set as DevKitC; comments differ (mentions external WS2812) |
+| `templates/Cargo.toml.tera` | crate manifest synced from r2-workshop. ⚠ Currently declares `ws2812-esp32-rmt-driver` because r2-workshop's xiao firmware still uses the external WS2812 — the Compiler sentant MUST drop that dep and emit LEDC-PWM driver code per the GPIO21 pinout. See [`board.toml`](board.toml) `[notes].gotchas` last entry. |
 | `templates/.cargo/config.toml` | target = xtensa-esp32s3-espidf, MCU=esp32s3 |
 | `templates/sdkconfig.defaults` | 8 MB flash, octal PSRAM, NimBLE, FATFS LFN, USB-Serial-JTAG console |
 | `templates/partitions.csv` | identical to the DevKitC layout (both carriers have 8 MB flash) — two OTA slots × 3 MB + 1.875 MB FAT storage |
@@ -75,12 +77,12 @@ After the first USB flash, subsequent updates can go over WiFi via OTA.
 | Aspect | DevKitC-1 | XIAO ESP32-S3 |
 |---|---|---|
 | GPIO count | 45 | 11 |
-| On-board RGB LED | WS2812 on GPIO38 (v1.1) | none — external on D5/GPIO6 |
+| Status LED | on-board WS2812 (RGB, GPIO38 on v1.1) | on-board mono yellow (GPIO21, LEDC PWM) |
 | Power | external buck-boost + JST-PH | on-board buck + BAT pads + on-board charger |
 | USB | dual (USB-OTG + CP2102) | single (USB-C native) |
 | Cell hot-swap | yes (JST-PH disconnect) | no (solder pads) |
 | Form factor | ~50 × 70 mm | 21 × 17.5 mm |
-| Best for | GPIO headroom, diagnosable power | size, USB-C convenience |
+| Best for | GPIO headroom, diagnosable power, colour-coded status | size, USB-C convenience, simpler hardware |
 
 Both carriers compile against the same Rust target (`xtensa-esp32s3-espidf`), same dependencies, same ESP-IDF version, and produce functionally-equivalent firmware. Only pin literals + sdkconfig comments + carrier-specific gotchas differ.
 
@@ -90,7 +92,8 @@ See [`board.toml`](board.toml) `[notes].gotchas`. The XIAO-specific ones:
 
 - **Cell solders directly to BAT+/BAT−** — there's no connector. Hot-swap during a session means de-soldering, so the workflow is "charge over USB-C while bench-debugging, run from cell in the field".
 - **No over-discharge protection** on-board. Use a protected 18650 cell, or disconnect when idle.
-- **External WS2812 required** for FSM status — the on-board GPIO21 LED is single-colour yellow and not driven by the FSM (colour info would be lost).
+- **FSM status LED is the on-board mono yellow on GPIO21** (LEDC PWM). The FSM does NOT surface colour on this carrier — states distinguished by blink rate, matching the dfr1117 pattern. No external WS2812 module required.
+- **Template lag (2026-05-31):** synced `templates/Cargo.toml.tera` still declares the old `ws2812-esp32-rmt-driver` dep because r2-workshop's xiao firmware hasn't yet caught up to this design. The Compiler sentant must reconcile.
 - **XIAO Plus is a different SKU** (16 MB flash, more GPIOs) — would be a separate board entry, sdkconfig differs.
 
 ## Authoring history

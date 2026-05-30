@@ -16,8 +16,9 @@ Seeed Studio XIAO ESP32-S3 (Pre-Soldered SKU) — coin-sized 21 × 17.5 mm \
 ESP32-S3 board around the ESP32-S3R8 die (Xtensa LX7 dual-core, 8 MB \
 flash + 8 MB octal PSRAM). USB-C with native USB-Serial-JTAG. On-board \
 LiPo charger + buck regulator with BAT+/BAT− solder pads on the back \
-(no JST-PH). Only 11 broken-out GPIOs (D0–D10). No on-board addressable \
-RGB LED — r2-workshop uses an external WS2812 on D5. r2-workshop's \
+(no JST-PH). Only 11 broken-out GPIOs (D0–D10). FSM status LED is the \
+on-board mono yellow LED on GPIO21 (LEDC PWM driven) — same mono-LED \
+pattern as the dfr1117 carrier, no external WS2812 required. r2-workshop's \
 alternative Xtensa carrier (ADR-001 promoted it briefly, ADR-002 reverted \
 default to DevKitC); fully supported.\
 """
@@ -48,14 +49,14 @@ provides = [
     "r2.hw.flash",        # 8 MB
     "r2.hw.psram",        # 8 MB octal
     "r2.hw.sdspi",        # SD on shared SPI bus
-    "r2.hw.rmt",          # used to drive external WS2812
+    "r2.hw.ledc",         # used to drive the on-board mono LED (GPIO21)
     "r2.hw.usb-serial-jtag",
     "r2.hw.lipo-charger", # on-board (USB-C charging)
     "r2.hw.lipo-buck",    # on-board buck regulator (cell direct → 3.3 V)
 ]
 
 absent = [
-    "r2.hw.ws2812-onboard",  # no on-board addressable RGB LED (external WS2812 module required for FSM status indication)
+    "r2.hw.ws2812-onboard",  # no on-board addressable RGB LED (FSM uses the mono GPIO21 LED instead — colour info isn't surfaced on this carrier)
     "r2.hw.usb-uart",        # no CP2102 — only the one USB-C native port
     "r2.hw.lipo-jst-ph",     # no JST-PH connector; cell solders to BAT+/BAT- pads on the back
 ]
@@ -87,10 +88,10 @@ functions   = ["digital", "adc"]
 role_hint   = "sd-cs"
 
 [pinout.gpio.GPIO6]
-description = "External WS2812 DIN (D5 silk) — RMT-driven status LED"
+description = "Spare digital GPIO (D5 silk pad). Not used by the FSM — status LED is the on-board mono yellow LED on GPIO21."
 silk        = "D5"
 functions   = ["digital", "rmt"]
-role_hint   = "status-led-ws2812-external"
+role_hint   = "spare"
 
 [pinout.gpio.GPIO7]
 description = "SPI SCK — shared ADXL355 + SD (D8 silk). XIAO default."
@@ -111,10 +112,10 @@ functions   = ["digital", "spi"]
 role_hint   = "spi-mosi"
 
 [pinout.gpio.GPIO21]
-description = "On-board user LED (single-colour yellow, not used by FSM — colour info would be lost; external WS2812 on D5 is the FSM indicator)"
+description = "On-board user LED (mono yellow, LEDC PWM driven). The FSM status indicator on this carrier — same mono-LED pattern as the dfr1117 carrier's GPIO15. Colour information is not surfaced on the XIAO; states are distinguished by blink rate / duty cycle."
 silk        = "(on-board)"
-functions   = ["digital"]
-role_hint   = "led-mono-onboard"
+functions   = ["digital", "ledc"]
+role_hint   = "status-led"
 
 # Reserved / strapping / unsafe:
 [pinout.reserved]
@@ -126,7 +127,7 @@ role_hint   = "led-mono-onboard"
 # XIAO header — no risk of accidental wiring.
 
 [pinout.free]
-gpio = ["GPIO3", "GPIO43", "GPIO44"]  # subject to strapping / UART caveats above
+gpio = ["GPIO6", "GPIO3", "GPIO43", "GPIO44"]  # GPIO6 (D5 silk) is freed by the mono-LED choice; GPIO3/43/44 are subject to strapping / UART caveats above
 
 [references]
 vendor_url        = "https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/"
@@ -140,10 +141,11 @@ gotchas = [
     "First install MUST be a USB flash; OTA over WiFi only works after.",
     "Cell wires solder directly to BAT+/BAT- pads on the back of the board — there is NO JST-PH connector. Disconnecting the cell requires de-soldering.",
     "On-board LiPo charger has NO over-discharge protection. Use a protected 18650 cell, or physically disconnect the cell when idle for >24 h.",
-    "No on-board addressable RGB LED — an external WS2812 module wired to D5/GPIO6 is required for FSM status indication. The on-board GPIO21 LED is single-colour yellow and not driven by the FSM.",
+    "FSM status LED is the on-board mono yellow LED on GPIO21 (LEDC PWM) — same mono-LED pattern as the dfr1117. Colour information is NOT surfaced on this carrier; states are distinguished by blink rate. No external WS2812 module required.",
     "D2/GPIO3 is a strapping pin (JTAG signal source select) — do not wire.",
     "XIAO ESP32-S3 Plus SKU has different flash/PSRAM (16 MB flash) AND additional GPIOs D11-D18 — treat as a SEPARATE board entry when added; sdkconfig.defaults differs.",
     "Bootloader mode: if espflash can't detect the chip, hold BOOT button while pressing/releasing RESET. Most of the time not needed — USB-Serial-JTAG drops into bootloader automatically when espflash resets it.",
     "Use esptool, not espflash, per R2-BUILD §5.1.",
-    "WS2812 capped at 20% brightness — uncapped is retinopathic indoors.",
+    "LED brightness should be capped (≤ 20% duty) — uncapped is harsh in a room.",
+    "DIVERGENCE FROM SYNCED TEMPLATES (2026-05-31): templates/Cargo.toml.tera still declares ws2812-esp32-rmt-driver and smart-leds (synced from r2-workshop, which currently uses the external WS2812 on D5). The Compiler sentant MUST drop those deps and emit LEDC-PWM driver code for GPIO21 instead, per this board.toml's pinout. This divergence resolves when r2-workshop's xiao firmware catches up to the mono-LED design — see [[project-xiao-led-choice]] in memory.",
 ]

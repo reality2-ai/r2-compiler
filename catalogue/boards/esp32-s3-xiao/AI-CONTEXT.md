@@ -4,9 +4,9 @@ If you are a Claude Code session resuming work on this board entry cold, read th
 
 ## Purpose
 
-Seeed Studio XIAO ESP32-S3 (Pre-Soldered) — coin-sized 21 × 17.5 mm ESP32-S3 board with on-board LiPo charging + USB-C. r2-workshop's compact alternative to the DevKitC carrier (ADR-001 made it default; ADR-002 reverted). Same chip family as `esp32-s3-devkitc` but very different envelope: USB-C only, only 11 GPIOs broken out, no on-board RGB LED, on-board buck + LiPo charger.
+Seeed Studio XIAO ESP32-S3 (Pre-Soldered) — coin-sized 21 × 17.5 mm ESP32-S3 board with on-board LiPo charging + USB-C. r2-workshop's compact alternative to the DevKitC carrier (ADR-001 made it default; ADR-002 reverted). Same chip family as `esp32-s3-devkitc` but very different envelope: USB-C only, only 11 GPIOs broken out, on-board buck + LiPo charger. FSM status LED is the on-board mono yellow LED on GPIO21 (LEDC PWM) — same mono-LED pattern as `esp32-c6-dfr1117`. No external WS2812 module is required; FSM does not surface colour on this carrier.
 
-The constrained-GPIO Xtensa option. Use when size and on-board power management matter; choose the DevKitC if you need pin headroom.
+The constrained-GPIO Xtensa option. Use when size and on-board power management matter; choose the DevKitC if you need pin headroom or colour-coded status indication.
 
 ## Class + target
 
@@ -46,14 +46,15 @@ None scaffolded yet under `plugins/`. BLE / WiFi singletons come from the vendor
 
 | Versus | Difference |
 |---|---|
-| **esp32-s3-devkitc** | Same chip + target + tag. XIAO has 11 GPIOs (vs 45), no on-board RGB LED (external on D5/GPIO6), on-board LiPo handling, USB-C only. Choose XIAO for size + USB-C; DevKitC for GPIO + diagnosability. |
-| **esp32-c6-dfr1117** | Different ISA (Xtensa vs RISC-V), 8 MB vs 4 MB flash, ADXL355 SPI vs LIS2DH I²C (capability swap). |
+| **esp32-s3-devkitc** | Same chip + target + tag. XIAO has 11 GPIOs (vs 45), mono LED on GPIO21 (vs DevKitC's on-board WS2812 on GPIO38), on-board LiPo handling, USB-C only. Choose XIAO for size + USB-C + simpler hardware; DevKitC for GPIO + colour-coded status. |
+| **esp32-c6-dfr1117** | Different ISA (Xtensa vs RISC-V), 8 MB vs 4 MB flash, ADXL355 SPI vs LIS2DH I²C (capability swap). **Same mono-LED pattern** — both use LEDC PWM on a single on-board pin (GPIO21 here, GPIO15 on the dfr1117). |
 
 ## Known gotchas (quick read — full list in `board.toml [notes].gotchas`)
 
 - **Cell solders directly to BAT+/BAT− pads on the back** — no JST-PH connector. Hot-swap during a session means de-soldering.
 - **No over-discharge protection** on the on-board charger. Use protected 18650 cells; disconnect when idle for >24 h.
-- **No on-board addressable RGB LED** — external WS2812 module on D5/GPIO6 required for FSM status indication. The on-board GPIO21 LED is single-colour yellow and not used by the FSM.
+- **FSM status LED is the on-board mono yellow LED on GPIO21** (LEDC PWM). No external WS2812 module is required; FSM uses blink rate / duty cycle (not colour) to distinguish states. Same mono-LED pattern as dfr1117 (GPIO15).
+- **Template lag (2026-05-31):** `templates/Cargo.toml.tera` still declares `ws2812-esp32-rmt-driver` because r2-workshop's xiao firmware hasn't yet been updated to the mono-LED design. The Compiler sentant must drop that dep and emit LEDC-PWM driver code. See `board.toml [notes].gotchas` last entry and `[[project-xiao-led-choice]]` in memory.
 - **D2/GPIO3 is a strapping pin** (JTAG signal source select). Do not wire.
 - **D6/GPIO43, D7/GPIO44** are UART0 TX/RX — reserved unless adding an external UART console.
 - Same `esptool`-not-`espflash` rule per R2-BUILD §5.1.
