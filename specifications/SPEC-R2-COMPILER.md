@@ -338,9 +338,29 @@ The earlier `r2.compiler.flash.*` set is generalised to a `r2.compiler.deploy.*`
 
 ---
 
-## 13. Change log
+## 13. r2-compiler is itself structurally an R2 ensemble
+
+r2-compiler is declared (§2.1) as an R2 ensemble with class `ai.reality2.ensemble.r2-compiler`, composed of two role-ensembles (orchestrator + webapp) bound by R2-WIRE. This is a **structural** ensemble-ness, not a runtime-TG one:
+
+- **Structural** (asserted): r2-compiler's own architecture is R2-DEF §7 conformant. A `meta/r2-compiler-as-ensemble.yaml` self-description will be authored in Phase 1.6+ when the orchestrator + webapp Rust sources are written, alongside the role-ensemble's sentants + plugins. The self-description lives under `meta/`, distinct from `catalogue/` (which holds parts r2-compiler builds firmware for) and `apiaries/` (operator's deployments).
+- **Runtime** (constraint): r2-compiler's hive instances do NOT have a standing "r2-compiler TG." Per R2-TRUST §2.3, every R2 hive is in exactly one TG at a time. At runtime, r2-compiler's orchestrator + webapp hives take on the **active apiary's** TG context — see SPEC-APIARY-LAYOUT.md §6. Apiary switch = TG-context switch for the whole stack including the tooling.
+
+Multi-operator collaboration on one apiary is free under this model: both operators' r2-compiler instances are members of the apiary's TG; they see each other via R2-WIRE within that TG.
+
+The meta self-description is dogfood: r2-compiler's catalogue browser will be able to INSPECT r2-compiler itself once `meta/` is populated. See `[[project-r2-compiler-self-as-ensemble]]` in memory for the full reasoning.
+
+## 14. Companion specs
+
+| Spec | Purpose |
+|---|---|
+| [`SPEC-CATALOGUE-LAYOUT.md`](SPEC-CATALOGUE-LAYOUT.md) | Layout + validation of `catalogue/boards/` + `catalogue/ensembles/<name>/` |
+| [`SPEC-APIARY-LAYOUT.md`](SPEC-APIARY-LAYOUT.md) | Layout + validation of `apiaries/<name>/` + `apiary.toml` schema |
+| [`SPEC-APIARY-AMENDMENT-PROPOSAL.md`](SPEC-APIARY-AMENDMENT-PROPOSAL.md) | Proposed upstream amendment to R2-APIARY (broaden scope to include the TG-bound multi-hive case) |
+
+## 15. Change log
 
 | Date | Version | Change |
 |---|---|---|
 | 2026-05-31 | 0.1 | Initial draft. Establishes the two-hive ensemble, the `r2.compiler.*` event vocabulary, the v0.1 success gate (round-trip the three r2-workshop carriers), and the catalogue authoring obligations. |
 | 2026-05-31 | 0.2 | Added §11 Trust Group management (implicit add/revoke from canvas + explicit `r2.compiler.tg.*` events). Added §12 Device lifecycle and deploy paths (USB First-install vs OTA update flows; compulsory plugins; `r2.compiler.deploy.*` event set generalising the earlier flash-only events). |
+| 2026-05-31 | 0.3 | Second-pass decisions: §13 acknowledges r2-compiler's structural-ensemble nature with deferred `meta/` self-description (Phase 1.6+); §14 companion-spec index added pointing at the new SPEC-APIARY-LAYOUT + SPEC-APIARY-AMENDMENT-PROPOSAL. Apiary terminology adopted throughout. |
