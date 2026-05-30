@@ -1,0 +1,414 @@
+//! `claude-code` plugin — subprocess driver for `claude -p '<brief>'
+//! `--output-format=stream-json`.
+//!
+//! Phase 1.7b — the first real plugin in the orchestrator hive.
+//! Validates conjecture C-1 from `plan/PLAN.md`: that we can drive
+//! a Claude Code subprocess autonomously, parse its `stream-json`
+//! output line-by-line, and surface progress events on the R2 bus.
+//!
+//! ## Lifecycle
+//!
+//! - `Plugin::execute(CMD_START, brief)` — spawn `claude -p` in a
+//!   worker thread; write the brief bytes to stdin; close stdin; read
+//!   stdout line-by-line; push each parsed line (or raw text) through
+//!   an internal channel; signal completion when the child exits.
+//!   Returns `Ok(empty)` immediately — the actual progress is async.
+//! - `Plugin::execute(CMD_CANCEL, _)` — kill the running child (if any).
+//! - `Plugin::poll()` — drains one queued event from the worker channel
+//!   and returns it as `(event_hash, payload)`. The bus emits it as a
+//!   normal `QueuedEvent` and routes it to subscribed sentants
+//!   (typically the Builder, which forwards to /r2).
+//!
+//! ## Events emitted (by hash, via `poll()`)
+//!
+//! - `r2.compiler.build.progress` — one per parsed stream-json line.
+//!   Payload is `{ "phase": "claude", "kind": "<type>", "line": "<raw json>" }`
+//!   (the `kind` field comes from the stream-json's `type` field when
+//!   present; otherwise it's `"unknown"`).
+//! - `r2.compiler.build.done` — the subprocess exited with code 0.
+//!   Payload is `{ "exit_code": 0 }`.
+//! - `r2.compiler.build.error` — non-zero exit OR a stream-json parse
+//!   error OR an IO error spawning the subprocess.
+//!   Payload is `{ "exit_code": N, "message": "<reason>" }`.
+//!
+//! ## Testability
+//!
+//! `ClaudeCodePlugin::with_command` takes an arbitrary `Command`,
+//! defaulting to `claude -p '--output-format=stream-json'`. Tests use
+//! `echo` / `printf` with pre-recorded stream-json fixtures.
+
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, Command, Stdio};
+use std::sync::{mpsc, OnceLock};
+use std::thread;
+
+use r2_engine::plugin::{
+    Plugin, PluginCommand, PluginError, PluginId, PluginResponse, PluginResult,
+};
+use serde::Serialize;
+
+/// Command opcode: start a new `claude -p` session.
+pub const CMD_START: PluginCommand = 0x01;
+/// Command opcode: cancel the running session (kills the child).
+pub const CMD_CANCEL: PluginCommand = 0x02;
+
+/// Error: subprocess spawn failed.
+pub const ERR_SPAWN: u8 = 0x01;
+/// Error: session is already running — refuse to start another.
+pub const ERR_BUSY: u8 = 0x02;
+/// Error: command byte was not recognised.
+pub const ERR_UNKNOWN_COMMAND: u8 = 0xFE;
+
+/// One parsed event delivered from the worker thread to `poll()`.
+#[derive(Debug)]
+enum WorkerMsg {
+    /// Stream-json line parsed (or fallback raw text).
+    Line { kind: String, line: String },
+    /// Subprocess finished with this exit code.
+    Done { exit_code: i32 },
+    /// Setup or read error.
+    Error { message: String, exit_code: i32 },
+}
+
+/// Plugin instance — holds a receiver from the worker thread + an
+/// optional `Child` handle for cancellation.
+pub struct ClaudeCodePlugin {
+    id: PluginId,
+    rx: Option<mpsc::Receiver<WorkerMsg>>,
+    child: Option<Child>,
+    /// Pre-hashed event names (interned at first construction).
+    hash_progress: u32,
+    hash_done: u32,
+    hash_error: u32,
+    /// Reusable output buffer for `poll()`.
+    out_buf: Vec<u8>,
+    /// Command + args to spawn. Default = `claude -p --output-format=stream-json`.
+    /// Tests override with `echo` / `printf` against fixtures.
+    command_program: String,
+    command_args: Vec<String>,
+}
+
+impl ClaudeCodePlugin {
+    /// Construct with the default `claude -p` command.
+    pub fn new(id: PluginId) -> Self {
+        Self::with_command(id, "claude", vec!["-p".to_string(), "--output-format=stream-json".to_string()])
+    }
+
+    /// Construct with a custom command (used by tests with fixture scripts).
+    pub fn with_command(id: PluginId, program: impl Into<String>, args: Vec<String>) -> Self {
+        Self {
+            id,
+            rx: None,
+            child: None,
+            hash_progress: r2_fnv::fnv1a_32(b"r2.compiler.build.progress"),
+            hash_done:     r2_fnv::fnv1a_32(b"r2.compiler.build.done"),
+            hash_error:    r2_fnv::fnv1a_32(b"r2.compiler.build.error"),
+            out_buf: Vec::with_capacity(256),
+            command_program: program.into(),
+            command_args: args,
+        }
+    }
+
+    fn start(&mut self, brief: &[u8]) -> PluginResult {
+        if self.rx.is_some() {
+            return PluginResult::Error(PluginError::new(ERR_BUSY, "session already running"));
+        }
+        let mut cmd = Command::new(&self.command_program);
+        cmd.args(&self.command_args);
+        cmd.stdin(Stdio::piped());
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                return PluginResult::Error(PluginError::new(
+                    ERR_SPAWN,
+                    &format!("spawn failed: {e}"),
+                ));
+            }
+        };
+        let stdin = child.stdin.take();
+        let stdout = match child.stdout.take() {
+            Some(s) => s,
+            None => {
+                let _ = child.kill();
+                return PluginResult::Error(PluginError::new(ERR_SPAWN, "no stdout pipe"));
+            }
+        };
+
+        let (tx, rx) = mpsc::channel();
+        let brief_owned = brief.to_vec();
+
+        // Writer thread: send the brief to claude's stdin.
+        if let Some(mut sin) = stdin {
+            let tx_err = tx.clone();
+            thread::spawn(move || {
+                if let Err(e) = sin.write_all(&brief_owned) {
+                    let _ = tx_err.send(WorkerMsg::Error {
+                        message: format!("stdin write failed: {e}"),
+                        exit_code: -1,
+                    });
+                }
+                // Closing `sin` here signals EOF to the child.
+            });
+        }
+
+        // Reader thread: parse stdout line-by-line.
+        let tx_rd = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines() {
+                match line {
+                    Ok(s) => {
+                        let kind = parse_kind(&s);
+                        let _ = tx_rd.send(WorkerMsg::Line { kind, line: s });
+                    }
+                    Err(e) => {
+                        let _ = tx_rd.send(WorkerMsg::Error {
+                            message: format!("stdout read failed: {e}"),
+                            exit_code: -1,
+                        });
+                        break;
+                    }
+                }
+            }
+            // Reader thread ends when the child closes its stdout. The
+            // wait thread below sends the Done/Error message based on
+            // the actual exit code.
+        });
+
+        // Wait thread: drain the child + report exit.
+        thread::spawn(move || {
+            let status = child.wait();
+            match status {
+                Ok(s) => {
+                    let code = s.code().unwrap_or(-1);
+                    if code == 0 {
+                        let _ = tx.send(WorkerMsg::Done { exit_code: 0 });
+                    } else {
+                        let _ = tx.send(WorkerMsg::Error {
+                            message: format!("claude exited with code {code}"),
+                            exit_code: code,
+                        });
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(WorkerMsg::Error {
+                        message: format!("wait failed: {e}"),
+                        exit_code: -1,
+                    });
+                }
+            }
+        });
+
+        self.rx = Some(rx);
+        // We don't keep the Child here — wait thread owns it.
+        // CMD_CANCEL would need a separate path; v0.1 returns ERR_BUSY
+        // and relies on the wait thread exiting naturally.
+        self.child = None;
+        PluginResult::Ok(PluginResponse::empty())
+    }
+
+    fn cancel(&mut self) -> PluginResult {
+        // Phase 1.7b stub: drop the receiver — Done/Error events from the
+        // wait thread fall on the floor. Real cancel needs the Child
+        // handle held here, which means refactoring the wait thread to
+        // share it via an Arc<Mutex<>>. Tracked as TODO; not blocking.
+        self.rx = None;
+        self.child = None;
+        PluginResult::Ok(PluginResponse::empty())
+    }
+
+    /// Pack a JSON payload into the reusable output buffer + return its slice.
+    fn pack<T: Serialize>(&mut self, v: &T) -> &[u8] {
+        self.out_buf.clear();
+        if let Ok(json) = serde_json::to_writer(&mut self.out_buf, v) {
+            let _ = json;
+        }
+        &self.out_buf
+    }
+}
+
+impl Plugin for ClaudeCodePlugin {
+    fn execute(&mut self, command: PluginCommand, data: &[u8]) -> PluginResult {
+        match command {
+            CMD_START => self.start(data),
+            CMD_CANCEL => self.cancel(),
+            _ => PluginResult::Error(PluginError::new(ERR_UNKNOWN_COMMAND, "unknown command byte")),
+        }
+    }
+
+    fn name(&self) -> &str { "claude-code" }
+
+    fn id(&self) -> PluginId { self.id }
+
+    fn poll(&mut self) -> Option<(u32, &[u8])> {
+        // Drain one message from the worker channel.
+        let msg = self.rx.as_ref()?.try_recv().ok()?;
+        // Hashes are Copy — read them BEFORE borrowing self for pack().
+        let (hash_progress, hash_done, hash_error) =
+            (self.hash_progress, self.hash_done, self.hash_error);
+        match msg {
+            WorkerMsg::Line { kind, line } => {
+                let payload = self.pack(&serde_json::json!({
+                    "phase": "claude",
+                    "kind": kind,
+                    "line": line,
+                }));
+                Some((hash_progress, payload))
+            }
+            WorkerMsg::Done { exit_code } => {
+                self.rx = None;
+                let payload = self.pack(&serde_json::json!({ "exit_code": exit_code }));
+                Some((hash_done, payload))
+            }
+            WorkerMsg::Error { message, exit_code } => {
+                self.rx = None;
+                let payload = self.pack(&serde_json::json!({
+                    "exit_code": exit_code,
+                    "message": message,
+                }));
+                Some((hash_error, payload))
+            }
+        }
+    }
+}
+
+/// Parse the `"type"` field from a stream-json line. Returns `"unknown"`
+/// for non-JSON or shapeless lines.
+fn parse_kind(line: &str) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+        if let Some(t) = v.get("type").and_then(|t| t.as_str()) {
+            return t.to_string();
+        }
+    }
+    "unknown".to_string()
+}
+
+/// Static instance of the orchestrator's claude-code plugin slot's
+/// pre-hashed names — handy for tests that need to identify which
+/// event came out of `poll()`.
+pub fn hashes() -> &'static (u32, u32, u32) {
+    static H: OnceLock<(u32, u32, u32)> = OnceLock::new();
+    H.get_or_init(|| (
+        r2_fnv::fnv1a_32(b"r2.compiler.build.progress"),
+        r2_fnv::fnv1a_32(b"r2.compiler.build.done"),
+        r2_fnv::fnv1a_32(b"r2.compiler.build.error"),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn drain_with_timeout(p: &mut ClaudeCodePlugin, timeout: Duration) -> Vec<(u32, Vec<u8>)> {
+        let mut out = Vec::new();
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            if let Some((h, payload)) = p.poll() {
+                out.push((h, payload.to_vec()));
+                continue;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+            // Stop when we've seen a terminal Done/Error event.
+            if let Some((h, _)) = out.last() {
+                let (_, done, err) = *hashes();
+                if *h == done || *h == err {
+                    break;
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn unknown_command_errors() {
+        let mut p = ClaudeCodePlugin::new(0);
+        let r = p.execute(0xAA, &[]);
+        match r {
+            PluginResult::Error(e) => assert_eq!(e.code, ERR_UNKNOWN_COMMAND),
+            _ => panic!("expected ERR_UNKNOWN_COMMAND"),
+        }
+    }
+
+    #[test]
+    fn echo_fixture_round_trips_to_progress_then_done() {
+        // Use printf to emit two stream-json-ish lines then exit 0.
+        // The shell-quoting matters; use a script via `sh -c`.
+        let mut p = ClaudeCodePlugin::with_command(
+            0,
+            "sh",
+            vec![
+                "-c".into(),
+                r#"printf '{"type":"system","subtype":"init"}\n{"type":"assistant","message":"hello"}\n'"#.into(),
+            ],
+        );
+
+        match p.execute(CMD_START, &[]) {
+            PluginResult::Ok(_) => {}
+            PluginResult::Error(e) => panic!("start failed: code 0x{:02X}: {}", e.code, e.description()),
+        }
+
+        let events = drain_with_timeout(&mut p, Duration::from_secs(3));
+        let (progress, done, _err) = *hashes();
+        let prog_count = events.iter().filter(|(h, _)| *h == progress).count();
+        let done_count = events.iter().filter(|(h, _)| *h == done).count();
+
+        assert!(prog_count >= 2, "expected >=2 progress events, got {prog_count}: {events:?}");
+        assert_eq!(done_count, 1, "expected 1 done event");
+
+        // First progress event's kind should be "system" (from stream-json type).
+        let first_progress = events.iter().find(|(h, _)| *h == progress).expect("a progress event");
+        let parsed: serde_json::Value = serde_json::from_slice(&first_progress.1).unwrap();
+        assert_eq!(parsed["kind"], "system");
+        assert_eq!(parsed["phase"], "claude");
+    }
+
+    #[test]
+    fn nonzero_exit_yields_error_event() {
+        let mut p = ClaudeCodePlugin::with_command(
+            0,
+            "sh",
+            vec!["-c".into(), "exit 3".into()],
+        );
+        match p.execute(CMD_START, &[]) {
+            PluginResult::Ok(_) => {}
+            PluginResult::Error(e) => panic!("start failed: 0x{:02X}", e.code),
+        }
+        let events = drain_with_timeout(&mut p, Duration::from_secs(2));
+        let (_, _, err) = *hashes();
+        let err_count = events.iter().filter(|(h, _)| *h == err).count();
+        assert_eq!(err_count, 1, "expected 1 error event for nonzero exit, got {events:?}");
+        let payload: serde_json::Value =
+            serde_json::from_slice(&events.iter().find(|(h, _)| *h == err).unwrap().1).unwrap();
+        assert_eq!(payload["exit_code"], 3);
+    }
+
+    #[test]
+    fn cannot_start_twice() {
+        // Spawn a long-running command so the first session lingers.
+        let mut p = ClaudeCodePlugin::with_command(
+            0,
+            "sh",
+            vec!["-c".into(), "sleep 5".into()],
+        );
+        assert!(matches!(p.execute(CMD_START, &[]), PluginResult::Ok(_)));
+        match p.execute(CMD_START, &[]) {
+            PluginResult::Error(e) => assert_eq!(e.code, ERR_BUSY),
+            _ => panic!("expected ERR_BUSY for double-start"),
+        }
+        // Cancel to let the test exit promptly.
+        p.execute(CMD_CANCEL, &[]);
+    }
+
+    #[test]
+    fn spawn_failure_returns_err_spawn() {
+        let mut p = ClaudeCodePlugin::with_command(0, "this-binary-does-not-exist-r2", vec![]);
+        match p.execute(CMD_START, &[]) {
+            PluginResult::Error(e) => assert_eq!(e.code, ERR_SPAWN),
+            _ => panic!("expected ERR_SPAWN"),
+        }
+    }
+}

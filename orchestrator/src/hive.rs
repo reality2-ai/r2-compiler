@@ -25,6 +25,7 @@ use r2_engine::queue::QueuedEvent;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{info, warn};
 
+use crate::plugins::ClaudeCodePlugin;
 use crate::sentants::BuilderSentant;
 
 /// Bridge handle exposed to the axum layer.
@@ -54,11 +55,14 @@ pub fn spawn() -> EngineHandle {
     std::thread::spawn(move || {
         let mut bus = EventBus::new();
 
-        // Register sentants (Phase 1.7a: just Builder).
-        let sid = bus.register_sentant(Box::new(BuilderSentant::new()));
-        info!("engine: registered Builder sentant (id={sid})");
+        // Register plugins FIRST — their IDs flow into the sentants that
+        // dispatch to them. Phase 1.7b: just claude-code.
+        let claude_code_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new(0)));
+        info!("engine: registered claude-code plugin (id={claude_code_pid})");
 
-        // Plugin registration is Phase 1.7b+.
+        // Register sentants. Phase 1.7b: Builder dispatches to claude-code.
+        let sid = bus.register_sentant(Box::new(BuilderSentant::new(claude_code_pid)));
+        info!("engine: registered Builder sentant (id={sid})");
 
         bus.init_all();
         info!("engine: bus initialised");

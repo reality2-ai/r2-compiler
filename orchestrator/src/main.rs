@@ -14,6 +14,7 @@
 
 mod bridge;
 mod hive;
+mod plugins;
 mod sentants;
 
 use std::net::SocketAddr;
