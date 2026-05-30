@@ -64,6 +64,30 @@ header h1 { margin: 0; font-size: 20px; font-weight: 600; color: var(--accent); 
 .project-label { color: var(--fg-muted); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .project-name  { color: var(--accent); }
 
+/* /r2 WebSocket status pill */
+.r2-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.r2-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  box-shadow: 0 0 0 2px transparent;
+}
+.r2-dot.ok   { background: var(--ensemble); box-shadow: 0 0 0 2px rgba(167,232,122,0.18); }
+.r2-dot.warn { background: #ffd66b;          box-shadow: 0 0 0 2px rgba(255,214,107,0.18); }
+.r2-dot.err  { background: #ff8a8a;          box-shadow: 0 0 0 2px rgba(255,138,138,0.18); }
+
 /* Main 3-column layout */
 main {
   flex: 1;
@@ -167,6 +191,13 @@ main {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+.workspace-top {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
 }
 
 .workspace-placeholder {
@@ -358,6 +389,114 @@ main {
   white-space: pre;
   tab-size: 4;
 }
+
+/* Build pane — bottom strip of the workspace, surfaces /r2 WS traffic
+ * and the Compile button. Phase 1.7b makes this visible. */
+.build-pane {
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  max-height: 45vh;
+  min-height: 200px;
+}
+.build-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  flex-wrap: wrap;
+}
+.build-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.build-controls .ctl-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.build-controls select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  min-width: 180px;
+}
+.build-controls select:focus { outline: 1px solid var(--accent); }
+
+.btn-primary, .btn-secondary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.btn-primary {
+  background: rgba(121,184,255,0.18);
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+.btn-primary:hover:not(:disabled) { background: rgba(121,184,255,0.28); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--fg-dim);
+}
+.btn-secondary:hover { background: var(--bg-hover); color: var(--fg); }
+
+.build-status {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.build-status[data-state="starting"]     { color: #ffd66b; }
+.build-status[data-state="building"]     { color: var(--accent); }
+.build-status[data-state="done"]         { color: var(--ensemble); }
+.build-status[data-state="error"]        { color: #ff8a8a; }
+.build-status[data-state="disconnected"] { color: #ff8a8a; }
+
+.build-console {
+  flex: 1;
+  margin: 0;
+  padding: 8px 16px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  background: var(--bg);
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.console-line { padding: 1px 0; }
+.console-line.sys          { color: var(--fg-muted); }
+.console-line.out          { color: var(--accent-dim); }
+.console-line.evt          { color: var(--fg-dim); }
+.console-line.evt-progress { color: var(--accent); }
+.console-line.evt-done     { color: var(--ensemble); }
+.console-line.evt-error    { color: #ff8a8a; }
+.console-line.warn         { color: #ffd66b; }
+.console-line.err          { color: #ff8a8a; }
 
 /* Footer */
 footer {

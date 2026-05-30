@@ -58,6 +58,13 @@ let wasmReady = false;
   renderBoards(manifest.boards);
   renderEnsembles(manifest.ensembles);
   attachGlobalHandlers();
+
+  // Phase 1.7b: connect to the orchestrator's /r2 WebSocket and wire
+  // the Build pane to it. The catalogue browser above stays
+  // fully usable even if the WS fails (e.g. when serving the webapp
+  // statically without the orchestrator).
+  populateBuildSelects(manifest);
+  connectR2();
 })();
 
 // ── Header ────────────────────────────────────────────────────────────
@@ -355,3 +362,196 @@ function cssEscape(s) {
 
 document.querySelector("#workspace-placeholder")?.classList.remove("hidden");
 document.querySelector("#entry-detail")?.classList.add("hidden");
+
+// ── /r2 WebSocket client + Build pane ─────────────────────────────────
+//
+// Browser ↔ orchestrator wire format matches `bridge::WireEnvelope`:
+//   {"kind":"event","name":"r2.compiler.build.start","payload":{...}}
+//   {"kind":"hello","from":"...","version":"...","note":"..."}
+//   {"kind":"ack","echo":"..."}
+//
+// We're tolerant of WS failure — if the orchestrator isn't running,
+// the catalogue browser still works; the Build pane just stays
+// disabled with a "disconnected" indicator.
+
+let r2Ws = null;
+let r2ReconnectTimer = null;
+let r2ReconnectDelayMs = 1000;
+const R2_RECONNECT_MAX_MS = 15_000;
+
+function r2Url() {
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  return `${scheme}://${location.host}/r2`;
+}
+
+function setR2Status(state, label) {
+  const dot = $("r2-dot");
+  const lbl = $("r2-label");
+  if (!dot || !lbl) return;
+  dot.classList.remove("ok", "warn", "err");
+  dot.classList.add(state);
+  lbl.textContent = label;
+  const compileBtn = $("build-compile");
+  if (compileBtn) {
+    const ready = state === "ok" && $("build-board").value && $("build-ensemble").value;
+    compileBtn.disabled = !ready;
+  }
+}
+
+function connectR2() {
+  setR2Status("warn", "connecting…");
+  try {
+    r2Ws = new WebSocket(r2Url());
+  } catch (err) {
+    consoleLine("err", `WS construct failed: ${err.message}`);
+    scheduleReconnect();
+    return;
+  }
+  r2Ws.addEventListener("open", () => {
+    r2ReconnectDelayMs = 1000;
+    setR2Status("ok", "connected");
+    consoleLine("sys", "/r2 connected");
+  });
+  r2Ws.addEventListener("message", (ev) => {
+    let env;
+    try {
+      env = JSON.parse(ev.data);
+    } catch (err) {
+      consoleLine("err", `unparseable frame: ${err.message}`);
+      return;
+    }
+    handleEnvelope(env);
+  });
+  r2Ws.addEventListener("close", () => {
+    setR2Status("err", "disconnected");
+    consoleLine("sys", "/r2 closed — reconnecting…");
+    scheduleReconnect();
+  });
+  r2Ws.addEventListener("error", () => {
+    setR2Status("err", "error");
+  });
+}
+
+function scheduleReconnect() {
+  if (r2ReconnectTimer) return;
+  r2ReconnectTimer = setTimeout(() => {
+    r2ReconnectTimer = null;
+    r2ReconnectDelayMs = Math.min(r2ReconnectDelayMs * 2, R2_RECONNECT_MAX_MS);
+    connectR2();
+  }, r2ReconnectDelayMs);
+}
+
+function handleEnvelope(env) {
+  switch (env.kind) {
+    case "hello":
+      consoleLine("sys", `hello from ${env.from} v${env.version}${env.note ? ` — ${env.note}` : ""}`);
+      break;
+    case "ack":
+      consoleLine("sys", `ack: ${env.echo}`);
+      break;
+    case "event":
+      onEvent(env.name, env.payload);
+      break;
+    default:
+      consoleLine("warn", `unknown envelope kind: ${env.kind}`);
+  }
+}
+
+function onEvent(name, payload) {
+  let cls = "evt";
+  if (name === "r2.compiler.build.progress") cls = "evt-progress";
+  else if (name === "r2.compiler.build.done") cls = "evt-done";
+  else if (name === "r2.compiler.build.error") cls = "evt-error";
+  consoleLine(cls, `${name}  ${formatPayload(payload)}`);
+  if (name === "r2.compiler.build.done") {
+    setBuildStatus("done");
+  } else if (name === "r2.compiler.build.error") {
+    setBuildStatus("error");
+  } else if (name === "r2.compiler.build.progress") {
+    setBuildStatus("building");
+  }
+}
+
+function formatPayload(p) {
+  if (p === null || p === undefined) return "";
+  if (typeof p === "string") return p;
+  try { return JSON.stringify(p); } catch { return String(p); }
+}
+
+function sendEvent(name, payload) {
+  if (!r2Ws || r2Ws.readyState !== WebSocket.OPEN) {
+    consoleLine("err", `cannot send ${name} — /r2 not open`);
+    return false;
+  }
+  const env = { kind: "event", name, payload };
+  r2Ws.send(JSON.stringify(env));
+  consoleLine("out", `→ ${name}  ${formatPayload(payload)}`);
+  return true;
+}
+
+// ── Build pane ────────────────────────────────────────────────────────
+
+function populateBuildSelects(m) {
+  const bsel = $("build-board");
+  const esel = $("build-ensemble");
+  if (!bsel || !esel) return;
+  bsel.innerHTML = '<option value="">— choose —</option>';
+  for (const b of m.boards) {
+    const opt = document.createElement("option");
+    opt.value = b.slug;
+    opt.textContent = `${b.name}  (${b.target_triple || "?"})`;
+    bsel.appendChild(opt);
+  }
+  esel.innerHTML = '<option value="">— choose —</option>';
+  for (const e of m.ensembles) {
+    const opt = document.createElement("option");
+    opt.value = e.slug;
+    opt.textContent = `${e.name}`;
+    esel.appendChild(opt);
+  }
+  const refresh = () => {
+    const ready = r2Ws && r2Ws.readyState === WebSocket.OPEN && bsel.value && esel.value;
+    $("build-compile").disabled = !ready;
+  };
+  bsel.addEventListener("change", refresh);
+  esel.addEventListener("change", refresh);
+
+  $("build-compile").addEventListener("click", () => {
+    const board = bsel.value;
+    const ensemble = esel.value;
+    if (!board || !ensemble) return;
+    setBuildStatus("starting");
+    const ok = sendEvent("r2.compiler.build.start", {
+      target: board,
+      score: ensemble,
+      // Phase 1.8 adds the Tera-rendered prompt brief in the payload;
+      // for now the claude-code plugin uses its default command per
+      // SPEC-R2-COMPILER §5.
+    });
+    if (!ok) setBuildStatus("disconnected");
+  });
+
+  $("build-clear").addEventListener("click", () => {
+    $("build-console").textContent = "";
+  });
+}
+
+function setBuildStatus(state) {
+  const el = $("build-status");
+  if (!el) return;
+  el.dataset.state = state;
+  el.textContent = state;
+}
+
+function consoleLine(cls, text) {
+  const pane = $("build-console");
+  if (!pane) return;
+  const line = document.createElement("div");
+  line.className = `console-line ${cls}`;
+  const ts = new Date().toISOString().slice(11, 19);
+  line.textContent = `${ts}  ${text}`;
+  pane.appendChild(line);
+  pane.scrollTop = pane.scrollHeight;
+  // Keep the log bounded — drop oldest lines past 500.
+  while (pane.childNodes.length > 500) pane.removeChild(pane.firstChild);
+}

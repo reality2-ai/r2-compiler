@@ -15,6 +15,10 @@
           <span class="project-label">Apiary</span>
           <span class="project-name">(none open)</span>
         </div>
+        <div class="r2-status" id="r2-status" title="/r2 WebSocket status">
+          <span class="r2-dot" id="r2-dot"></span>
+          <span class="r2-label" id="r2-label">connecting…</span>
+        </div>
         <p class="stats" id="stats">Loading…</p>
       </div>
     </header>
@@ -31,6 +35,9 @@
 
       <!-- CENTRE: workspace -->
       <section class="workspace">
+        <!-- Wrapper for placeholder + entry-detail so the Build pane
+             can sit beneath them in the column. -->
+        <div class="workspace-top">
         <div class="workspace-placeholder" id="workspace-placeholder">
           <h2>Workspace</h2>
           <p>
@@ -40,9 +47,11 @@
             open in the viewer below.
           </p>
           <p class="hint">
-            Once you've chosen a board + an ensemble, the canvas will
-            serialise the composition to an R2-DEF §7 score and dispatch
-            <code>claude -p</code> to produce per-carrier firmware.
+            The Build pane below fires a real <code>r2.compiler.build.start</code>
+            event on the <code>/r2</code> WebSocket — try it. (Today
+            the orchestrator's <code>claude-code</code> plugin actually
+            spawns <code>claude -p</code>; Phase 1.8+ adds a Tera-rendered
+            prompt template per SPEC-R2-COMPILER §5.)
           </p>
         </div>
 
@@ -71,6 +80,27 @@
             </div>
           </div>
         </div>
+        </div><!-- /.workspace-top -->
+
+        <!-- Build pane — always-visible bottom strip. Phase 1.7b's
+             event flow surfaces here. Phase 2-full's drag-and-drop
+             canvas will replace the placeholder above. -->
+        <div class="build-pane" id="build-pane">
+          <div class="build-controls">
+            <label>
+              <span class="ctl-label">Board</span>
+              <select id="build-board"></select>
+            </label>
+            <label>
+              <span class="ctl-label">Ensemble</span>
+              <select id="build-ensemble"></select>
+            </label>
+            <button class="btn-primary" id="build-compile" disabled>Compile</button>
+            <button class="btn-secondary" id="build-clear" title="Clear the build console">Clear</button>
+            <span class="build-status" id="build-status">idle</span>
+          </div>
+          <pre class="build-console" id="build-console" aria-live="polite"></pre>
+        </div>
       </section>
 
       <!-- RIGHT: ensembles -->
@@ -85,7 +115,9 @@
 
     <footer>
       <span>
-        Static preview — no WASM hive, no R2 events, no compile yet.
+        Phase 1.7b end-to-end live — <code>r2.compiler.build.start</code> over <code>/r2</code>
+        dispatches to the <code>claude-code</code> plugin; progress events stream back into
+        the Build pane.
         See <a href="https://github.com/reality2-ai/r2-compiler/blob/main/plan/PLAN.md">PLAN.md</a>
         for the full architecture.
       </span>
