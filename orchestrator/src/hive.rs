@@ -26,7 +26,7 @@ use tokio::sync::{broadcast, mpsc};
 use tracing::{info, warn};
 
 use crate::plugins::ClaudeCodePlugin;
-use crate::sentants::BuilderSentant;
+use crate::sentants::{AuthorSentant, BuilderSentant};
 
 /// Bridge handle exposed to the axum layer.
 #[derive(Clone)]
@@ -56,13 +56,20 @@ pub fn spawn() -> EngineHandle {
         let mut bus = EventBus::new();
 
         // Register plugins FIRST — their IDs flow into the sentants that
-        // dispatch to them. Phase 1.7b: just claude-code.
-        let claude_code_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new(0)));
-        info!("engine: registered claude-code plugin (id={claude_code_pid})");
+        // dispatch to them. Two claude-code plugin instances: one for
+        // the build flow (emits r2.compiler.build.*) and one for the
+        // author / chat flow (emits r2.compiler.author.*). Same plugin
+        // impl; different event-name configuration at construction time.
+        let build_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new(0)));
+        info!("engine: registered claude-code plugin for build (id={build_pid})");
+        let author_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new_author(0)));
+        info!("engine: registered claude-code plugin for author (id={author_pid})");
 
-        // Register sentants. Phase 1.7b: Builder dispatches to claude-code.
-        let sid = bus.register_sentant(Box::new(BuilderSentant::new(claude_code_pid)));
-        info!("engine: registered Builder sentant (id={sid})");
+        // Register sentants.
+        let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));
+        info!("engine: registered Builder sentant (id={build_sid})");
+        let author_sid = bus.register_sentant(Box::new(AuthorSentant::new(author_pid)));
+        info!("engine: registered Author sentant (id={author_sid})");
 
         bus.init_all();
         info!("engine: bus initialised");

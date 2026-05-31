@@ -1168,12 +1168,16 @@ function onAuthorEvent(name, payload) {
     chatState.history.push(chatState.pending);
   }
   if (name === "r2.compiler.author.reply") {
-    const chunk = typeof payload === "string"
-      ? payload
-      : (payload?.text ?? payload?.line ?? payload?.content ?? "");
-    chatState.pending.content += String(chunk);
-    renderChat();
-    bumpChatBadge();
+    // The orchestrator's claude-code plugin extracts `payload.text` from
+    // stream-json assistant + result lines; system / init / tool-use
+    // lines come through with text=null and we skip them so the chat
+    // pane only shows the actual conversation.
+    const text = typeof payload === "string" ? payload : payload?.text;
+    if (text) {
+      chatState.pending.content += String(text);
+      renderChat();
+      bumpChatBadge();
+    }
   } else if (name === "r2.compiler.author.done") {
     chatState.pending = null;
     renderChat();

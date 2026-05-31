@@ -62,12 +62,47 @@ pub const ERR_UNKNOWN_COMMAND: u8 = 0xFE;
 /// One parsed event delivered from the worker thread to `poll()`.
 #[derive(Debug)]
 enum WorkerMsg {
-    /// Stream-json line parsed (or fallback raw text).
-    Line { kind: String, line: String },
+    /// A text chunk extracted from an assistant / result line. Already
+    /// sized to fit in r2-engine's 256B payload cap once packed into
+    /// `{"kind":..., "text":...}`. The reader thread splits long text
+    /// into multiple `Text` messages; the chat pane concatenates them
+    /// back together as they arrive.
+    Text { kind: String, chunk: String },
+    /// Structural / metadata line (system init, rate_limit_event,
+    /// tool_use, …) with no user-visible text. Emitted once so build
+    /// consoles can observe the cadence; the chat pane skips them.
+    Meta { kind: String },
     /// Subprocess finished with this exit code.
     Done { exit_code: i32 },
     /// Setup or read error.
     Error { message: String, exit_code: i32 },
+}
+
+/// Per-emission payload budget. r2-engine's `MAX_QUEUED_PAYLOAD` is 256
+/// bytes; a `{"kind":"assistant","text":"…"}` wrapper costs ~28 bytes of
+/// overhead, and JSON escaping inflates text by up to 2× in the
+/// pathological case. 150 keeps us safely under the cap across the
+/// expected character mix; r2-engine task #29 will lift this constraint.
+const TEXT_CHUNK_BYTES: usize = 150;
+
+/// Split a UTF-8 text into ≤`max` byte chunks, respecting char
+/// boundaries so we never bisect a multi-byte codepoint.
+fn chunk_text(text: &str, max: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut start = 0;
+    while start < text.len() {
+        let mut end = (start + max).min(text.len());
+        // Walk back to a char boundary if we landed mid-codepoint.
+        while end < text.len() && !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        if end == start {
+            break; // shouldn't happen with valid UTF-8 + non-zero max
+        }
+        out.push(text[start..end].to_string());
+        start = end;
+    }
+    out
 }
 
 /// Plugin instance — holds a receiver from the worker thread + an
@@ -76,8 +111,11 @@ pub struct ClaudeCodePlugin {
     id: PluginId,
     rx: Option<mpsc::Receiver<WorkerMsg>>,
     child: Option<Child>,
-    /// Pre-hashed event names (interned at first construction).
-    hash_progress: u32,
+    /// Pre-hashed event names — configurable per instance so the same
+    /// plugin implementation drives both the build flow
+    /// (`r2.compiler.build.*`) and the author / chat flow
+    /// (`r2.compiler.author.*`).
+    hash_text: u32,
     hash_done: u32,
     hash_error: u32,
     /// Reusable output buffer for `poll()`.
@@ -89,20 +127,73 @@ pub struct ClaudeCodePlugin {
 }
 
 impl ClaudeCodePlugin {
-    /// Construct with the default `claude -p` command.
+    /// Construct for the **build flow** — emits `r2.compiler.build.progress`,
+    /// `r2.compiler.build.done`, `r2.compiler.build.error`.
     pub fn new(id: PluginId) -> Self {
-        Self::with_command(id, "claude", vec!["-p".to_string(), "--output-format=stream-json".to_string()])
+        Self::with_events(
+            id,
+            "claude",
+            vec![
+                "-p".to_string(),
+                "--output-format=stream-json".to_string(),
+                "--verbose".to_string(),
+            ],
+            "r2.compiler.build.progress",
+            "r2.compiler.build.done",
+            "r2.compiler.build.error",
+        )
+    }
+
+    /// Construct for the **author / chat flow** — emits
+    /// `r2.compiler.author.reply`, `r2.compiler.author.done`,
+    /// `r2.compiler.author.error`. Same subprocess shape; different
+    /// event names so the webapp can route the stream into the chat
+    /// pane rather than the build console.
+    pub fn new_author(id: PluginId) -> Self {
+        Self::with_events(
+            id,
+            "claude",
+            vec![
+                "-p".to_string(),
+                "--output-format=stream-json".to_string(),
+                "--verbose".to_string(),
+            ],
+            "r2.compiler.author.reply",
+            "r2.compiler.author.done",
+            "r2.compiler.author.error",
+        )
     }
 
     /// Construct with a custom command (used by tests with fixture scripts).
+    /// Defaults to the build event-name set.
     pub fn with_command(id: PluginId, program: impl Into<String>, args: Vec<String>) -> Self {
+        Self::with_events(
+            id,
+            program,
+            args,
+            "r2.compiler.build.progress",
+            "r2.compiler.build.done",
+            "r2.compiler.build.error",
+        )
+    }
+
+    /// Construct with custom command + custom event names. The most
+    /// general constructor; the typed builders above call it.
+    pub fn with_events(
+        id: PluginId,
+        program: impl Into<String>,
+        args: Vec<String>,
+        text_event: &str,
+        done_event: &str,
+        error_event: &str,
+    ) -> Self {
         Self {
             id,
             rx: None,
             child: None,
-            hash_progress: r2_fnv::fnv1a_32(b"r2.compiler.build.progress"),
-            hash_done:     r2_fnv::fnv1a_32(b"r2.compiler.build.done"),
-            hash_error:    r2_fnv::fnv1a_32(b"r2.compiler.build.error"),
+            hash_text:  r2_fnv::fnv1a_32(text_event.as_bytes()),
+            hash_done:  r2_fnv::fnv1a_32(done_event.as_bytes()),
+            hash_error: r2_fnv::fnv1a_32(error_event.as_bytes()),
             out_buf: Vec::with_capacity(256),
             command_program: program.into(),
             command_args: args,
@@ -154,7 +245,11 @@ impl ClaudeCodePlugin {
             });
         }
 
-        // Reader thread: parse stdout line-by-line.
+        // Reader thread: parse stdout line-by-line; extract text content
+        // from assistant / result lines and chunk it before queueing.
+        // Non-text lines (system init, rate_limit_event, tool_use, …)
+        // surface as Meta so the build console can observe the cadence
+        // without flooding the chat.
         let tx_rd = tx.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
@@ -162,7 +257,19 @@ impl ClaudeCodePlugin {
                 match line {
                     Ok(s) => {
                         let kind = parse_kind(&s);
-                        let _ = tx_rd.send(WorkerMsg::Line { kind, line: s });
+                        match extract_text_content(&s) {
+                            Some(text) if !text.is_empty() => {
+                                for chunk in chunk_text(&text, TEXT_CHUNK_BYTES) {
+                                    let _ = tx_rd.send(WorkerMsg::Text {
+                                        kind: kind.clone(),
+                                        chunk,
+                                    });
+                                }
+                            }
+                            _ => {
+                                let _ = tx_rd.send(WorkerMsg::Meta { kind });
+                            }
+                        }
                     }
                     Err(e) => {
                         let _ = tx_rd.send(WorkerMsg::Error {
@@ -247,16 +354,22 @@ impl Plugin for ClaudeCodePlugin {
         // Drain one message from the worker channel.
         let msg = self.rx.as_ref()?.try_recv().ok()?;
         // Hashes are Copy — read them BEFORE borrowing self for pack().
-        let (hash_progress, hash_done, hash_error) =
-            (self.hash_progress, self.hash_done, self.hash_error);
+        let (hash_text, hash_done, hash_error) =
+            (self.hash_text, self.hash_done, self.hash_error);
         match msg {
-            WorkerMsg::Line { kind, line } => {
+            WorkerMsg::Text { kind, chunk } => {
                 let payload = self.pack(&serde_json::json!({
-                    "phase": "claude",
                     "kind": kind,
-                    "line": line,
+                    "text": chunk,
                 }));
-                Some((hash_progress, payload))
+                Some((hash_text, payload))
+            }
+            WorkerMsg::Meta { kind } => {
+                let payload = self.pack(&serde_json::json!({
+                    "kind": kind,
+                    "text": serde_json::Value::Null,
+                }));
+                Some((hash_text, payload))
             }
             WorkerMsg::Done { exit_code } => {
                 self.rx = None;
@@ -284,6 +397,36 @@ fn parse_kind(line: &str) -> String {
         }
     }
     "unknown".to_string()
+}
+
+/// Extract the human-readable text content from a Claude Code stream-json
+/// line. Returns `None` for system / init / tool-use / result / other
+/// lines that carry no NEW user-visible text — the chat pane skips
+/// those; the build console still observes the cadence via Meta events.
+///
+/// Result lines are deliberately treated as Meta: their `result` field
+/// duplicates the assistant text already emitted, and showing it again
+/// would render the reply twice in chat.
+///
+/// Recognised text-bearing shapes:
+///   `{"type":"assistant","message":{"content":[{"type":"text","text":"…"},…]}}`
+fn extract_text_content(line: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+    match v.get("type").and_then(|t| t.as_str())? {
+        "assistant" => {
+            let content = v.get("message")?.get("content")?.as_array()?;
+            let mut out = String::new();
+            for item in content {
+                if item.get("type").and_then(|t| t.as_str()) == Some("text") {
+                    if let Some(t) = item.get("text").and_then(|t| t.as_str()) {
+                        out.push_str(t);
+                    }
+                }
+            }
+            if out.is_empty() { None } else { Some(out) }
+        }
+        _ => None,
+    }
 }
 
 /// Static instance of the orchestrator's claude-code plugin slot's
@@ -359,11 +502,12 @@ mod tests {
         assert!(prog_count >= 2, "expected >=2 progress events, got {prog_count}: {events:?}");
         assert_eq!(done_count, 1, "expected 1 done event");
 
-        // First progress event's kind should be "system" (from stream-json type).
+        // First progress event's kind should be "system" (Meta variant
+        // since the line carries no text content).
         let first_progress = events.iter().find(|(h, _)| *h == progress).expect("a progress event");
         let parsed: serde_json::Value = serde_json::from_slice(&first_progress.1).unwrap();
         assert_eq!(parsed["kind"], "system");
-        assert_eq!(parsed["phase"], "claude");
+        assert!(parsed["text"].is_null());
     }
 
     #[test]
