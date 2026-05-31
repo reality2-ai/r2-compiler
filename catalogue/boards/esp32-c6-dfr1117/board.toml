@@ -30,6 +30,7 @@ esp_idf_version = "v5.2.5"                         # quoted from templates/.carg
 flash_size_mb   = 4                                # CONFIG_ESPTOOLPY_FLASHSIZE_4MB
 psram           = false                            # ESP32-C6-FH4 has no PSRAM
 usb_serial_jtag = true                             # CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+uart_cp2102     = false                            # no on-board CP2102; native USB-Serial-JTAG only (USB-C)
 
 [compile_target]
 tag = "esp32-c6"                                   # R2-DEF §7.7 — what scores match against
@@ -139,6 +140,11 @@ role_hint   = "spi-sck"
 "GPIO0"  = "BOOT button — strapping pin, avoid"
 "GPIO8"  = "Strapping pin, avoid"
 "GPIO9"  = "Strapping pin, avoid"
+
+# Pins broken out on the header but not yet assigned a role on this carrier.
+# Informative — safe for ensemble plugins to bind for future expansion.
+[pinout.free]
+gpio = ["GPIO5", "GPIO6"]
 
 [references]
 vendor_url        = "https://wiki.dfrobot.com/dfr1117/"

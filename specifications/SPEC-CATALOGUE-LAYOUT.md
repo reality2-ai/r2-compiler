@@ -1,11 +1,15 @@
 # SPEC-CATALOGUE-LAYOUT: directory shape and authoring rules for r2-compiler's catalogue
 
-**Version:** 0.2 Draft
-**Date:** 2026-05-31
+**Version:** 0.3 Draft
+**Date:** 2026-06-01
 **Status:** Normative Draft
 **Depends on:**
-- **Upstream (canonical):** R2-PLUGIN §12 (plugin manifest, README mandatory sections), R2-DEF §2 (sentant schema), R2-DEF §7 (ensemble score), R2-ENSEMBLE §2.1.2 (hive-shared vs ensemble-owned), R2-COMPILE §4 (compile targets), R2-BUILD §2 (target triples)
+- **Upstream (canonical):** R2-PLUGIN §12 (plugin manifest, README mandatory sections), R2-DEF §2 (sentant schema), R2-DEF §7 (ensemble score), R2-ENSEMBLE §2.1.2 (hive-shared vs ensemble-owned), R2-COMPILE §4 (compile targets), R2-BUILD §2 (target triples), RFC 2119 + RFC 8174 (normative keywords)
 - **r2-compiler:** companion [`SPEC-R2-COMPILER.md`](SPEC-R2-COMPILER.md)
+
+## Conventions
+
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this document are to be interpreted as described in BCP 14 (RFC 2119, RFC 8174) when, and only when, they appear in all capitals, as shown here.
 
 ---
 
@@ -53,109 +57,222 @@ Out of scope:
 
 ### 3.1 Directory layout
 
+A carrier-board catalogue entry **MUST** conform to the layout below. Files marked **REQUIRED** **MUST** be present; files marked **OPTIONAL** **MAY** be present.
+
 ```
 catalogue/boards/<arch>-<chip>-<carrier>/
-  board.toml                  # REQUIRED — see §3.2
-  BOARD.md                    # REQUIRED — narrative
-  AI-CONTEXT.md               # REQUIRED — fresh-CC brief
-  pinout.svg                  # OPTIONAL in v0.1; REQUIRED once Phase 4 (pin visualisation) lands
-  plugins/                    # OPTIONAL — hive-shared singleton plugins for this carrier
-    <category>/<name>/        # e.g. comms/ble-radio, comms/wifi-radio, comms/lora-radio
-  templates/                  # REQUIRED — per-carrier firmware-crate seed files
+  board.toml                  # REQUIRED — canonical artefact (§3.3)
+  BOARD.md                    # REQUIRED — narrative (§3.4)
+  AI-CONTEXT.md               # REQUIRED — fresh-CC brief (§3.5)
+  pinout.svg                  # OPTIONAL in v0.1; REQUIRED once Phase 4 lands
+  plugins/                    # OPTIONAL — hive-shared singleton plugins (§5)
+    <category>/<name>/        # e.g. comms/ble-radio, comms/wifi-radio
+  templates/                  # REQUIRED — per-carrier firmware-crate seed files (§3.6)
     Cargo.toml.tera           # REQUIRED — Tera template; rendered per build
-    sdkconfig.defaults        # OPTIONAL — ESP-IDF carriers
-    partitions.csv            # OPTIONAL — ESP-IDF carriers
     .cargo/config.toml        # REQUIRED — target triple + linker
-    rust-toolchain.toml       # OPTIONAL — pins toolchain
-    wifi_config.toml.example  # OPTIONAL — dev fallback for WiFi creds
-  datasheets/                 # REQUIRED if vendor PDFs were consulted
-    *.pdf                     # one or more vendor datasheets / schematic exports
-  conversation/               # REQUIRED — one transcript per authoring session
+    build.rs                  # REQUIRED — env stamping, partition staging
+    rust-toolchain.toml       # REQUIRED — pinned toolchain
+    sdkconfig.defaults        # REQUIRED for ESP-IDF carriers
+    partitions.csv            # REQUIRED for ESP-IDF carriers
+    wifi_config.toml.example  # REQUIRED if the carrier supports WiFi
+  datasheets/                 # REQUIRED if vendor PDFs / wiring docs were consulted
+    HARDWARE-WIRING-<X>.md    # REQUIRED — wiring guide; filename SHOULD match
+                              # `references.wiring_guide` in board.toml
+    *.pdf                     # OPTIONAL — vendor datasheets / schematic exports
+  material/                   # OPTIONAL — raw uploaded references awaiting processing
+                              # (per [[project-material-collection-and-processing]])
+  conversation/               # REQUIRED — ≥1 transcript per authoring session
     YYYY-MM-DD-<topic>-NN.md
 ```
 
-Directory NAME = `<arch>-<chip>-<carrier>`, kebab-case:
+The directory name **MUST** be `<arch>-<chip>-<carrier>` in kebab-case:
 
 | Segment | Value |
 |---|---|
 | `<arch>` | R2-COMPILE §4 platform tag (`esp32`, `nrf`, `rp2`, `avr`, `linux-embedded`) |
-| `<chip>` | chip family slug (`s3`, `c6`, …) |
-| `<carrier>` | board model (`devkitc`, `xiao`, `dfr1117`, …) |
+| `<chip>` | Chip family slug (`s3`, `c6`, `nrf52840`, `rp2040`, …) |
+| `<carrier>` | Board / module model (`devkitc`, `xiao`, `dfr1117`, …) |
 
-### 3.2 `board.toml`
+### 3.2 Class string and hash
+
+A carrier board's R2 class string **MUST** be `ai.reality2.board.<carrier>` (e.g. `ai.reality2.board.dfr1117`). The class hash is `FNV-1a-32(class_string_utf8_bytes)` per R2-FNV §2. The orchestrator computes the hash; `board.toml` **SHOULD NOT** include a hard-coded hash.
+
+### 3.3 `board.toml` — REQUIRED canonical artefact
+
+Every key below is normatively scoped. Unknown keys **MUST NOT** be silently accepted by validators — they **MUST** be either accepted (after a spec amendment) or reported as `E_BOARD_UNKNOWN_KEY`.
+
+#### 3.3.1 `[board]` — REQUIRED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `name` | string | **REQUIRED** | **MUST** equal the directory name. |
+| `arch` | string | **REQUIRED** | **MUST** be a R2-COMPILE §4 platform tag. |
+| `chip` | string | **REQUIRED** | ESP-IDF / vendor chip-family slug (`esp32s3`, `esp32c6`, `nrf52840`, …). |
+| `carrier` | string | **REQUIRED** | Carrier model slug (`devkitc`, `xiao`, `dfr1117`). **MUST** match the `<carrier>` segment of the directory name. |
+| `version` | string | **REQUIRED** | Semver. Tracks the board entry's own version, not the chip's revision. |
+| `description` | string | **REQUIRED** | Multi-line freeform paragraph. **SHOULD** describe physical form factor, key peripherals, USB topology, role in the catalogue. |
+
+#### 3.3.2 `[build]` — REQUIRED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `target_triple` | string | **REQUIRED** | **MUST** appear in R2-BUILD §2 table. |
+| `toolchain` | string | **REQUIRED** | Toolchain identifier (`esp` via `espup install`, `nightly`, `stable`, etc.). |
+| `esp_idf_version` | string | **REQUIRED** if `chip` starts with `esp32` | Quoted from `templates/.cargo/config.toml`. |
+| `flash_size_mb` | integer | **REQUIRED** | **MUST** match `CONFIG_ESPTOOLPY_FLASHSIZE_*MB` in `sdkconfig.defaults` for ESP-IDF carriers. |
+| `psram` | boolean | **REQUIRED** | |
+| `psram_mode` | string | **REQUIRED** if `psram = true` | `"octal"` or `"quad"`. |
+| `psram_speed_mhz` | integer | **REQUIRED** if `psram = true` | Typically `80` or `120`. |
+| `usb_serial_jtag` | boolean | **REQUIRED** for ESP-IDF carriers | Whether the chip exposes native USB-Serial-JTAG. |
+| `uart_cp2102` | boolean | **REQUIRED** for ESP-IDF carriers | Whether the carrier has a CP2102 (or equivalent) USB-UART bridge **in addition to** the native USB. **MUST** be explicitly `false` rather than omitted if absent. |
+
+Other `[build]` keys **MAY** be added for non-ESP families (e.g. `bootloader_kind = "mcuboot"` for nRF); such additions **MUST** be reflected in an amendment to this spec.
+
+#### 3.3.3 `[compile_target]` — REQUIRED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `tag` | string | **REQUIRED** | **MUST** appear in R2-DEF §7.7 list. Ensemble scores match against this tag. Multiple carriers **MAY** share a tag (e.g. esp32-s3-devkitc and esp32-s3-xiao both use `esp32-s3`). |
+
+#### 3.3.4 `[capabilities]` — REQUIRED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `provides` | array&lt;string&gt; | **REQUIRED** | Hardware capabilities the carrier exposes (`r2.hw.*` namespace). Ensemble plugins' `capabilities.requires` **MUST** be satisfiable from this list or from a hive-shared plugin under this board's `plugins/`. |
+| `absent` | array&lt;string&gt; | **RECOMMENDED** | Capabilities deliberately NOT present, listed when their absence is surprising (e.g. `r2.hw.psram` on a chip variant most people assume has PSRAM). |
+
+#### 3.3.5 `[pinout]` — REQUIRED (empty header) + per-GPIO sub-tables
+
+The empty `[pinout]` header **MUST** precede the per-GPIO sub-tables. For each GPIO the board exposes that has a documented role or is reserved:
 
 ```toml
-[board]
-name        = "esp32-c6-dfr1117"
-arch        = "esp32"
-chip        = "esp32c6"
-carrier     = "dfr1117"
-version     = "0.1.0"
-description = "DFRobot DFR1117 ESP32-C6 carrier (RISC-V, NimBLE, WiFi 6, BLE 5.3)."
-
-[build]
-target_triple   = "riscv32imac-esp-espidf"
-toolchain       = "esp"
-flash_size_mb   = 4
-psram           = false
-usb_serial_jtag = true
-
-[compile_target]
-tag = "esp32-c6"                               # R2-DEF §7.7
-
-[capabilities]
-# Hardware-shared singletons exposed by this carrier.
-# Ensemble plugins' `capabilities.requires` MUST be satisfiable from this list
-# OR from a hive-shared plugin declared under this board's plugins/ subtree.
-provides = [
-  "r2.hw.spi", "r2.hw.i2c", "r2.hw.gpio", "r2.hw.adc", "r2.hw.uart",
-  "r2.hw.ble", "r2.hw.wifi", "r2.hw.flash", "r2.hw.sdspi",
-]
-
-[pinout]                                       # OPTIONAL in v0.1; used by Phase 4
-
-[references]
-vendor_url        = "https://wiki.dfrobot.com/..."
-chip_datasheet    = "esp32-c6-datasheet.pdf"
-carrier_schematic = "dfr1117-schematic.pdf"
-
-[compulsory_plugins]
-# Plugins / capabilities that MUST be linked into every build for this carrier,
-# regardless of operator choice on the canvas. The compiler plugin resolves
-# these against the chosen ensemble's plugins/, this board's plugins/, and
-# the core crates under crates/r2-plugin-*. Build fails with
-# E_COMPULSORY_PLUGIN_MISSING if any capability is unsatisfied.
-#
-# OTA is universally compulsory per [[project-compulsory-plugins-and-virgin-boards]];
-# the specific OTA plugin chosen here is carrier-appropriate (e.g. esp_ota_*-based
-# for ESP32 family, MCUboot-based for nRF / RP2 once those carriers are added).
-capabilities = ["ai.reality2.deploy.ota"]
-prefer = ["ota-tcp"]                              # plugin name to satisfy each capability
+[pinout.gpio.GPIO<N>]
+description = "…"
+silk        = "…"
+header      = "…"            # OPTIONAL
+functions   = [...]
+role_hint   = "…"            # OPTIONAL
 ```
 
-Validation (orchestrator's `catalogue plugin` MUST enforce):
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `description` | string | **REQUIRED** | Human-readable purpose, including pin number on header where relevant. |
+| `silk` | string | **REQUIRED** | Silkscreen label on the physical board (e.g. `"D0"`, `"LP_RX"`, `"(on-board)"` for non-exposed pins). |
+| `header` | string | **OPTIONAL** | Header-pin identifier (e.g. `"J1.4"`) for boards with named headers. |
+| `functions` | array&lt;string&gt; | **REQUIRED** | Per-pin capability tags (`"digital"`, `"adc"`, `"spi"`, `"i2c"`, `"rtc"`, `"rmt"`, `"ledc"`, `"uart"`, `"spi-cs"`). |
+| `role_hint` | string | **OPTIONAL** | Suggested binding (`"status-led"`, `"accel-cs"`, `"battery-sense"`, `"i2c-sda"`). Drives default pin assignments when the compiler plugin resolves ensemble plugin requirements. |
+
+Two further tables **SHOULD** be present:
+
+```toml
+[pinout.reserved]
+"GPIO<N>" = "<reason>"            # strapping pin, USB D±, PSRAM, etc.
+
+[pinout.free]
+gpio = ["GPIO<N>", "GPIO<M>", …]  # informative list of pins available for expansion
+```
+
+| Sub-table | Status | Notes |
+|---|---|---|
+| `[pinout.reserved]` | **RECOMMENDED** | Pins **MUST NOT** be wired to peripherals (strapping pins, USB D±, console UART, PSRAM lines). |
+| `[pinout.free]` | **RECOMMENDED** | Informative — pins not currently assigned a role and safe for future bindings. |
+
+#### 3.3.6 `[references]` — REQUIRED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `vendor_url` | string | **REQUIRED** | Carrier vendor's product / wiki page. |
+| `chip_vendor_url` | string | **REQUIRED** | Chip vendor's product page (e.g. Espressif SoC page). |
+| `product_url` | string | **OPTIONAL** | Retail SKU page where the carrier is sold. |
+| `arduino_variant` | string | **OPTIONAL** | GitHub URL of the Arduino-ESP32 variant definition, when one exists. |
+| `wiring_guide` | string | **REQUIRED** | Filename (relative to `datasheets/`) of the wiring guide markdown. The file **MUST** exist. Naming convention: `HARDWARE-WIRING-<CARRIER-UPPERCASE>.md`. |
+
+Additional `*_url` keys **MAY** be added at the author's discretion; validators **MUST** accept them.
+
+#### 3.3.7 `[compulsory_plugins]` — REQUIRED
+
+Per SPEC-R2-COMPILER §12.1 and [[project-compulsory-plugins-and-virgin-boards]].
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `capabilities` | array&lt;string&gt; | **REQUIRED** | Capabilities every build for this carrier **MUST** satisfy. **MUST** contain `"ai.reality2.deploy.ota"`. |
+| `prefer` | array&lt;string&gt; | **REQUIRED** | Plugin slugs preferred when multiple plugins satisfy a compulsory capability. |
+
+#### 3.3.8 `[notes]` — RECOMMENDED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `gotchas` | array&lt;string&gt; | **RECOMMENDED** | One string per surprise / quirk a future operator or fresh CC session would benefit from. AGENTS.md §3 governs what belongs here. |
+
+#### 3.3.9 Validation
+
+The orchestrator's `catalogue` plugin **MUST** enforce:
 
 | Rule | Error |
 |---|---|
-| `board.name` matches the directory name | `E_BOARD_NAME` |
-| `build.target_triple` is in R2-BUILD §2 table | `E_BOARD_TRIPLE` |
-| `compile_target.tag` is in R2-DEF §7.7 list | `E_BOARD_TAG` |
-| Every `references.*` file exists under `datasheets/` | `E_BOARD_DS` |
-| `templates/Cargo.toml.tera` and `.cargo/config.toml` exist | `E_BOARD_TPL` |
+| `board.name` equals the directory name | `E_BOARD_NAME` |
+| `board.carrier` equals the `<carrier>` segment of the directory name | `E_BOARD_CARRIER` |
+| `build.target_triple` is in R2-BUILD §2 | `E_BOARD_TRIPLE` |
+| `compile_target.tag` is in R2-DEF §7.7 | `E_BOARD_TAG` |
+| `build.psram_mode` and `build.psram_speed_mhz` are present iff `build.psram` is `true` | `E_BOARD_PSRAM_FIELDS` |
+| `references.wiring_guide` resolves to an existing file under `datasheets/` | `E_BOARD_DS` |
+| `templates/Cargo.toml.tera`, `.cargo/config.toml`, `build.rs`, `rust-toolchain.toml` exist | `E_BOARD_TPL` |
+| `templates/sdkconfig.defaults` + `partitions.csv` exist for ESP-IDF carriers | `E_BOARD_TPL_ESP` |
+| `compulsory_plugins.capabilities` contains `"ai.reality2.deploy.ota"` | `E_BOARD_NO_OTA` |
 | Every plugin under `plugins/` validates per §5 | propagated |
-| Every capability in `compulsory_plugins.capabilities` is provided by a plugin in scope when a build runs (composition-time check, not sync-time) | `E_COMPULSORY_PLUGIN_MISSING` |
+| Every capability in `compulsory_plugins.capabilities` is provided by a plugin in scope at build time (composition-time check, not sync-time) | `E_COMPULSORY_PLUGIN_MISSING` |
 
-### 3.3 `AI-CONTEXT.md` (per board)
+### 3.4 `BOARD.md` — REQUIRED narrative
 
-MUST contain, in this order:
+A board's narrative **MUST** open with an `# H1` heading naming the carrier in long form (e.g. `# DFRobot Beetle ESP32-C6 (DFR1117)`).
 
-1. **Purpose** — one paragraph. What this board is.
-2. **Class + target** — `<arch>-<chip>-<carrier>` + target triple + R2-DEF §7.7 tag.
-3. **Where the canonical artefact lives** — `board.toml`.
-4. **Vendor refs** — datasheet filenames under `datasheets/` (the bytes must be on disk too — not live URLs alone).
-5. **Hive-shared plugins on this carrier** — if any are under `plugins/`, list them.
-6. **Known gotchas / quirks** — bootstrapping, USB chips, pin remappings, sdkconfig hazards.
-7. **Read these files in this order** for a fresh CC session resuming work on this board.
+The following `## H2` sections **MUST** appear in this order:
+
+| Section | Purpose |
+|---|---|
+| `## At a glance` | Bulleted summary of the carrier — chip, flash/PSRAM, USB topology, key on-board features. |
+| `## Role in r2-compiler` | Where this carrier fits in the catalogue — reference variant, peer alternative, RISC-V vs Xtensa, etc. |
+| `## Where to wire what` | Tabular summary of `[pinout.gpio.*]`; references `board.toml` as authoritative. |
+| `## Build & flash` | How to compile and flash. Cites `templates/` files and R2-BUILD references. |
+| `## Templates` | Inventory of `templates/` contents with a one-line purpose per file. |
+| `## Known gotchas` | Subset of `[notes].gotchas` (full list cross-referenced to `board.toml`). |
+| `## Authoring history` | Pointer into `conversation/` — date + topic + outcome of each session. |
+| `## See also` | Sibling carriers, the wiring guide, related catalogue entries. |
+
+A board **MAY** add additional `## H2` sections (e.g. `## Differences vs <peer>`) when they add value. Such sections **SHOULD** appear after `## Known gotchas` and before `## Authoring history`.
+
+### 3.5 `AI-CONTEXT.md` — REQUIRED fresh-CC brief
+
+The brief opens with an `# H1` heading `AI-CONTEXT.md — <board name>`.
+
+The following `## H2` sections **MUST** appear in this order:
+
+1. **`## Purpose`** — one paragraph. What this board is.
+2. **`## Class + target`** — class string `ai.reality2.board.<carrier>`, FNV hash, target triple, R2-DEF §7.7 tag.
+3. **`## Where the canonical artefact lives`** — `board.toml`.
+4. **`## Vendor refs`** — datasheet filenames under `datasheets/`. The bytes **MUST** be on disk, not just URLs.
+5. **`## Hive-shared plugins on this carrier`** — list any `plugins/<category>/<name>/` entries; if none, state explicitly.
+6. **`## Templates`** — one line per file under `templates/`.
+7. **`## Quick differences vs siblings`** — concise contrast with the closest peer carrier(s) in the catalogue.
+8. **`## Known gotchas (quick read — full list in `board.toml [notes].gotchas`)`** — 3–6 highest-impact gotchas.
+9. **`## Read these files in this order (cold-start resume)`** — ordered list of file paths a fresh CC session should consume before touching this board.
+10. **`## Authoring status`** — current state (e.g. `synced from r2-workshop`, `divergence pending upstream catch-up`, `partial — Phase X work outstanding`).
+
+### 3.6 `templates/` — REQUIRED firmware-crate seed files
+
+Every carrier **MUST** ship a `templates/` subtree that the compiler plugin renders into a firmware crate per R2-COMPILE.
+
+| File | Status | Purpose |
+|---|---|---|
+| `Cargo.toml.tera` | **REQUIRED** | Tera template; the compiler plugin renders this per build, substituting in the resolved plugin/sentant set and the active class string. |
+| `.cargo/config.toml` | **REQUIRED** | Target triple, linker, runner, build-std flags. |
+| `build.rs` | **REQUIRED** | Stamps env vars consumed by the firmware: class string, git SHA, build timestamp, partition table staging, WiFi config load. Function names **SHOULD** match across carriers (`stamp_sensor_class`, `track_git_state`, `stamp_build_metadata`, `stage_partitions_csv`, `load_wifi_config`). |
+| `rust-toolchain.toml` | **REQUIRED** | Pins toolchain channel + components. |
+| `sdkconfig.defaults` | **REQUIRED** for ESP-IDF carriers | ESP-IDF configuration. `CONFIG_ESPTOOLPY_FLASHSIZE_*MB` **MUST** match `[build].flash_size_mb`. |
+| `partitions.csv` | **REQUIRED** for ESP-IDF carriers | Partition table. Layout sized for the carrier's flash. |
+| `wifi_config.toml.example` | **REQUIRED** if carrier supports WiFi | Committable example; the real `wifi_config.toml` **MUST NOT** be committed (contains credentials). |
+
+The `templates/` files **MUST** lint cleanly: a `cargo build` from a fresh checkout — using the template files unchanged with placeholder values for Tera variables — **SHOULD** succeed.
 
 ## 4. Ensembles
 
@@ -368,3 +485,4 @@ The orchestrator's `catalogue plugin` MUST report any non-conforming entry as `d
 |---|---|---|
 | 2026-05-31 | 0.1 | Initial draft. Three-branch catalogue (boards/plugins/sentants). |
 | 2026-05-31 | 0.2 | **Restructured to two-part canvas model** per `[[feedback-two-part-canvas]]`. Plugins and sentants are no longer top-level catalogue trees — they live inside ensembles (ensemble-owned) or boards (hive-shared singletons). Always-available infrastructure including the crypto plugin lives in `crates/`. |
+| 2026-06-01 | 0.3 | **§3 (Boards) rewritten** as the canonical board-authoring spec, with RFC 2119 (BCP 14) normative keywords throughout. Full `board.toml` schema documented (every section + key with REQUIRED / OPTIONAL / CONDITIONAL status); canonical BOARD.md + AI-CONTEXT.md section structure; canonical `templates/` file list; expanded validation rules. Authored by reading the three existing carrier entries (esp32-s3-devkitc, esp32-s3-xiao, esp32-c6-dfr1117) and codifying the conventions they collectively used. Sweep of those three entries to bring them into full conformance committed alongside this revision. |

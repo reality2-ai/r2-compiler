@@ -43,6 +43,12 @@ None scaffolded yet under `plugins/`. The carrier's transport singletons (BLE ra
 
 The compiler plugin (Phase 1.5+) renders `Cargo.toml.tera` per-build, substituting the vendored-crate paths. The other files are copied verbatim.
 
+## Quick differences vs siblings
+
+- **vs `esp32-s3-devkitc`**: different ISA (RISC-V vs Xtensa), single-core vs dual-core, 4 MB vs 8 MB flash, no PSRAM vs 8 MB octal PSRAM, USB-C native USB-Serial-JTAG only (no CP2102), two-bus design (I²C accel + SPI SD) vs shared SPI for both. WiFi 6 (C6) vs WiFi 4 (S3).
+- **vs `esp32-s3-xiao`**: same ISA difference. Both are coin-sized boards but DFR1117 is the RISC-V reference; XIAO is the alternative Xtensa coin board. DFR1117 has on-board LiPo charger via TP4057; XIAO has charger + buck regulator integrated.
+- **Shared with both ESP32-S3 carriers**: native USB-Serial-JTAG, OTA over WiFi (TCP port 21043), `esptool` (not `espflash`) for the first USB flash, custom `partitions.csv` (two OTA slots, no factory).
+
 ## Known gotchas (quick read — full list in `board.toml [notes].gotchas`)
 
 - Custom `partitions.csv` requires **two clean rebuilds** on a fresh checkout; `build.rs` finds the esp-idf-sys CMake build dir and copies the partition table there. First build often uses the ESP-IDF default 1-app layout; rebuild and the custom 2-OTA layout takes effect. See `r2-workshop/tools/setup-firmware.sh`.
