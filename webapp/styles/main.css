@@ -1215,6 +1215,40 @@ table.csv-table tbody tr:hover { background: var(--bg-hover); }
 }
 @keyframes pulse { 50% { opacity: 0.3; } }
 
+/* Intent chip — sits above the input when the operator has signalled
+ * an authoring kind. Calm-computing: small, peripheral, single colour. */
+.intent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 16px 0;
+  padding: 3px 8px 3px 10px;
+  align-self: flex-start;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-dim);
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.intent-chip.hidden { display: none; }
+.intent-label { color: var(--fg-muted); }
+.intent-kind  { color: var(--accent); font-weight: 600; }
+.intent-clear {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 2px;
+  cursor: pointer;
+}
+.intent-clear:hover { color: #ff8a8a; }
+
 .chat-input-row {
   display: flex;
   gap: 10px;

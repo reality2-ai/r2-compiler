@@ -169,6 +169,15 @@
                 The canvas (above) is sent along as context, and what you build here populates it back.
               </div>
             </div>
+            <!-- Intent chip — visible when the operator has signalled
+                 a kind-specific authoring session (e.g. via "+ New apiary…").
+                 Sets `kind` on each subsequent `author.prompt` until the
+                 AI signals `author.done` (or the operator dismisses). -->
+            <div class="intent-chip hidden" id="intent-chip">
+              <span class="intent-label">Authoring</span>
+              <span class="intent-kind" id="intent-kind"></span>
+              <button class="intent-clear" id="intent-clear" title="Exit this authoring session">×</button>
+            </div>
             <div class="chat-input-row">
               <textarea
                 id="chat-input"

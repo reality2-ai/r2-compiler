@@ -1084,6 +1084,15 @@ function refreshCompileButton() {
 const chatState = {
   history: [],   // [{role: 'user'|'assistant', content, canvas?}]
   pending: null, // ref into history — the assistant msg currently streaming
+  // The active authoring `kind` — set by a UI affordance (e.g. the
+  // "+ New apiary…" pill seeds "apiary"; future pills would seed
+  // "board" / "plugin" / "sentant" / "ensemble"). Sent as the `kind`
+  // field on every `author.prompt` payload until cleared. The
+  // orchestrator's AuthorSentant dispatches to the matching Tera
+  // template (orchestrator/prompts/author-<kind>.md.tera). Cleared
+  // automatically on `author.done` / `author.error` or manually by
+  // the × on the chip.
+  authoringKind: null,
 };
 
 function attachBottomPanel() {
@@ -1115,8 +1124,26 @@ function attachBottomPanel() {
   });
   send.addEventListener("click", sendChat);
 
+  // Intent chip dismissal — operator bails out of the current
+  // authoring kind. Chat continues in default freeform mode.
+  $("intent-clear").addEventListener("click", () => setAuthoringKind(null));
+
   refreshChatSendButton();
   renderChat();
+}
+
+/// Set or clear the active authoring kind. Updates the visible chip
+/// + persists state for use by sendChat.
+function setAuthoringKind(kind) {
+  chatState.authoringKind = kind;
+  const chip = $("intent-chip");
+  if (!chip) return;
+  if (kind) {
+    chip.classList.remove("hidden");
+    $("intent-kind").textContent = kind;
+  } else {
+    chip.classList.add("hidden");
+  }
 }
 
 function switchTab(tab) {
@@ -1165,11 +1192,18 @@ function sendChat() {
     role: m.role,
     content: m.content,
   }));
-  sendEvent("r2.composer.author.prompt", {
+  const payload = {
     message: text,
     canvas: canvasCtx,
     history: historyForServer,
-  });
+  };
+  // Intent-tag the prompt when the operator has signalled an
+  // authoring kind. The orchestrator's AuthorSentant dispatches on
+  // this field to pick the matching Tera template.
+  if (chatState.authoringKind) {
+    payload.kind = chatState.authoringKind;
+  }
+  sendEvent("r2.composer.author.prompt", payload);
 
   input.value = "";
   refreshChatSendButton();
@@ -1195,12 +1229,18 @@ function onAuthorEvent(name, payload) {
     }
   } else if (name === "r2.composer.author.done") {
     chatState.pending = null;
+    // Authoring session done — clear the intent so the next prompt
+    // is freeform chat again.
+    setAuthoringKind(null);
     renderChat();
     bumpChatBadge();
   } else if (name === "r2.composer.author.error") {
     const msg = typeof payload === "string" ? payload : (payload?.message ?? JSON.stringify(payload));
     chatState.pending.content += `\n\n**[error]** ${msg}`;
     chatState.pending = null;
+    // Same as done — clear the intent on error. Operator can re-engage
+    // via the pill if they want to retry the same kind.
+    setAuthoringKind(null);
     renderChat();
     bumpChatBadge();
   } else if (name === "r2.composer.author.file_added") {
@@ -1387,13 +1427,15 @@ function attachApiaryCanvas() {
 
   // C-A1 "+ New apiary…" pill — seeds the chat input per
   // SPEC-APIARY-CREATE §2.1 (initiate via chat utterance OR pill).
+  // C-A2 prep: also signals the authoring intent so each subsequent
+  // author.prompt carries kind: "apiary" until the AI signals done.
   $("new-apiary-pill").addEventListener("click", () => {
     const input = $("chat-input");
     if (!input) return;
     input.value = "I want to start a new apiary for ";
-    // Place caret at end so the operator can keep typing.
     input.focus();
     input.selectionStart = input.selectionEnd = input.value.length;
+    setAuthoringKind("apiary");
     refreshChatSendButton();
   });
 }
