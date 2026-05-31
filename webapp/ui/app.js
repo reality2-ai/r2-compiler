@@ -65,10 +65,9 @@ let wasmReady = false;
   attachCanvas();
 
   // Phase 1.7b: connect to the orchestrator's /r2 WebSocket and wire
-  // the Build pane to it. The catalogue browser above stays
-  // fully usable even if the WS fails (e.g. when serving the webapp
-  // statically without the orchestrator).
-  attachBuildPane();
+  // the bottom panel (tabbed: Chat | Build). The catalogue browser
+  // above stays fully usable even if the WS fails.
+  attachBottomPanel();
   connectR2();
 })();
 
@@ -731,6 +730,45 @@ function attachGlobalHandlers() {
     $("entry-detail").classList.add("hidden");
     $("canvas").classList.remove("hidden");
   });
+
+  attachFileResizer();
+}
+
+// Drag handle between the file-tree and file-viewer in the entry-detail
+// pane. Resize is clamped [120, 700] px so the tree never disappears or
+// eats the viewer.
+function attachFileResizer() {
+  const resizer = $("file-resizer");
+  const tree = document.querySelector(".file-tree");
+  if (!resizer || !tree) return;
+
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  resizer.addEventListener("mousedown", (ev) => {
+    dragging = true;
+    startX = ev.clientX;
+    startWidth = tree.offsetWidth;
+    resizer.classList.add("dragging");
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    ev.preventDefault();
+  });
+
+  window.addEventListener("mousemove", (ev) => {
+    if (!dragging) return;
+    const w = Math.max(120, Math.min(700, startWidth + (ev.clientX - startX)));
+    tree.style.width = `${w}px`;
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove("dragging");
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  });
 }
 
 function escape(s) {
@@ -784,6 +822,7 @@ function setR2Status(state, label) {
   dot.classList.add(state);
   lbl.textContent = label;
   refreshCompileButton();
+  refreshChatSendButton();
 }
 
 function connectR2() {
@@ -846,6 +885,12 @@ function handleEnvelope(env) {
 }
 
 function onEvent(name, payload) {
+  // Author flow → chat pane
+  if (name.startsWith("r2.compiler.author.")) {
+    onAuthorEvent(name, payload);
+    return;
+  }
+  // Build flow → build console
   let cls = "evt";
   if (name === "r2.compiler.build.progress") cls = "evt-progress";
   else if (name === "r2.compiler.build.done") cls = "evt-done";
@@ -1011,12 +1056,191 @@ function refreshCompileButton() {
   status.textContent = label;
 }
 
-// ── Build pane ────────────────────────────────────────────────────────
+// ── Bottom panel (tabbed: Chat | Build) ───────────────────────────────
+//
+// The Chat tab is the hybrid-UX dialog: user prompts go out as
+// `r2.compiler.author.prompt` events carrying the current canvas as
+// context; assistant replies stream back as `r2.compiler.author.reply`
+// and finalise on `r2.compiler.author.done`. The orchestrator-side
+// Author plugin (Phase 1.7d, not yet wired) is what turns those
+// prompts into real `claude -p` invocations with the canvas + history
+// spliced into the brief.
 
-function attachBuildPane() {
-  $("build-clear").addEventListener("click", () => {
-    $("build-console").textContent = "";
+const chatState = {
+  history: [],   // [{role: 'user'|'assistant', content, canvas?}]
+  pending: null, // ref into history — the assistant msg currently streaming
+};
+
+function attachBottomPanel() {
+  // Tab switching
+  for (const btn of document.querySelectorAll(".tab")) {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  }
+  // Clear (context-dependent)
+  $("bottom-clear").addEventListener("click", () => {
+    const active = document.querySelector(".tab-pane.active")?.id;
+    if (active === "pane-chat") {
+      chatState.history = [];
+      chatState.pending = null;
+      renderChat();
+    } else if (active === "pane-build") {
+      $("build-console").textContent = "";
+    }
   });
+
+  // Chat input
+  const input = $("chat-input");
+  const send = $("chat-send");
+  input.addEventListener("input", refreshChatSendButton);
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      sendChat();
+    }
+  });
+  send.addEventListener("click", sendChat);
+
+  refreshChatSendButton();
+  renderChat();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.tab === tab);
+  });
+  document.querySelectorAll(".tab-pane").forEach((p) => {
+    p.classList.toggle("active", p.id === `pane-${tab}`);
+  });
+  if (tab === "chat") {
+    $("tab-badge-chat").textContent = "";
+    setTimeout(() => $("chat-input")?.focus(), 0);
+  }
+}
+
+function refreshChatSendButton() {
+  const input = $("chat-input");
+  const send = $("chat-send");
+  if (!input || !send) return;
+  const text = input.value.trim();
+  const wsOpen = r2Ws && r2Ws.readyState === WebSocket.OPEN;
+  send.disabled = !(text && wsOpen);
+}
+
+function sendChat() {
+  const input = $("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  if (!r2Ws || r2Ws.readyState !== WebSocket.OPEN) return;
+
+  const canvasCtx = {
+    board: canvasState.board,
+    ensemble: canvasState.ensemble,
+  };
+
+  // Append the user turn + a placeholder assistant turn so the UI
+  // can show "claude is thinking…" while the orchestrator works.
+  chatState.history.push({ role: "user", content: text, canvas: canvasCtx });
+  const pending = { role: "assistant", content: "" };
+  chatState.history.push(pending);
+  chatState.pending = pending;
+
+  // The history sent to the orchestrator EXCLUDES the empty assistant
+  // placeholder — it's only there for UI rendering.
+  const historyForServer = chatState.history.slice(0, -1).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  sendEvent("r2.compiler.author.prompt", {
+    message: text,
+    canvas: canvasCtx,
+    history: historyForServer,
+  });
+
+  input.value = "";
+  refreshChatSendButton();
+  renderChat();
+}
+
+function onAuthorEvent(name, payload) {
+  // Ensure a pending assistant message exists to absorb streamed content
+  if (!chatState.pending) {
+    chatState.pending = { role: "assistant", content: "" };
+    chatState.history.push(chatState.pending);
+  }
+  if (name === "r2.compiler.author.reply") {
+    const chunk = typeof payload === "string"
+      ? payload
+      : (payload?.text ?? payload?.line ?? payload?.content ?? "");
+    chatState.pending.content += String(chunk);
+    renderChat();
+    bumpChatBadge();
+  } else if (name === "r2.compiler.author.done") {
+    chatState.pending = null;
+    renderChat();
+    bumpChatBadge();
+  } else if (name === "r2.compiler.author.error") {
+    const msg = typeof payload === "string" ? payload : (payload?.message ?? JSON.stringify(payload));
+    chatState.pending.content += `\n\n**[error]** ${msg}`;
+    chatState.pending = null;
+    renderChat();
+    bumpChatBadge();
+  } else if (name === "r2.compiler.author.file_added") {
+    const path = payload?.path ?? formatPayload(payload);
+    chatState.pending.content += `\n_[file added: ${path}]_\n`;
+    renderChat();
+  }
+}
+
+function bumpChatBadge() {
+  if (!document.querySelector("#tab-chat")?.classList.contains("active")) {
+    $("tab-badge-chat").textContent = "•";
+  }
+}
+
+function renderChat() {
+  const root = $("chat-messages");
+  if (!root) return;
+  if (chatState.history.length === 0) {
+    root.innerHTML = `<div class="chat-empty">
+      Ask Claude Code anything about your composition — modifications, explanations, new boards, new plugins.
+      The canvas (above) is sent along as context, and what you build here populates back into it.
+    </div>`;
+    return;
+  }
+  root.innerHTML = "";
+  for (const msg of chatState.history) {
+    const msgEl = document.createElement("div");
+    msgEl.className = `chat-msg ${msg.role}`;
+
+    const meta = document.createElement("div");
+    meta.className = "chat-msg-meta";
+    const role = document.createElement("span");
+    role.className = `chat-msg-role ${msg.role}`;
+    role.textContent = msg.role === "user" ? "you" : "claude";
+    meta.appendChild(role);
+    if (msg.canvas && (msg.canvas.board || msg.canvas.ensemble)) {
+      const ctx = document.createElement("span");
+      ctx.className = "chat-canvas-ctx";
+      ctx.textContent = `canvas: ${msg.canvas.board ?? "—"} + ${msg.canvas.ensemble ?? "—"}`;
+      meta.appendChild(ctx);
+    }
+    msgEl.appendChild(meta);
+
+    const body = document.createElement("div");
+    body.className = `chat-msg-body ${msg.role}`;
+    if (msg.role === "assistant") {
+      if (msg.content) {
+        body.innerHTML = renderMarkdown(msg.content);
+      } else {
+        body.innerHTML = `<span class="chat-thinking">thinking…</span>`;
+      }
+    } else {
+      body.textContent = msg.content;
+    }
+    msgEl.appendChild(body);
+    root.appendChild(msgEl);
+  }
+  root.scrollTop = root.scrollHeight;
 }
 
 function setBuildStatus(state) {

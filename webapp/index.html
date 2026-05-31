@@ -78,6 +78,7 @@
               <h3>Files</h3>
               <ul id="file-tree-list"></ul>
             </div>
+            <div class="file-resizer" id="file-resizer" title="Drag to resize"></div>
             <div class="file-viewer">
               <div class="file-viewer-header">
                 <span id="viewer-path">— select a file —</span>
@@ -88,17 +89,43 @@
         </div>
         </div><!-- /.workspace-top -->
 
-        <!-- Build pane — bottom strip, console only.
-             Phase 1.7c moved compose controls onto the canvas; this
-             pane is now purely the AI-build event stream. -->
-        <div class="build-pane" id="build-pane">
-          <div class="build-controls">
-            <span class="ctl-label">Build</span>
-            <span class="build-status" id="build-status" data-state="idle">idle</span>
-            <span class="build-flex"></span>
-            <button class="btn-secondary" id="build-clear" title="Clear the build console">Clear console</button>
+        <!-- Bottom panel — tabbed [Chat][Build]. Chat is the AI dialog
+             that mutates the canvas above; Build is the compile-event
+             stream from `r2.compiler.build.*`. -->
+        <div class="bottom-panel" id="bottom-panel">
+          <div class="tab-bar">
+            <button class="tab active" data-tab="chat" id="tab-chat">
+              Chat
+              <span class="tab-badge" id="tab-badge-chat"></span>
+            </button>
+            <button class="tab" data-tab="build" id="tab-build">
+              Build
+              <span class="build-status" id="build-status" data-state="idle">idle</span>
+            </button>
+            <span class="tab-flex"></span>
+            <button class="btn-secondary" id="bottom-clear" title="Clear the current pane">Clear</button>
           </div>
-          <pre class="build-console" id="build-console" aria-live="polite"></pre>
+
+          <div class="tab-pane chat-pane active" id="pane-chat">
+            <div class="chat-messages" id="chat-messages">
+              <div class="chat-empty">
+                Ask Claude Code anything about your composition — modifications, explanations, new boards, new plugins.
+                The canvas (above) is sent along as context, and what you build here populates it back.
+              </div>
+            </div>
+            <div class="chat-input-row">
+              <textarea
+                id="chat-input"
+                placeholder="Message Claude Code…   (Enter to send, Shift+Enter for newline)"
+                rows="2"
+              ></textarea>
+              <button class="btn-primary" id="chat-send" disabled>Send</button>
+            </div>
+          </div>
+
+          <div class="tab-pane build-tab-pane" id="pane-build">
+            <pre class="build-console" id="build-console" aria-live="polite"></pre>
+          </div>
         </div>
       </section>
 
