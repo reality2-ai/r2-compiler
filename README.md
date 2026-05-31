@@ -1,16 +1,16 @@
-# r2-compiler
+# r2-composer
 
 **A visual composer for Reality2 firmware.** Pick a carrier board, a set of plugins, and a set of sentants from the catalogue around the canvas; the tool drives a Claude Code session to produce a flashable per-carrier firmware image.
 
-Status: design phase (2026-05-31). The spec at [`specifications/SPEC-R2-COMPILER.md`](specifications/SPEC-R2-COMPILER.md) is the contract; everything else is in flux.
+Status: design phase (2026-05-31). The spec at [`specifications/SPEC-R2-COMPOSER.md`](specifications/SPEC-R2-COMPOSER.md) is the contract; everything else is in flux.
 
 ## What this is
 
-r2-compiler is the **B2 step** of the R2-COMPILE roadmap (per `r2-workshop/specifications/SPEC-R2-WORKSHOP-ENSEMBLE.md` §4). Today, each carrier under `r2-workshop/firmware/<arch>/<carrier>/` is hand-authored. This tool replaces that loop:
+r2-composer is the **B2 step** of the R2-COMPILE roadmap (per `r2-workshop/specifications/SPEC-R2-WORKSHOP-ENSEMBLE.md` §4). Today, each carrier under `r2-workshop/firmware/<arch>/<carrier>/` is hand-authored. This tool replaces that loop:
 
 ```
 visual canvas (browser hive)
-    │ R2-WIRE event: r2.compiler.build.start
+    │ R2-WIRE event: r2.composer.build.start
     ▼
 orchestrator hive (workstation, Rust)
     │ subprocess: claude -p '<brief>' --output-format=stream-json
@@ -36,7 +36,7 @@ The visual layer is a browser-side WASM R2 hive (same architecture as `r2-worksh
 | [`AGENTS.md`](AGENTS.md) | Orientation for AI agents (Claude Code, Codex, …) — **read first** |
 | [`AI-CONTEXT.md`](AI-CONTEXT.md) | Fresh-session entry point for any AI assistant resuming work |
 | [`PROCESS.md`](PROCESS.md) | The five working rules (spec-first, conversation-as-data, …) |
-| [`specifications/`](specifications/) | Normative specs for this tool (SPEC-R2-COMPILER, SPEC-CATALOGUE-LAYOUT) |
+| [`specifications/`](specifications/) | Normative specs for this tool (SPEC-R2-COMPOSER, SPEC-CATALOGUE-LAYOUT) |
 | [`catalogue/boards/`](catalogue/boards/) | One directory per carrier — `board.toml` + datasheets + templates + AI-CONTEXT. The canvas's first opt-in part type. |
 | [`catalogue/ensembles/`](catalogue/ensembles/) | One directory per ensemble (R2-ENSEMBLE / R2-DEF §7). Plugins + sentants live **inside** their ensemble. The canvas's second opt-in part type. |
 | [`scores/`](scores/) | Complete R2-DEF §7 ensembles (the visual composer's serialised output for a specific build) |

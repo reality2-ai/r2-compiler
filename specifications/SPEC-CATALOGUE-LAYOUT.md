@@ -1,11 +1,11 @@
-# SPEC-CATALOGUE-LAYOUT: directory shape and authoring rules for r2-compiler's catalogue
+# SPEC-CATALOGUE-LAYOUT: directory shape and authoring rules for r2-composer's catalogue
 
 **Version:** 0.4 Draft
 **Date:** 2026-06-01
 **Status:** Normative Draft
 **Depends on:**
 - **Upstream (canonical):** R2-PLUGIN §12 (plugin manifest, README mandatory sections), R2-DEF §2 (sentant schema), R2-DEF §7 (ensemble score), R2-ENSEMBLE §2.1.2 (hive-shared vs ensemble-owned), R2-COMPILE §4 (compile targets), R2-BUILD §2 (target triples), RFC 2119 + RFC 8174 (normative keywords)
-- **r2-compiler:** companion [`SPEC-R2-COMPILER.md`](SPEC-R2-COMPILER.md)
+- **r2-composer:** companion [`SPEC-R2-COMPOSER.md`](SPEC-R2-COMPOSER.md)
 
 ## Conventions
 
@@ -15,7 +15,7 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **
 
 ## 1. The two-part canvas model
 
-r2-compiler's visual canvas exposes exactly two kinds of opt-in part:
+r2-composer's visual canvas exposes exactly two kinds of opt-in part:
 
 1. **Carrier board** — exactly one per build. The carrier IS a plugin per R2-PLUGIN §1 (it provides hardware capabilities to the hive), but in the UI taxonomy it occupies its own category because it is the substrate everything else runs on.
 2. **Ensembles** — one or more per build. An ensemble is a complete R2-ENSEMBLE / R2-DEF §7 unit: a class string + a set of sentants + a set of ensemble-owned plugins + UI registrations + capability declarations.
@@ -191,7 +191,7 @@ Additional `*_url` keys **MAY** be added at the author's discretion; validators 
 
 #### 3.3.7 `[compulsory_plugins]` — REQUIRED
 
-Per SPEC-R2-COMPILER §12.1 and [[project-compulsory-plugins-and-virgin-boards]].
+Per SPEC-R2-COMPOSER §12.1 and [[project-compulsory-plugins-and-virgin-boards]].
 
 | Key | Type | Status | Notes |
 |---|---|---|---|
@@ -231,7 +231,7 @@ The following `## H2` sections **MUST** appear in this order:
 | Section | Purpose |
 |---|---|
 | `## At a glance` | Bulleted summary of the carrier — chip, flash/PSRAM, USB topology, key on-board features. |
-| `## Role in r2-compiler` | Where this carrier fits in the catalogue — reference variant, peer alternative, RISC-V vs Xtensa, etc. |
+| `## Role in r2-composer` | Where this carrier fits in the catalogue — reference variant, peer alternative, RISC-V vs Xtensa, etc. |
 | `## Where to wire what` | Tabular summary of `[pinout.gpio.*]`; references `board.toml` as authoritative. |
 | `## Build & flash` | How to compile and flash. Cites `templates/` files and R2-BUILD references. |
 | `## Templates` | Inventory of `templates/` contents with a one-line purpose per file. |
@@ -301,7 +301,7 @@ An ensemble's R2 class string is the `class:` field in `ensemble.yaml` (reverse-
 
 ### 4.3 `ensemble.yaml` — REQUIRED canonical artefact
 
-Conforms to R2-DEF §7. The top-level key **MUST** be `ensemble:`. The orchestrator **MUST** run R2-DEF §7.10 load-time validation in addition to the r2-compiler rules below.
+Conforms to R2-DEF §7. The top-level key **MUST** be `ensemble:`. The orchestrator **MUST** run R2-DEF §7.10 load-time validation in addition to the r2-composer rules below.
 
 #### 4.3.1 Keys under `ensemble:` — REQUIRED
 
@@ -649,19 +649,19 @@ REQUIRED `## H2` sections in this order:
 9. **`## Read these files in this order (cold-start resume)`** — ordered file list.
 10. **`## Authoring status`** — completion state.
 
-## 7. Authoring flow (normative — referenced from SPEC-R2-COMPILER §7)
+## 7. Authoring flow (normative — referenced from SPEC-R2-COMPOSER §7)
 
-**This document IS the authoring brief.** §3 (Boards), §4 (Ensembles), §5 (Plugins), and §6 (Sentants) each define a kind's REQUIRED schema, file shape, narrative structure, and AI-CONTEXT.md structure. When the operator initiates `r2.compiler.author.start{kind, description}`, the orchestrator's Author sentant (calling the `claude-code` plugin) constructs a brief from these sections and dispatches it to the AI — there is no separate authoring document.
+**This document IS the authoring brief.** §3 (Boards), §4 (Ensembles), §5 (Plugins), and §6 (Sentants) each define a kind's REQUIRED schema, file shape, narrative structure, and AI-CONTEXT.md structure. When the operator initiates `r2.composer.author.start{kind, description}`, the orchestrator's Author sentant (calling the `claude-code` plugin) constructs a brief from these sections and dispatches it to the AI — there is no separate authoring document.
 
-When the operator initiates `r2.compiler.author.start{kind, description}`, the Author sentant **MUST**:
+When the operator initiates `r2.composer.author.start{kind, description}`, the Author sentant **MUST**:
 
 1. **Create the entry directory** per §3.1 / §4.1 / §5.2 / §6.1 — empty, just the shell.
 2. **Spawn `claude -p`** with the entry's parent directory as cwd + a Tera-rendered brief from `orchestrator/prompts/author-<kind>.md.tera`. The brief **MUST** splice in the matching SPEC-CATALOGUE-LAYOUT section verbatim — §3 for boards, §4 for ensembles, §5 for plugins, §6 for sentants — plus a pointer to one canonical example already in the catalogue to imitate.
-3. **Stream the agent's clarifying questions** via `r2.compiler.author.prompt` to the operator. Operator replies via `r2.compiler.author.reply`.
+3. **Stream the agent's clarifying questions** via `r2.composer.author.prompt` to the operator. Operator replies via `r2.composer.author.reply`.
 4. **Allow the agent to use WebFetch** for vendor datasheets and Write for files under the new entry directory ONLY. Writes outside **MUST** be surfaced to the operator, not silently performed.
 5. **Inside an ensemble authoring session**, the operator **MAY** further request "add a new plugin/sentant to this ensemble" — the Author sentant spawns a nested authoring flow scoped to `catalogue/ensembles/<name>/plugins/...` or `.../sentants/...`.
-6. **On completion**, validate against the spec's validation table for the kind (§3.3.9 / §4.3.4 / §5.3.8 / §6.3.3). On failure, re-enter the loop with the validation error surfaced to the operator. On success, emit `r2.compiler.author.done`.
-7. **On error/abandonment**, run §8 (decommission) before emitting `r2.compiler.author.error`.
+6. **On completion**, validate against the spec's validation table for the kind (§3.3.9 / §4.3.4 / §5.3.8 / §6.3.3). On failure, re-enter the loop with the validation error surfaced to the operator. On success, emit `r2.composer.author.done`.
+7. **On error/abandonment**, run §8 (decommission) before emitting `r2.composer.author.error`.
 
 ### 7.1 Brief templates
 
@@ -676,7 +676,7 @@ Each brief **MUST** include:
 
 - The full RFC 2119 schema for the kind (the relevant §3 / §4 / §5 / §6).
 - A pointer to one canonical existing entry to imitate (board → `esp32-c6-dfr1117`, ensemble → `rocker-sensor`, plugin → `sensor/adxl355`, sentant → `Accelerometer`).
-- The operator's request (free text — provided in the `description` field of `r2.compiler.author.start`).
+- The operator's request (free text — provided in the `description` field of `r2.composer.author.start`).
 - The applicable upstream-R2 spec citations (R2-COMPILE §4 + R2-BUILD §2 for boards, R2-ENSEMBLE + R2-DEF §7 for ensembles, R2-PLUGIN §12 + §13 for plugins, R2-DEF §2 + R2-COMPILE §3.1 for sentants).
 - A list of files the AI **MUST** produce, with a one-line purpose per file.
 

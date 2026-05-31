@@ -4,7 +4,7 @@ If you are a Claude Code session resuming work on this board entry with no prior
 
 ## Purpose
 
-The DFRobot Beetle ESP32-C6 (DFR1117) carrier — r2-compiler's RISC-V reference. Single-core 160 MHz RISC-V (ESP32-C6), WiFi 6, BLE 5.0, 802.15.4. 4 MB flash, no PSRAM. Distinct from the two Xtensa ESP32-S3 carriers (`esp32-s3-devkitc`, `esp32-s3-xiao`) in that it's a different ISA — cross-architecture firmware-build exercise.
+The DFRobot Beetle ESP32-C6 (DFR1117) carrier — r2-composer's RISC-V reference. Single-core 160 MHz RISC-V (ESP32-C6), WiFi 6, BLE 5.0, 802.15.4. 4 MB flash, no PSRAM. Distinct from the two Xtensa ESP32-S3 carriers (`esp32-s3-devkitc`, `esp32-s3-xiao`) in that it's a different ISA — cross-architecture firmware-build exercise.
 
 ## Class + target
 
@@ -82,4 +82,4 @@ The compiler plugin (Phase 1.5+) renders `Cargo.toml.tera` per-build, substituti
 
 ---
 
-*Created 2026-05-31. The first concrete board entry in r2-compiler's catalogue — used as the schema worked example referenced by SPEC-CATALOGUE-LAYOUT.*
+*Created 2026-05-31. The first concrete board entry in r2-composer's catalogue — used as the schema worked example referenced by SPEC-CATALOGUE-LAYOUT.*

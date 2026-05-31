@@ -1,6 +1,6 @@
-//! # r2-compiler-webapp
+//! # r2-composer-webapp
 //!
-//! The browser-side Rust foundation of r2-compiler's webapp role-ensemble.
+//! The browser-side Rust foundation of r2-composer's webapp role-ensemble.
 //! Compiled to `wasm32-unknown-unknown` via `wasm-pack build --target web`.
 //!
 //! ## v0.1 scope
@@ -21,7 +21,7 @@
 //! ## Phase 2-full scope (future commits)
 //!
 //! The full set of webapp-hive sentants (Catalogue / Composition /
-//! SourceViewer / Builder / Author / Apiary) per SPEC-R2-COMPILER §3.2,
+//! SourceViewer / Builder / Author / Apiary) per SPEC-R2-COMPOSER §3.2,
 //! using the vendored `r2-wasm` crate to bring the R2 hive into the
 //! browser. The class-hash functions in this v0.1 stay; everything
 //! else grows alongside them.
@@ -77,7 +77,7 @@ pub fn on_load() {
     // Wire up panics to the browser console. No external dep — we
     // synthesise the hook inline with js-sys so the cdylib stays small.
     std::panic::set_hook(Box::new(|info| {
-        let msg = format!("r2-compiler-webapp WASM panic: {info}");
+        let msg = format!("r2-composer-webapp WASM panic: {info}");
         let s = wasm_bindgen::JsValue::from_str(&msg);
         let console = js_sys::Reflect::get(
             &js_sys::global(),

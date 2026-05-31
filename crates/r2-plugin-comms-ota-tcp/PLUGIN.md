@@ -1,12 +1,12 @@
 # ota-tcp
 
-**Version:** 0.1.0 · **Modes:** `aot` (esp32-s3, esp32-c6) · **Conformance:** R2-PLUGIN §12 · **COMPULSORY** per SPEC-R2-COMPILER §12.1
+**Version:** 0.1.0 · **Modes:** `aot` (esp32-s3, esp32-c6) · **Conformance:** R2-PLUGIN §12 · **COMPULSORY** per SPEC-R2-COMPOSER §12.1
 
 ## 1. Purpose
 
 TCP listener on port **21043** receiving a new firmware image, staging it to the inactive OTA partition (`esp_ota_*` APIs), verifying SHA-256, marking the new slot bootable, and triggering `esp_restart()`. The bootloader's rollback gate handles failures — if the new image can't talk to the dashboard within the rollback window, the bootloader reverts to the previous slot.
 
-Compulsory per SPEC-R2-COMPILER §12.1 — every MCU build links this plugin regardless of operator selection.
+Compulsory per SPEC-R2-COMPOSER §12.1 — every MCU build links this plugin regardless of operator selection.
 
 ## 2. Modes & Platforms
 

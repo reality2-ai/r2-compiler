@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# webapp/build-wasm.sh — build the WASM bundle for r2-compiler's webapp.
+# webapp/build-wasm.sh — build the WASM bundle for r2-composer's webapp.
 #
 # Output goes to webapp/dist/wasm/ (alongside dist/manifest.json from
 # the Python catalogue builder). The HTML at webapp/index.html imports
-# webapp/dist/wasm/r2_compiler_webapp.js at runtime.
+# webapp/dist/wasm/r2_composer_webapp.js at runtime.
 #
 # Requires:
 # - rustup toolchain (any recent stable)
@@ -32,7 +32,7 @@ wasm-pack build webapp/crate \
   $FLAG \
   --target web \
   --out-dir ../dist/wasm \
-  --out-name r2_compiler_webapp
+  --out-name r2_composer_webapp
 
 echo
 echo "[wasm] Output:"

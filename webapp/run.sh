@@ -19,7 +19,7 @@ python3 "$REPO_ROOT/tools/build-catalogue-index.py"
 
 # 2. Ensure the WASM bundle exists. Skip if already built; operators can
 #    force a rebuild via `webapp/build-wasm.sh` directly.
-if [ ! -f "$REPO_ROOT/webapp/dist/wasm/r2_compiler_webapp.js" ]; then
+if [ ! -f "$REPO_ROOT/webapp/dist/wasm/r2_composer_webapp.js" ]; then
   if command -v wasm-pack >/dev/null 2>&1; then
     echo "[run] WASM bundle missing — building..."
     "$REPO_ROOT/webapp/build-wasm.sh" release

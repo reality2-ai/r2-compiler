@@ -1,6 +1,6 @@
 //! `Author` sentant — handles the chat-driven authoring flow.
 //!
-//! Phase 1.7d. On `r2.compiler.author.prompt`, constructs a brief from
+//! Phase 1.7d. On `r2.composer.author.prompt`, constructs a brief from
 //! the payload (user message + canvas state + chat history) and
 //! dispatches it to the `claude-code` plugin configured for the author
 //! event-name set. The plugin's `poll()` emits reply / done / error
@@ -54,17 +54,17 @@ impl AuthorSentant {
             state: State::Idle,
             author_plugin_id,
             brief_slot,
-            prompt_hash: reg.hash_of("r2.compiler.author.prompt").unwrap(),
-            reply_hash:  reg.hash_of("r2.compiler.author.reply").unwrap(),
-            done_hash:   reg.hash_of("r2.compiler.author.done").unwrap(),
-            error_hash:  reg.hash_of("r2.compiler.author.error").unwrap(),
+            prompt_hash: reg.hash_of("r2.composer.author.prompt").unwrap(),
+            reply_hash:  reg.hash_of("r2.composer.author.reply").unwrap(),
+            done_hash:   reg.hash_of("r2.composer.author.done").unwrap(),
+            error_hash:  reg.hash_of("r2.composer.author.error").unwrap(),
         }
     }
 }
 
 impl Sentant for AuthorSentant {
     fn handle_event(&mut self, event: &Event, actions: &mut ActionBuf) {
-        // r2.compiler.author.prompt  →  build brief + dispatch to claude-code.
+        // r2.composer.author.prompt  →  build brief + dispatch to claude-code.
         // Brief goes into the side-channel slot (bus payload caps at 256B,
         // way too small); the PluginCall data is just a trigger.
         if event.hash == self.prompt_hash {
@@ -115,7 +115,7 @@ impl Sentant for AuthorSentant {
     }
 
     fn class_hash(&self) -> u32 {
-        r2_fnv::fnv1a_32(b"ai.reality2.r2-compiler.author")
+        r2_fnv::fnv1a_32(b"ai.reality2.r2-composer.author")
     }
 
     fn name(&self) -> &str {
@@ -128,10 +128,10 @@ impl Sentant for AuthorSentant {
         SUBS.get_or_init(|| {
             let reg = registry();
             let subs = vec![
-                reg.hash_of("r2.compiler.author.prompt").unwrap(),
-                reg.hash_of("r2.compiler.author.reply").unwrap(),
-                reg.hash_of("r2.compiler.author.done").unwrap(),
-                reg.hash_of("r2.compiler.author.error").unwrap(),
+                reg.hash_of("r2.composer.author.prompt").unwrap(),
+                reg.hash_of("r2.composer.author.reply").unwrap(),
+                reg.hash_of("r2.composer.author.done").unwrap(),
+                reg.hash_of("r2.composer.author.error").unwrap(),
             ];
             Box::leak(subs.into_boxed_slice())
         })
@@ -167,7 +167,7 @@ fn construct_brief(payload: &[u8]) -> String {
 
     let mut brief = String::new();
     brief.push_str(
-        "You are Claude Code assisting an operator using r2-compiler — \
+        "You are Claude Code assisting an operator using r2-composer — \
          a visual composer for Reality2 firmware. The operator drags a \
          carrier board and an ensemble onto a canvas; the canvas plus \
          their chat with you produces the build brief for the per-carrier \
@@ -206,7 +206,7 @@ mod tests {
     fn author_prompt_dispatches_plugin_call() {
         let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         let mut actions = ActionBuf::new();
-        let prompt_hash = r2_fnv::fnv1a_32(b"r2.compiler.author.prompt");
+        let prompt_hash = r2_fnv::fnv1a_32(b"r2.composer.author.prompt");
         let payload = br#"{"message":"hi","canvas":{"board":"x","ensemble":"y"},"history":[]}"#;
         a.handle_event(&ev(prompt_hash, payload, EventSource::Local(0)), &mut actions);
 
@@ -226,7 +226,7 @@ mod tests {
     fn plugin_sourced_reply_rebroadcasts() {
         let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.author.reply");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.author.reply");
         a.handle_event(&ev(h, b"{}", EventSource::Plugin(0)), &mut actions);
         let collected: Vec<_> = actions.drain().collect();
         assert_eq!(collected.len(), 1);
@@ -243,7 +243,7 @@ mod tests {
     fn locally_sourced_reply_does_not_rebroadcast() {
         let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.author.reply");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.author.reply");
         a.handle_event(&ev(h, b"{}", EventSource::Local(0)), &mut actions);
         assert!(actions.is_empty(), "must not re-broadcast our own emissions");
     }
@@ -278,7 +278,7 @@ mod tests {
         let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         a.state = State::Working;
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.author.done");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.author.done");
         a.handle_event(&ev(h, b"{}", EventSource::Plugin(0)), &mut actions);
         assert_eq!(a.state, State::Idle);
     }

@@ -5,8 +5,8 @@
 timestamp = "2026-05-30T20:53:26Z"
 
 [sources]
-r2-core     = { path = "/mnt/data/Development/R2/r2-compiler/../r2-core", commit = "54d2e1c2182751afc378d9eda5355b444193d291" }
-r2-workshop = { path = "/mnt/data/Development/R2/r2-compiler/../r2-workshop", commit = "bf978142beff3425a029642a06241033abe75c61" }
+r2-core     = { path = "/mnt/data/Development/R2/r2-composer/../r2-core", commit = "54d2e1c2182751afc378d9eda5355b444193d291" }
+r2-workshop = { path = "/mnt/data/Development/R2/r2-composer/../r2-workshop", commit = "bf978142beff3425a029642a06241033abe75c61" }
 
 [crates.protocol]
 r2-engine = "r2-core/crates/r2-engine"

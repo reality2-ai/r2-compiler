@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tools/sync-catalogue.sh — populate r2-compiler's catalogue from sibling repos.
+# tools/sync-catalogue.sh — populate r2-composer's catalogue from sibling repos.
 #
 # This script handles only the DETERMINISTIC parts of catalogue population:
 #   - Vendoring R2 protocol crates from r2-core/crates/ into crates/
@@ -101,7 +101,7 @@ for p in "${CORE_PLUGINS[@]}"; do
   rsync -a --exclude='target' --exclude='Cargo.lock' --exclude='.git*' "$src/" "$dst/"
   # Patch path deps. In r2-core the dep was `path = "../../../crates/r2-engine"`
   # (up three levels from r2-core/plugins/crypto/software-ed25519/ to r2-core root).
-  # In r2-compiler the plugin sits at crates/<crate_name>/ so the dep is
+  # In r2-composer the plugin sits at crates/<crate_name>/ so the dep is
   # `path = "../r2-engine"` (one level up to crates/).
   if [ -f "$dst/Cargo.toml" ]; then
     sed -i.bak 's|path = "\.\./\.\./\.\./crates/|path = "../|g' "$dst/Cargo.toml"

@@ -1,4 +1,4 @@
-// r2-compiler — minimal catalogue preview app.
+// r2-composer — minimal catalogue preview app.
 //
 // Loads webapp/dist/manifest.json (built by tools/build-catalogue-index.py)
 // AND the WASM module built from webapp/crate/ (`webapp/build-wasm.sh`).
@@ -19,7 +19,7 @@ import init, {
   class_hash_hex,
   verify_class_hash,
   version as wasmVersion,
-} from "../dist/wasm/r2_compiler_webapp.js";
+} from "../dist/wasm/r2_composer_webapp.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,7 +36,7 @@ let wasmReady = false;
   try {
     await init();
     wasmReady = true;
-    console.info(`r2-compiler-webapp WASM loaded — v${wasmVersion()}`);
+    console.info(`r2-composer-webapp WASM loaded — v${wasmVersion()}`);
   } catch (err) {
     console.warn(`WASM init failed — class hashing falls back to text-only display: ${err.message}`);
     wasmReady = false;
@@ -796,7 +796,7 @@ document.querySelector("#entry-detail")?.classList.add("hidden");
 // ── /r2 WebSocket client + Build pane ─────────────────────────────────
 //
 // Browser ↔ orchestrator wire format matches `bridge::WireEnvelope`:
-//   {"kind":"event","name":"r2.compiler.build.start","payload":{...}}
+//   {"kind":"event","name":"r2.composer.build.start","payload":{...}}
 //   {"kind":"hello","from":"...","version":"...","note":"..."}
 //   {"kind":"ack","echo":"..."}
 //
@@ -886,21 +886,21 @@ function handleEnvelope(env) {
 
 function onEvent(name, payload) {
   // Author flow → chat pane
-  if (name.startsWith("r2.compiler.author.")) {
+  if (name.startsWith("r2.composer.author.")) {
     onAuthorEvent(name, payload);
     return;
   }
   // Build flow → build console
   let cls = "evt";
-  if (name === "r2.compiler.build.progress") cls = "evt-progress";
-  else if (name === "r2.compiler.build.done") cls = "evt-done";
-  else if (name === "r2.compiler.build.error") cls = "evt-error";
+  if (name === "r2.composer.build.progress") cls = "evt-progress";
+  else if (name === "r2.composer.build.done") cls = "evt-done";
+  else if (name === "r2.composer.build.error") cls = "evt-error";
   consoleLine(cls, `${name}  ${formatPayload(payload)}`);
-  if (name === "r2.compiler.build.done") {
+  if (name === "r2.composer.build.done") {
     setBuildStatus("done");
-  } else if (name === "r2.compiler.build.error") {
+  } else if (name === "r2.composer.build.error") {
     setBuildStatus("error");
-  } else if (name === "r2.compiler.build.progress") {
+  } else if (name === "r2.composer.build.progress") {
     setBuildStatus("building");
   }
 }
@@ -924,7 +924,7 @@ function sendEvent(name, payload) {
 
 // ── Canvas (Phase 1.7c) ───────────────────────────────────────────────
 //
-// The canvas is r2-compiler's structured-prompt builder: drag a board
+// The canvas is r2-composer's structured-prompt builder: drag a board
 // + an ensemble onto it; Compile dispatches the composition over /r2.
 // Phase 1.7d adds the AI-chat pane that reads + mutates `canvas`.
 
@@ -979,11 +979,11 @@ function attachCanvas() {
   $("canvas-compile").addEventListener("click", () => {
     if (!canvasState.board || !canvasState.ensemble) return;
     setBuildStatus("starting");
-    const ok = sendEvent("r2.compiler.build.start", {
+    const ok = sendEvent("r2.composer.build.start", {
       target: canvasState.board,
       score: canvasState.ensemble,
       // Phase 1.8 wraps this in a Tera-rendered prompt brief per
-      // SPEC-R2-COMPILER §5.
+      // SPEC-R2-COMPOSER §5.
     });
     if (!ok) setBuildStatus("disconnected");
   });
@@ -1059,9 +1059,9 @@ function refreshCompileButton() {
 // ── Bottom panel (tabbed: Chat | Build) ───────────────────────────────
 //
 // The Chat tab is the hybrid-UX dialog: user prompts go out as
-// `r2.compiler.author.prompt` events carrying the current canvas as
-// context; assistant replies stream back as `r2.compiler.author.reply`
-// and finalise on `r2.compiler.author.done`. The orchestrator-side
+// `r2.composer.author.prompt` events carrying the current canvas as
+// context; assistant replies stream back as `r2.composer.author.reply`
+// and finalise on `r2.composer.author.done`. The orchestrator-side
 // Author plugin (Phase 1.7d, not yet wired) is what turns those
 // prompts into real `claude -p` invocations with the canvas + history
 // spliced into the brief.
@@ -1150,7 +1150,7 @@ function sendChat() {
     role: m.role,
     content: m.content,
   }));
-  sendEvent("r2.compiler.author.prompt", {
+  sendEvent("r2.composer.author.prompt", {
     message: text,
     canvas: canvasCtx,
     history: historyForServer,
@@ -1167,7 +1167,7 @@ function onAuthorEvent(name, payload) {
     chatState.pending = { role: "assistant", content: "" };
     chatState.history.push(chatState.pending);
   }
-  if (name === "r2.compiler.author.reply") {
+  if (name === "r2.composer.author.reply") {
     // The orchestrator's claude-code plugin extracts `payload.text` from
     // stream-json assistant + result lines; system / init / tool-use
     // lines come through with text=null and we skip them so the chat
@@ -1178,17 +1178,17 @@ function onAuthorEvent(name, payload) {
       renderChat();
       bumpChatBadge();
     }
-  } else if (name === "r2.compiler.author.done") {
+  } else if (name === "r2.composer.author.done") {
     chatState.pending = null;
     renderChat();
     bumpChatBadge();
-  } else if (name === "r2.compiler.author.error") {
+  } else if (name === "r2.composer.author.error") {
     const msg = typeof payload === "string" ? payload : (payload?.message ?? JSON.stringify(payload));
     chatState.pending.content += `\n\n**[error]** ${msg}`;
     chatState.pending = null;
     renderChat();
     bumpChatBadge();
-  } else if (name === "r2.compiler.author.file_added") {
+  } else if (name === "r2.composer.author.file_added") {
     const path = payload?.path ?? formatPayload(payload);
     chatState.pending.content += `\n_[file added: ${path}]_\n`;
     renderChat();

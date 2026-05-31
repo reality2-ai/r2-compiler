@@ -8,7 +8,7 @@ Receives `#wifi_offer` over L2CAP, validates TG signature, persists creds to NVS
 
 ## Platform-extension template tokens
 
-`{{platform.verify_tg_signature(...)}}` and `{{platform.parse_wifi_offer(...)}}` are r2-compiler extensions to R2-DEF §5.1 — the compiler synthesises Rust at code-gen. Same pattern as Identity's `{{platform.random_seed_32}}`.
+`{{platform.verify_tg_signature(...)}}` and `{{platform.parse_wifi_offer(...)}}` are r2-composer extensions to R2-DEF §5.1 — the compiler synthesises Rust at code-gen. Same pattern as Identity's `{{platform.random_seed_32}}`.
 
 ## Read in order
 

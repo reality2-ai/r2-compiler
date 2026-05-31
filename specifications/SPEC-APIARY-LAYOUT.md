@@ -1,4 +1,4 @@
-# SPEC-APIARY-LAYOUT: directory layout and `apiary.toml` schema for r2-compiler apiaries
+# SPEC-APIARY-LAYOUT: directory layout and `apiary.toml` schema for r2-composer apiaries
 
 **Version:** 0.1 Draft
 **Date:** 2026-05-31
@@ -6,7 +6,7 @@
 **Depends on:**
 - **Upstream (proposed amendment):** R2-APIARY at `r2-specifications/specs/r2-core/R2-APIARY.md` (see `SPEC-APIARY-AMENDMENT-PROPOSAL.md` in this directory — broadens R2-APIARY scope to encompass the TG-bound multi-hive case as the general definition)
 - **Upstream (existing):** R2-TRUST (§2.3 one-TG-per-hive constraint), R2-ENSEMBLE, R2-DEF §7
-- **r2-compiler:** SPEC-R2-COMPILER, SPEC-CATALOGUE-LAYOUT
+- **r2-composer:** SPEC-R2-COMPOSER, SPEC-CATALOGUE-LAYOUT
 
 ---
 
@@ -48,7 +48,7 @@ apiaries/<name>/                          # entire apiary — committable to its
 **OFF-TREE** (per apiary, never in the repo):
 
 ```
-~/.config/r2-compiler/apiaries/<name>/tg_signer/
+~/.config/r2-composer/apiaries/<name>/tg_signer/
 └── tg_priv.bin                           # TG private key — NEVER committed
 ```
 
@@ -56,13 +56,13 @@ The split between repo-committable + `~/.config` mirrors r2-workshop's existing 
 
 ### 2.1 Apiaries can live anywhere
 
-The `apiaries/` directory inside r2-compiler is the **default** location. An apiary directory is structurally self-contained and CAN be:
+The `apiaries/` directory inside r2-composer is the **default** location. An apiary directory is structurally self-contained and CAN be:
 
-- A subdirectory of r2-compiler at `apiaries/<name>/` (the default).
+- A subdirectory of r2-composer at `apiaries/<name>/` (the default).
 - A separate git repository at any path on the operator's machine, opened by absolute path.
 - A cloned repository (`git clone <apiary-repo>` then "Open apiary…" in the webapp).
 
-The orchestrator's `r2.compiler.apiary.open` event accepts any absolute path matching this layout.
+The orchestrator's `r2.composer.apiary.open` event accepts any absolute path matching this layout.
 
 ## 3. `apiary.toml` schema
 
@@ -80,7 +80,7 @@ ai_context  = "AI-CONTEXT.md"                  # OPTIONAL path; default is AI-CO
 # The single TG that scopes this apiary. Per R2-TRUST §2.3 every hive
 # performing a part of this apiary is a member of EXACTLY this TG.
 public_key     = "trust_keys/tg_pub.bin"      # REQUIRED — path relative to apiary root
-keyholder_path = "~/.config/r2-compiler/apiaries/rocker-rig/tg_signer/"   # REQUIRED — off-tree
+keyholder_path = "~/.config/r2-composer/apiaries/rocker-rig/tg_signer/"   # REQUIRED — off-tree
 keyholder_fp   = "<sha256 of keyholder pubkey>"   # REQUIRED — informational; lets the UI verify a loaded key matches
 
 # Each role-ensemble in this apiary. References catalogue entries by slug.
@@ -190,28 +190,28 @@ Per [[project-ensemble-equals-project]] §"TG constraint on project switching", 
 | Orchestrator | Drops current TG cert + KeyHolder context; loads the new apiary's `tg_pub.bin` + matching `tg_priv.bin` from off-tree. |
 | Webapp browser hive | Looks up the new apiary's class hash in IndexedDB-stored cert list. If a matching cert exists, presents it. If not, prompts re-enrolment via QR/link flow. |
 | Catalogue browser | Re-scopes the device-roster pane to the new apiary's `devices/roster.toml`. Catalogue itself stays unchanged (it's the shared library across apiaries). |
-| In-flight builds | Aborts with `r2.compiler.build.error{phase: "apiary_switched"}` OR completes against the OLD apiary's TG (operator preference at switch time). |
+| In-flight builds | Aborts with `r2.composer.build.error{phase: "apiary_switched"}` OR completes against the OLD apiary's TG (operator preference at switch time). |
 | Live R2-WIRE subscriptions | Tear down for old TG; re-subscribe under new TG. |
 
 **Multi-cert browser layout**: the webapp's IndexedDB stores `{ <tg_class_hash>: <device_keypair + cert> }`. On apiary switch the browser picks the matching pair; only enrols when it sees a new TG class hash for the first time.
 
 **Two apiaries sharing a TG**: legal — both reference the same `tg_pub.bin`. The orchestrator detects the shared TG and skips the heavy re-bind; only the composition + roster + conversation pane swap.
 
-## 7. Events (extension to SPEC-R2-COMPILER §4)
+## 7. Events (extension to SPEC-R2-COMPOSER §4)
 
 | Event | Direction | Payload | Purpose |
 |---|---|---|---|
-| `r2.compiler.apiary.list` | webapp → orchestrator | `{}` | List known apiaries in `apiaries/` + recent-opened paths |
-| `r2.compiler.apiary.entry` | orchestrator → webapp | `{ name, class, version, last_modified, path }` | Streamed per-apiary summary |
-| `r2.compiler.apiary.open` | webapp → orchestrator | `{ path }` (absolute or relative to repo) | Open an apiary; orchestrator scopes all subsequent state |
-| `r2.compiler.apiary.active` | orchestrator → webapp | full hydrated state (apiary.toml + roster + recent transcripts) | Sent after open |
-| `r2.compiler.apiary.create` | webapp → orchestrator | `{ name, description, class, tg_class_string, path? }` | Scaffold a new apiary + generate its TG keypair |
-| `r2.compiler.apiary.save` | webapp → orchestrator | `{}` | Persist (typically implicit; this is an explicit checkpoint) |
-| `r2.compiler.apiary.close` | webapp → orchestrator | `{}` | Tear down active state |
-| `r2.compiler.apiary.git.init` | webapp → orchestrator | `{}` | `git init` inside the active apiary + write `.gitignore` template |
-| `r2.compiler.apiary.git.publish` | webapp → orchestrator | `{ remote_org, visibility }` | `gh repo create` + push |
+| `r2.composer.apiary.list` | webapp → orchestrator | `{}` | List known apiaries in `apiaries/` + recent-opened paths |
+| `r2.composer.apiary.entry` | orchestrator → webapp | `{ name, class, version, last_modified, path }` | Streamed per-apiary summary |
+| `r2.composer.apiary.open` | webapp → orchestrator | `{ path }` (absolute or relative to repo) | Open an apiary; orchestrator scopes all subsequent state |
+| `r2.composer.apiary.active` | orchestrator → webapp | full hydrated state (apiary.toml + roster + recent transcripts) | Sent after open |
+| `r2.composer.apiary.create` | webapp → orchestrator | `{ name, description, class, tg_class_string, path? }` | Scaffold a new apiary + generate its TG keypair |
+| `r2.composer.apiary.save` | webapp → orchestrator | `{}` | Persist (typically implicit; this is an explicit checkpoint) |
+| `r2.composer.apiary.close` | webapp → orchestrator | `{}` | Tear down active state |
+| `r2.composer.apiary.git.init` | webapp → orchestrator | `{}` | `git init` inside the active apiary + write `.gitignore` template |
+| `r2.composer.apiary.git.publish` | webapp → orchestrator | `{ remote_org, visibility }` | `gh repo create` + push |
 
-All other `r2.compiler.*` events (build, deploy, author, tg, …) become implicitly scoped to the active apiary once open.
+All other `r2.composer.*` events (build, deploy, author, tg, …) become implicitly scoped to the active apiary once open.
 
 ## 8. Conformance
 

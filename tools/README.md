@@ -1,6 +1,6 @@
 # tools/
 
-Scripts that support r2-compiler's catalogue + build lifecycle.
+Scripts that support r2-composer's catalogue + build lifecycle.
 
 ## Planned scripts (v0.1)
 

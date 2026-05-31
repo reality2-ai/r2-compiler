@@ -136,7 +136,7 @@ chip_vendor_url   = "https://www.espressif.com/en/products/socs/esp32-s3"
 wiring_guide      = "HARDWARE-WIRING-XIAO.md"
 
 [compulsory_plugins]
-# Per SPEC-R2-COMPILER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
+# Per SPEC-R2-COMPOSER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
 capabilities = ["ai.reality2.deploy.ota"]
 prefer       = ["ota-tcp"]                         # esp_ota_*-based, runs over TCP port 21043 on the WiFi STA
 

@@ -1,8 +1,8 @@
-# AGENTS.md — Orientation for AI Agents working in `r2-compiler`
+# AGENTS.md — Orientation for AI Agents working in `r2-composer`
 
-This file is the entry point for AI agents (Claude Code, Codex, Cursor, …) operating in this repository. Read this first, then [`AI-CONTEXT.md`](AI-CONTEXT.md), then the spec at [`specifications/SPEC-R2-COMPILER.md`](specifications/SPEC-R2-COMPILER.md).
+This file is the entry point for AI agents (Claude Code, Codex, Cursor, …) operating in this repository. Read this first, then [`AI-CONTEXT.md`](AI-CONTEXT.md), then the spec at [`specifications/SPEC-R2-COMPOSER.md`](specifications/SPEC-R2-COMPOSER.md).
 
-> **One-paragraph orientation:** r2-compiler is a visual composer for R2 firmware that drives Claude Code as its compile backend. The operator picks a carrier board + plugins + sentants from a catalogue around a canvas; the tool serialises that composition into an R2-DEF §7 ensemble score and dispatches a Claude Code session that produces a per-carrier firmware crate. The catalogue is **authorable through dialog with the agent** — new boards, plugins, sentants are created by the same conversational pattern Roy uses with r2-workshop today, and every entry leaves behind enough material (datasheets, AI-CONTEXT.md, conversation transcripts) that a fresh CC instance can pick the entry up cold. Everything in this repo must conform to the canonical R2 specs at `../r2-specifications/`.
+> **One-paragraph orientation:** r2-composer is a visual composer for R2 firmware that drives Claude Code as its compile backend. The operator picks a carrier board + plugins + sentants from a catalogue around a canvas; the tool serialises that composition into an R2-DEF §7 ensemble score and dispatches a Claude Code session that produces a per-carrier firmware crate. The catalogue is **authorable through dialog with the agent** — new boards, plugins, sentants are created by the same conversational pattern Roy uses with r2-workshop today, and every entry leaves behind enough material (datasheets, AI-CONTEXT.md, conversation transcripts) that a fresh CC instance can pick the entry up cold. Everything in this repo must conform to the canonical R2 specs at `../r2-specifications/`.
 
 ## 1. The upstream contracts you are bound by
 
@@ -100,14 +100,14 @@ The normative spec is at [`specifications/SPEC-CATALOGUE-LAYOUT.md`](specificati
 For each build the operator triggers from the webapp:
 
 1. Webapp serialises canvas state → R2-DEF §7 ensemble score under `scores/<name>-<timestamp>.yaml`.
-2. Webapp emits `r2.compiler.build.start { score, target }` over R2-WIRE to the orchestrator hive.
+2. Webapp emits `r2.composer.build.start { score, target }` over R2-WIRE to the orchestrator hive.
 3. Orchestrator's `Compiler` sentant materialises a per-carrier crate under `out/<carrier>/` from `catalogue/boards/<board>/templates/`.
 4. Orchestrator spawns `claude -p '<brief>' --output-format=stream-json` with the catalogue root as working directory. The brief specifies: the score, the carrier, the plugins to link, the success criteria (e.g. `cargo build --release --target <triple>` returns 0).
 5. Claude Code does the work — authors the per-carrier `main.rs`, wires plugin glue, runs cargo, debugs failures by reading datasheets + similar existing crates in `catalogue/`.
-6. Orchestrator streams `r2.compiler.build.progress` events back to the webapp for display.
+6. Orchestrator streams `r2.composer.build.progress` events back to the webapp for display.
 7. Output: a flashable `.bin` under `out/<carrier>/releases/` + optional `esptool` flash via a second sentant.
 
-If you ARE the Claude Code session inside step 4–5: read the brief, the score, the board's `AI-CONTEXT.md`, then the relevant `plugin.toml` files and `sentant.yaml` files for each part on the canvas. Cite the spec sections you rely on. Don't invent — when something is missing from the catalogue, ask via a `r2.compiler.brief.question` event back to the orchestrator rather than guessing.
+If you ARE the Claude Code session inside step 4–5: read the brief, the score, the board's `AI-CONTEXT.md`, then the relevant `plugin.toml` files and `sentant.yaml` files for each part on the canvas. Cite the spec sections you rely on. Don't invent — when something is missing from the catalogue, ask via a `r2.composer.brief.question` event back to the orchestrator rather than guessing.
 
 ## 6. The first success gate (binding)
 
@@ -123,7 +123,7 @@ Behavioural equivalence (per R2-COMPILE §8) is the gate — same `r2.sensor.ann
 
 ## 7. Things you will probably miss first time
 
-- **Two repo paths.** `/mnt/data/Development/R2/r2-compiler` and `/home/roycdavies/Development/R2/r2-compiler` resolve to the same inode (one is a symlink). Don't be confused.
+- **Two repo paths.** `/mnt/data/Development/R2/r2-composer` and `/home/roycdavies/Development/R2/r2-composer` resolve to the same inode (one is a symlink). Don't be confused.
 - **The orchestrator IS a hive**, not a plain HTTP server. Same R2-WIRE / R2-TRUST membership story as r2-workshop's `dashboard/` binary. It happens to also serve static files for the webapp bundle on the same port (peek-based protocol detection per R2-WIRE §13.5).
 - **The webapp IS a hive too**, running in the browser via WASM. Look at `r2-workshop/webapp/` for the working pattern.
 - **The catalogue is self-contained.** Don't add `path = "../r2-core"` dependencies. Vendor what you need into [`crates/`](crates/), kept in sync via `tools/sync-catalogue.sh`.
@@ -149,4 +149,4 @@ Behavioural equivalence (per R2-COMPILE §8) is the gate — same `r2.sensor.ann
 
 ---
 
-*AGENTS.md — orientation for AI agents working in r2-compiler.*
+*AGENTS.md — orientation for AI agents working in r2-composer.*

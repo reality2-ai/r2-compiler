@@ -1,8 +1,8 @@
-# orchestrator — r2-compiler's workstation-side R2 hive.
+# orchestrator — r2-composer's workstation-side R2 hive.
 #
 # Serves the webapp/ bundle on localhost:21050 + exposes /r2 as the
 # WebSocket entry point for the browser hive. Drives Claude Code via
-# subprocess for builds + catalogue authoring per SPEC-R2-COMPILER §5.
+# subprocess for builds + catalogue authoring per SPEC-R2-COMPOSER §5.
 #
 # Phase 1.6 scope (this commit): the minimum-viable shell — axum web
 # server, static-file serving, /r2 WebSocket endpoint accepting
@@ -23,12 +23,12 @@ name        = "orchestrator"
 version     = "0.1.0"
 edition.workspace      = true
 license.workspace      = true
-description = "r2-compiler workstation orchestrator hive — serves the webapp + drives Claude Code"
+description = "r2-composer workstation orchestrator hive — serves the webapp + drives Claude Code"
 repository.workspace   = true
 rust-version.workspace = true
 
 [[bin]]
-name = "r2-compiler-orchestrator"
+name = "r2-composer-orchestrator"
 path = "src/main.rs"
 
 [dependencies]

@@ -132,4 +132,4 @@ None. Local hardware driver, no remote endpoints, no API keys.
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-05-31 | 0.1.0 | Metadata draft. `plugin.toml`, this `PLUGIN.md`, `AI-CONTEXT.md` authored in r2-compiler session 02 as the first worked-example plugin entry. No source / Cargo.toml / datasheets yet. |
+| 2026-05-31 | 0.1.0 | Metadata draft. `plugin.toml`, this `PLUGIN.md`, `AI-CONTEXT.md` authored in r2-composer session 02 as the first worked-example plugin entry. No source / Cargo.toml / datasheets yet. |

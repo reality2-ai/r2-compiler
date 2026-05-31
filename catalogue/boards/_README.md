@@ -33,7 +33,7 @@ See [`../../specifications/SPEC-CATALOGUE-LAYOUT.md`](../../specifications/SPEC-
 
 ## Adding a board
 
-Through the visual UI: open r2-compiler, hit **+ New Board** in the catalogue browser, describe the board to the agent. The agent will ask clarifying questions, fetch the vendor schematic + chip datasheet, write `board.toml`, populate `templates/`, and leave the entry in a state where the next CC session can pick it up.
+Through the visual UI: open r2-composer, hit **+ New Board** in the catalogue browser, describe the board to the agent. The agent will ask clarifying questions, fetch the vendor schematic + chip datasheet, write `board.toml`, populate `templates/`, and leave the entry in a state where the next CC session can pick it up.
 
 Direct authoring (CLI fallback) — `tools/new-entry.sh board <slug>` will scaffold the empty directory; you fill it in by hand against SPEC-CATALOGUE-LAYOUT §3.
 

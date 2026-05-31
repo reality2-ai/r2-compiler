@@ -245,6 +245,261 @@
       "plugins": [
         {
           "kind": "plugin",
+          "category": "comms",
+          "slug": "data-tcp",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp",
+          "name": "data-tcp",
+          "version": "0.1.0",
+          "description": "TCP server on port 21047 implementing LIST / GET / DEL / DEL_ALL over the captures directory on the SD card. Used by the dashboard to download named capture files and to free SD space remotely (SPEC-R2-WORKSHOP-CAPTURE \u00a76).",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.workshop.cap.data-tcp"
+          ],
+          "requires": [
+            "r2.net.tcp",
+            "ai.reality2.workshop.cap.sd-ring"
+          ],
+          "commands": [
+            "init"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            }
+          ]
+        },
+        {
+          "kind": "plugin",
+          "category": "comms",
+          "slug": "log-tcp",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp",
+          "name": "log-tcp",
+          "version": "0.1.0",
+          "description": "TCP fan-out of the device's log::info!/warn!/error! stream on port 21046. Multiple dashboard clients can `nc <ip> 21046` to tail the live log (SPEC-R2-WORKSHOP-SENSOR-LIVE-LOGS). Read-only; ignores any data sent by the client.",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.workshop.cap.log-tcp"
+          ],
+          "requires": [
+            "r2.net.tcp"
+          ],
+          "commands": [
+            "init"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            }
+          ]
+        },
+        {
+          "kind": "plugin",
+          "category": "comms",
+          "slug": "reset-tcp",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp",
+          "name": "reset-tcp",
+          "version": "0.1.0",
+          "description": "TCP listener on port 21044 accepting a single CMD_RESET byte (0x52). On receipt, calls esp_restart(). Implements SPEC-R2-WORKSHOP-SENSOR-REMOTE-RESET; used by the dashboard's `r2.dash.cmd.reset` flow.",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.workshop.cap.reset-tcp"
+          ],
+          "requires": [
+            "r2.net.tcp"
+          ],
+          "commands": [
+            "init",
+            "listen"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            }
+          ]
+        },
+        {
+          "kind": "plugin",
+          "category": "indicator",
+          "slug": "led",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led",
+          "name": "led",
+          "version": "0.1.0",
+          "description": "Status LED driver \u2014 abstracts over WS2812 (RMT-driven RGB on devkitc) and mono LEDC PWM (xiao GPIO21 + dfr1117 GPIO15). The plugin exposes a small FSM-state-to-colour-or-blink mapping; the consuming Status sentant calls set_state(<state>) and the plugin handles the per-carrier rendering.",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.workshop.cap.status-led"
+          ],
+          "requires": [
+            "r2.hw.gpio"
+          ],
+          "commands": [
+            "init",
+            "set_state",
+            "set_color",
+            "off"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            }
+          ]
+        },
+        {
+          "kind": "plugin",
+          "category": "sensor",
+          "slug": "adxl355",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355",
+          "name": "adxl355",
+          "version": "0.1.0",
+          "description": "Analog Devices ADXL355 precision triaxial MEMS accelerometer over SPI. 20-bit native resolution, low-noise, SHM-grade. r2-workshop's primary sensing element on the ESP32-S3 carriers (DevKitC + XIAO); capability-paired with `lis2dh` (I\u00b2C, 10-bit) \u2014 same `ai.reality2.cap.accel.triaxial`, different bus + precision, swappable per R2-PLUGIN \u00a710.",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.cap.accel.triaxial",
+            "ai.reality2.cap.accel.triaxial.20bit"
+          ],
+          "requires": [
+            "r2.hw.spi"
+          ],
+          "commands": [
+            "init",
+            "read",
+            "read_burst",
+            "set_odr",
+            "set_range",
+            "set_offset",
+            "sleep"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            }
+          ]
+        },
+        {
+          "kind": "plugin",
+          "category": "sensor",
+          "slug": "battery-adc",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc",
+          "name": "battery-adc",
+          "version": "0.1.0",
+          "description": "Single-channel ADC reading the LiPo cell voltage through a 100 k\u03a9/100 k\u03a9 divider. Converts raw ADC counts \u2192 millivolts at the cell terminal; consuming sentants compute charge state from voltage curves. ESP32-family ADC1 (ADC2 is unusable while WiFi is active).",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.workshop.cap.battery",
+            "r2.hw.adc.battery"
+          ],
+          "requires": [
+            "r2.hw.adc"
+          ],
+          "commands": [
+            "init",
+            "read_mv",
+            "calibrate"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            }
+          ]
+        },
+        {
+          "kind": "plugin",
           "category": "sensor",
           "slug": "lis2dh",
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh",
@@ -304,9 +559,215 @@
               "kind": "rs"
             }
           ]
+        },
+        {
+          "kind": "plugin",
+          "category": "storage",
+          "slug": "sd-card",
+          "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card",
+          "name": "sd-card",
+          "version": "0.1.0",
+          "description": "FATFS-mounted microSD card on a shared SPI bus, plus the 20-byte fixed-record acceleration ring (r2-workshop CAPTURE \u00a76). Provides durable sample storage + capture-file management + boot recovery (replay-on-reconnect). Two-CS sharing with the accel plugin: only one chip-select is asserted per transaction.",
+          "modes": {
+            "aot": true,
+            "nif": false,
+            "web": false
+          },
+          "provides": [
+            "ai.reality2.workshop.cap.sd-ring",
+            "r2.hw.storage.fatfs"
+          ],
+          "requires": [
+            "r2.hw.sdspi"
+          ],
+          "commands": [
+            "init",
+            "ring_push",
+            "ring_pop",
+            "file_open",
+            "file_write",
+            "file_close",
+            "file_list",
+            "file_get",
+            "file_delete",
+            "sync"
+          ],
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/PLUGIN.md",
+              "name": "PLUGIN.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/plugin.toml",
+              "name": "plugin.toml",
+              "kind": "toml"
+            }
+          ]
         }
       ],
       "sentants": [
+        {
+          "kind": "sentant",
+          "slug": "Accelerometer",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer",
+          "name": "Accelerometer",
+          "class": "nz.ac.auckland.rocker.accelerometer",
+          "description": "Domain sentant. Binds the generic accel.triaxial capability (NOT a specific chip), reads samples at the configured ODR, applies the calibration offset baked into vars, stamps with clock.now_ms, emits r2.sensor.acceleration. The sensing-element swap lever (lis2dh vs adxl355) keeps this sentant chip-agnostic.",
+          "storage": "durable-state",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Battery",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Battery",
+          "name": "Battery",
+          "class": "ai.reality2.workshop.sensor.battery",
+          "description": "Polls the battery-adc plugin every 30 s and emits r2.sensor.battery. Also flips low-battery state to the LED + a power_state_changed event so Beacon updates the BLE AD.",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Battery/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Battery/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Battery/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Beacon",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Beacon",
+          "name": "Beacon",
+          "class": "ai.reality2.workshop.sensor.beacon",
+          "description": "Drives the BLE R2-BEACON advertiser. Starts after Identity reaches ready (rbid populated); calls `ble-beacon` plugin to emit the 28-byte legacy AD with class hash + RBID + state. Updates the AD on power-state changes (low battery, OTA in progress).",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Beacon/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Beacon/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Beacon/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Bootstrap",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Bootstrap",
+          "name": "Bootstrap",
+          "class": "ai.reality2.workshop.sensor.bootstrap",
+          "description": "Owns the BLE L2CAP `#wifi_offer` reception. On a valid TG-signed offer, decodes the FrameHeader byte (R2-WIRE) + compact frame, verifies the TG signature using the baked-in TG public key, persists WiFi creds to NVS, receives the KeyHolder-signed DeviceCertificate, then triggers a reboot to pick up the new credentials. Per R2-BOOTSTRAP \u00a74.",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Bootstrap/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Bootstrap/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Bootstrap/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Capture",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Capture",
+          "name": "Capture",
+          "class": "ai.reality2.workshop.sensor.capture",
+          "description": "Owns the Idle / Calibrating / Recording state machine per SPEC-R2-WORKSHOP-CAPTURE \u00a72. On r2.dash.capture.start, opens a named capture file on the SD card and starts duplicating every r2.sensor.acceleration to it. On r2.dash.capture.stop, closes the file. Event marks (r2.dash.capture.event_mark) are written to a sidecar file (\u00a77.5). Calibration samples (r2.dash.cal.sample.req) handled in the Calibrating state.",
+          "storage": "durable-state",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Capture/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Capture/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Capture/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Health",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Health",
+          "name": "Health",
+          "class": "ai.reality2.workshop.sensor.health",
+          "description": "Watches for a stuck data source per SPEC-R2-WORKSHOP-SENSOR-HEALTH \u00a76. Tracks the last-arrived sample timestamp; if no acceleration arrives for > 2 s while in real-data-source mode, flags data_source=\"sim\" via a set_data_source event (Status sentant catches + propagates).",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Health/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Health/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Health/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
         {
           "kind": "sentant",
           "slug": "Identity",
@@ -332,6 +793,214 @@
               "kind": "yaml"
             }
           ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Ota",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Ota",
+          "name": "Ota",
+          "class": "ai.reality2.workshop.sensor.ota",
+          "description": "Owns the OTA update flow. Subscribes r2.dash.fw.update; delegates to the core ota-tcp plugin (port 21043). On successful image swap, sets status to Ota (LED \u2192 white strobe) until reboot. The mark_app_valid step is the responsibility of the Uplink sentant (after the first frame round-trips post-reboot \u2014 SENSOR \u00a712.2).",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Ota/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Ota/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Ota/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Presence",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Presence",
+          "name": "Presence",
+          "class": "ai.reality2.workshop.sensor.presence",
+          "description": "One-shot at boot: 5\u00d7 UDP broadcast to 255.255.255.255:21044 carrying {rbid, ip}. Drives the controller's RBID-based bootstrap reconciliation \u2014 after a sensor reboot, the controller knows the device's new IP within a few hundred ms without waiting for the next BLE scan cycle.",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Presence/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Presence/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Presence/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Recorder",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Recorder",
+          "name": "Recorder",
+          "class": "ai.reality2.workshop.sensor.recorder",
+          "description": "Writes every r2.sensor.acceleration record to the SD ring buffer (CAPTURE \u00a76). On r2.dash.ack {through_seq}, frees ring records up to that sequence. Stores last-acked-seq in NVS so cold boots can resume catch-up from the right place.",
+          "storage": "durable-state",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Recorder/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Recorder/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Recorder/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Reset",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Reset",
+          "name": "Reset",
+          "class": "ai.reality2.workshop.sensor.reset",
+          "description": "Handles remote-reset requests. Two paths: r2.dash.reset over R2-WIRE (preferred), or a TCP byte 0x52 to port 21044 via the reset-tcp plugin (fallback when R2-WIRE is silent). Both lead to esp_restart() after a brief LED blink to signal pending reboot.",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Reset/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Reset/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Reset/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Status",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Status",
+          "name": "Status",
+          "class": "ai.reality2.workshop.sensor.status",
+          "description": "Emits r2.sensor.status every 2 s \u2014 FSM state, data_source (real/sim), seq watermark, uptime. Drives the dashboard's virtual LED + diagnostics. Also sets the physical LED state via the led plugin on every FSM transition received.",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Status/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Status/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Status/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Sync",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Sync",
+          "name": "Sync",
+          "class": "ai.reality2.workshop.sensor.sync",
+          "description": "Time-sync per SPEC-R2-WORKSHOP-TIMESYNC \u00a72 (Cristian's algorithm). On r2.dash.sync_pulse, immediately emits r2.sensor.sync_pong. On r2.dash.set_clock_offset, writes the new offset to the clock plugin. Wall-clock accuracy ~5 ms (network-jitter-bound).",
+          "storage": "durable-state",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Sync/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Sync/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Sync/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "Uplink",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Uplink",
+          "name": "Uplink",
+          "class": "ai.reality2.workshop.sensor.uplink",
+          "description": "Single TCP session to the controller (port 21042). Sends the announce frame on connect (with cert + device_pk + class_hash), then forwards subscribed events as R2-WIRE compact frames. Reconnects with exponential backoff.",
+          "storage": "ephemeral",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Uplink/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Uplink/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/Uplink/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
+        },
+        {
+          "kind": "sentant",
+          "slug": "WifiProv",
+          "path": "catalogue/ensembles/rocker-sensor/sentants/WifiProv",
+          "name": "WifiProv",
+          "class": "ai.reality2.workshop.sensor.wifi-prov",
+          "description": "One-shot at boot. Reads WiFi credentials from NVS (set by Bootstrap) or wifi_config.toml (dev fallback) and drives the WiFi STA singleton to associate. On failure (no creds, or association timeout), yields to Bootstrap (sets LED to Advertising and starts BLE listening).",
+          "storage": "durable",
+          "files": [
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/WifiProv/AI-CONTEXT.md",
+              "name": "AI-CONTEXT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/WifiProv/SENTANT.md",
+              "name": "SENTANT.md",
+              "kind": "md"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/sentants/WifiProv/sentant.yaml",
+              "name": "sentant.yaml",
+              "kind": "yaml"
+            }
+          ]
         }
       ],
       "files": [
@@ -339,6 +1008,96 @@
           "path": "catalogue/ensembles/rocker-sensor/ensemble.yaml",
           "name": "ensemble.yaml",
           "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/AI-CONTEXT.md",
@@ -371,6 +1130,111 @@
           "kind": "rs"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/PLUGIN.md",
+          "name": "PLUGIN.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/plugin.toml",
+          "name": "plugin.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Battery/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Battery/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Battery/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Beacon/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Beacon/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Beacon/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Bootstrap/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Bootstrap/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Bootstrap/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Capture/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Capture/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Capture/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Health/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Health/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Health/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/AI-CONTEXT.md",
           "name": "AI-CONTEXT.md",
           "kind": "md"
@@ -384,6 +1248,126 @@
           "path": "catalogue/ensembles/rocker-sensor/sentants/Identity/sentant.yaml",
           "name": "sentant.yaml",
           "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Ota/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Ota/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Ota/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Presence/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Presence/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Presence/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Recorder/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Recorder/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Recorder/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Reset/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Reset/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Reset/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Status/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Status/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Status/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Sync/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Sync/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Sync/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Uplink/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Uplink/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/Uplink/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/WifiProv/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/WifiProv/SENTANT.md",
+          "name": "SENTANT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/sentants/WifiProv/sentant.yaml",
+          "name": "sentant.yaml",
+          "kind": "yaml"
         }
       ]
     }
@@ -391,7 +1375,7 @@
   "stats": {
     "boards": 3,
     "ensembles": 1,
-    "plugins": 1,
-    "sentants": 1
+    "plugins": 8,
+    "sentants": 15
   }
 }

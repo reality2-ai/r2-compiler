@@ -1,12 +1,12 @@
 # PROCESS.md — the five working rules
 
-These rules govern every change in this repo. They are the same rules `r2-workshop/PROCESS.md` codifies, adapted to r2-compiler's catalogue-authoring model.
+These rules govern every change in this repo. They are the same rules `r2-workshop/PROCESS.md` codifies, adapted to r2-composer's catalogue-authoring model.
 
 ## 1. Spec before code
 
 Every meaningful behaviour change has a driving spec — either local to this repo (under [`specifications/`](specifications/)) or upstream in `r2-specifications/`. The spec wins disagreements unless the user re-opens.
 
-If you're about to write code for a behaviour that no spec covers, **stop and write the spec first**. If the upstream spec is ambiguous, raise it against `r2-specifications` as a sharper question or a targeted edit — do not invent a r2-compiler-local workaround.
+If you're about to write code for a behaviour that no spec covers, **stop and write the spec first**. If the upstream spec is ambiguous, raise it against `r2-specifications` as a sharper question or a targeted edit — do not invent a r2-composer-local workaround.
 
 ## 2. Conversation is research data
 
@@ -34,7 +34,7 @@ PRs adding incomplete entries are blocked, not parked.
 
 - **No private keys** (TG signing keys, Ed25519 secret keys, API tokens), no WiFi credentials, no device UUIDs in the working tree. `.gitignore` blocks the patterns; *don't put them there in the first place* is the real rule.
 - **Cite sources.** Spec section + filename for protocol claims; datasheet page + filename for hardware claims; vendor URL when fetching; `path:line` for code refs. An unchecked citation is a hallucination wearing a uniform.
-- **No mocking of compile output.** If r2-compiler claims a build succeeded, it must have run `cargo build` and observed exit 0. If a UI shows "build ok" without a real subprocess exit code behind it, that's a bug. Same for `esptool` flash.
+- **No mocking of compile output.** If r2-composer claims a build succeeded, it must have run `cargo build` and observed exit 0. If a UI shows "build ok" without a real subprocess exit code behind it, that's a bug. Same for `esptool` flash.
 
 ---
 

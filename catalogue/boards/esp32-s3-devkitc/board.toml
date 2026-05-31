@@ -1,7 +1,7 @@
 # board.toml — Espressif ESP32-S3-DevKitC-1.
 #
 # Schema: SPEC-CATALOGUE-LAYOUT §3.2.
-# Source of truth for all r2-compiler decisions about this carrier.
+# Source of truth for all r2-composer decisions about this carrier.
 #
 # Authored 2026-05-31 by reading r2-workshop/firmware/esp32-s3/devkitc/
 # and r2-workshop/specifications/HARDWARE-WIRING-DEVKITC.md.
@@ -151,7 +151,7 @@ chip_vendor_url   = "https://www.espressif.com/en/products/socs/esp32-s3"
 wiring_guide      = "HARDWARE-WIRING-DEVKITC.md"
 
 [compulsory_plugins]
-# Per SPEC-R2-COMPILER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
+# Per SPEC-R2-COMPOSER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
 capabilities = ["ai.reality2.deploy.ota"]
 prefer       = ["ota-tcp"]                         # esp_ota_*-based, runs over TCP port 21043 on the WiFi STA
 

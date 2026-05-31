@@ -3,7 +3,7 @@
 **Version:** 0.1 Draft
 **Date:** 2026-05-31
 **Status:** Proposal — for ratification + upstream merge into r2-specifications
-**Author:** r2-compiler design session 02, Roy Davies
+**Author:** r2-composer design session 02, Roy Davies
 **Target spec:** `r2-specifications/specs/r2-core/R2-APIARY.md` (currently v0.3 Draft 2026-05-06)
 
 ---
@@ -16,12 +16,12 @@ R2-APIARY's current scope (v0.3, R2-APIARY §1.1) defines an **apiary** as:
 
 R2-APIARY §1.1 itself acknowledges this is a **"deliberate slight stretch"** of the dictionary meaning. In ordinary usage, an apiary is a place that contains **one or more separate beehives**, each with its own queen and colony. R2 borrowed the term for the OPPOSITE concept: one colony spread across multiple boxes (Langstroth supers — one queen, multiple boxes).
 
-r2-compiler's design has surfaced an unmet vocabulary need: the **TG-bound set of cooperating hives that together deliver one deployment**. The r2-workshop rocker rig is the canonical example — one TG, four role-ensembles (sensor + controller + viewer + keyholder), many hive instances. Currently this lacks a name in the R2 spec suite (workshop calls it informally "the deployment").
+r2-composer's design has surfaced an unmet vocabulary need: the **TG-bound set of cooperating hives that together deliver one deployment**. The r2-workshop rocker rig is the canonical example — one TG, four role-ensembles (sensor + controller + viewer + keyholder), many hive instances. Currently this lacks a name in the R2 spec suite (workshop calls it informally "the deployment").
 
 The proposal: **broaden R2-APIARY's scope** so an apiary is the broader TG-bound-set-of-stacks concept, with the existing multi-processor-single-identity case becoming a labeled specialisation ("tightly-bound apiary"). This:
 
 - Returns the term to its dictionary meaning (a yard with many hives).
-- Provides one canonical R2 term for the deployment-level concept r2-compiler needs.
+- Provides one canonical R2 term for the deployment-level concept r2-composer needs.
 - Preserves all current R2-APIARY reasoning under a more specific name.
 
 ## 2. Proposed scope
@@ -81,17 +81,17 @@ The reason the original R2-APIARY argued AGAINST per-component identity was spec
 - R2-WIRE, R2-FNV, R2-CBOR, R2-BEACON, R2-TRUST, R2-DEF, R2-COMPILE, R2-PLUGIN — all unchanged.
 - The protocol surface (events, frames, TG semantics) doesn't change. The amendment is purely vocabulary + organising principle.
 
-## 4. r2-compiler usage post-amendment
+## 4. r2-composer usage post-amendment
 
 Once the upstream amendment lands:
 
-- r2-compiler uses the term **"apiary"** for the operator's deployment unit (replaces the placeholder "project" terminology used so far).
+- r2-composer uses the term **"apiary"** for the operator's deployment unit (replaces the placeholder "project" terminology used so far).
 - Directory layout: `apiaries/<name>/` per [`SPEC-APIARY-LAYOUT.md`](SPEC-APIARY-LAYOUT.md) §2.
 - `apiary.toml` schema per `SPEC-APIARY-LAYOUT.md` §3.
-- Event vocabulary `r2.compiler.apiary.*` per `SPEC-APIARY-LAYOUT.md` §7.
+- Event vocabulary `r2.composer.apiary.*` per `SPEC-APIARY-LAYOUT.md` §7.
 - Webapp UI: project pill → "Apiary: rocker-rig".
 
-The amendment does NOT block r2-compiler's adoption of the term — `SPEC-APIARY-LAYOUT.md` already uses it. If Roy decides against the upstream amendment, r2-compiler would need to either:
+The amendment does NOT block r2-composer's adoption of the term — `SPEC-APIARY-LAYOUT.md` already uses it. If Roy decides against the upstream amendment, r2-composer would need to either:
 
 - Use a different word locally (project / deployment / federation / …), OR
 - Continue using "apiary" with a noted scope-divergence from R2-APIARY (cleaner if amendment is just slow, awkward if rejected).
@@ -104,14 +104,14 @@ The amendment does NOT block r2-compiler's adoption of the term — `SPEC-APIARY
 
 3. **Apiary as a parameter to `r2.dash.*` commands.** Today `r2.dash.cmd.*` commands are scoped per-device. Should there be an `r2.apiary.cmd.*` family that broadcasts to all members of one role-ensemble within an apiary?
 
-These are spec-amendment design questions, not r2-compiler blockers. r2-compiler can use "apiary" today and the spec answers shape the protocol-level integration over time.
+These are spec-amendment design questions, not r2-composer blockers. r2-composer can use "apiary" today and the spec answers shape the protocol-level integration over time.
 
 ## 6. Ratification path
 
 1. Roy reviews this proposal.
 2. Apply the §3.1 amendments to `r2-specifications/specs/r2-core/R2-APIARY.md` (version bump 0.3 → 0.4).
 3. Update R2-ENSEMBLE + R2-INTRO per §3.2.
-4. Notify r2-compiler that the upstream amendment has landed (just a sync run will pick it up if any vendored crates reference the spec; otherwise r2-compiler's local specs already use the term).
+4. Notify r2-composer that the upstream amendment has landed (just a sync run will pick it up if any vendored crates reference the spec; otherwise r2-composer's local specs already use the term).
 5. Sweep r2-workshop's documentation to use "apiary" where it currently says "deployment" or "the four role-ensembles".
 
 ## 7. Backwards compatibility
@@ -122,4 +122,4 @@ The amendment does NOT change the protocol surface — it only broadens vocabula
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-05-31 | 0.1 | Initial draft of the amendment proposal. Authored in r2-compiler design session 02 alongside `SPEC-APIARY-LAYOUT.md`. Awaits Roy's ratification + upstream merge. |
+| 2026-05-31 | 0.1 | Initial draft of the amendment proposal. Authored in r2-composer design session 02 alongside `SPEC-APIARY-LAYOUT.md`. Awaits Roy's ratification + upstream merge. |

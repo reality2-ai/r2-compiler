@@ -21,13 +21,13 @@
 //!
 //! ## Events emitted (by hash, via `poll()`)
 //!
-//! - `r2.compiler.build.progress` — one per parsed stream-json line.
+//! - `r2.composer.build.progress` — one per parsed stream-json line.
 //!   Payload is `{ "phase": "claude", "kind": "<type>", "line": "<raw json>" }`
 //!   (the `kind` field comes from the stream-json's `type` field when
 //!   present; otherwise it's `"unknown"`).
-//! - `r2.compiler.build.done` — the subprocess exited with code 0.
+//! - `r2.composer.build.done` — the subprocess exited with code 0.
 //!   Payload is `{ "exit_code": 0 }`.
-//! - `r2.compiler.build.error` — non-zero exit OR a stream-json parse
+//! - `r2.composer.build.error` — non-zero exit OR a stream-json parse
 //!   error OR an IO error spawning the subprocess.
 //!   Payload is `{ "exit_code": N, "message": "<reason>" }`.
 //!
@@ -122,8 +122,8 @@ pub struct ClaudeCodePlugin {
     child: Option<Child>,
     /// Pre-hashed event names — configurable per instance so the same
     /// plugin implementation drives both the build flow
-    /// (`r2.compiler.build.*`) and the author / chat flow
-    /// (`r2.compiler.author.*`).
+    /// (`r2.composer.build.*`) and the author / chat flow
+    /// (`r2.composer.author.*`).
     hash_text: u32,
     hash_done: u32,
     hash_error: u32,
@@ -138,8 +138,8 @@ pub struct ClaudeCodePlugin {
 }
 
 impl ClaudeCodePlugin {
-    /// Construct for the **build flow** — emits `r2.compiler.build.progress`,
-    /// `r2.compiler.build.done`, `r2.compiler.build.error`.
+    /// Construct for the **build flow** — emits `r2.composer.build.progress`,
+    /// `r2.composer.build.done`, `r2.composer.build.error`.
     pub fn new(id: PluginId) -> Self {
         Self::with_events(
             id,
@@ -149,15 +149,15 @@ impl ClaudeCodePlugin {
                 "--output-format=stream-json".to_string(),
                 "--verbose".to_string(),
             ],
-            "r2.compiler.build.progress",
-            "r2.compiler.build.done",
-            "r2.compiler.build.error",
+            "r2.composer.build.progress",
+            "r2.composer.build.done",
+            "r2.composer.build.error",
         )
     }
 
     /// Construct for the **author / chat flow** — emits
-    /// `r2.compiler.author.reply`, `r2.compiler.author.done`,
-    /// `r2.compiler.author.error`. Same subprocess shape; different
+    /// `r2.composer.author.reply`, `r2.composer.author.done`,
+    /// `r2.composer.author.error`. Same subprocess shape; different
     /// event names so the webapp can route the stream into the chat
     /// pane rather than the build console.
     ///
@@ -175,9 +175,9 @@ impl ClaudeCodePlugin {
                 "--output-format=stream-json".to_string(),
                 "--verbose".to_string(),
             ],
-            "r2.compiler.author.reply",
-            "r2.compiler.author.done",
-            "r2.compiler.author.error",
+            "r2.composer.author.reply",
+            "r2.composer.author.done",
+            "r2.composer.author.error",
         );
         p.brief_slot = Some(brief_slot);
         p
@@ -190,9 +190,9 @@ impl ClaudeCodePlugin {
             id,
             program,
             args,
-            "r2.compiler.build.progress",
-            "r2.compiler.build.done",
-            "r2.compiler.build.error",
+            "r2.composer.build.progress",
+            "r2.composer.build.done",
+            "r2.composer.build.error",
         )
     }
 
@@ -466,9 +466,9 @@ fn extract_text_content(line: &str) -> Option<String> {
 pub fn hashes() -> &'static (u32, u32, u32) {
     static H: OnceLock<(u32, u32, u32)> = OnceLock::new();
     H.get_or_init(|| (
-        r2_fnv::fnv1a_32(b"r2.compiler.build.progress"),
-        r2_fnv::fnv1a_32(b"r2.compiler.build.done"),
-        r2_fnv::fnv1a_32(b"r2.compiler.build.error"),
+        r2_fnv::fnv1a_32(b"r2.composer.build.progress"),
+        r2_fnv::fnv1a_32(b"r2.composer.build.done"),
+        r2_fnv::fnv1a_32(b"r2.composer.build.error"),
     ))
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# orchestrator/run.sh — build + launch the r2-compiler orchestrator.
+# orchestrator/run.sh — build + launch the r2-composer orchestrator.
 #
 # Listens on http://localhost:21050 by default. Opens the webapp at
 # http://localhost:21050/webapp/index.html.
@@ -27,7 +27,7 @@ esac
 python3 "$REPO_ROOT/tools/build-catalogue-index.py"
 
 # Ensure the WASM bundle exists; build if missing AND wasm-pack present.
-if [ ! -f "$REPO_ROOT/webapp/dist/wasm/r2_compiler_webapp.js" ]; then
+if [ ! -f "$REPO_ROOT/webapp/dist/wasm/r2_composer_webapp.js" ]; then
   if command -v wasm-pack >/dev/null 2>&1; then
     echo "[run] WASM bundle missing — building..."
     "$REPO_ROOT/webapp/build-wasm.sh" release
@@ -41,13 +41,13 @@ echo "[run] cargo build -p orchestrator $FLAG"
 cargo build -p orchestrator $FLAG
 
 echo
-echo "[run] Starting r2-compiler-orchestrator on http://localhost:$PORT"
+echo "[run] Starting r2-composer-orchestrator on http://localhost:$PORT"
 echo "[run] Open: http://localhost:$PORT/webapp/index.html"
 echo "[run]       (or visit the root and you'll be redirected)"
 echo
 echo "[run] Ctrl-C to stop."
 echo
 
-exec "$REPO_ROOT/target/$BIN_DIR/r2-compiler-orchestrator" \
+exec "$REPO_ROOT/target/$BIN_DIR/r2-composer-orchestrator" \
   --port "$PORT" \
   --webapp-root "$REPO_ROOT/webapp"

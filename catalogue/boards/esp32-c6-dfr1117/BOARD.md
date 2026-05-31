@@ -1,6 +1,6 @@
 # DFRobot Beetle ESP32-C6 (DFR1117)
 
-The RISC-V member of r2-compiler's carrier-board catalogue. Coin-sized DFRobot board around the **ESP32-C6-FH4** — single-core 160 MHz RISC-V, WiFi 6, BLE 5.0, 802.15.4. 4 MB flash, no PSRAM, native USB-Serial-JTAG.
+The RISC-V member of r2-composer's carrier-board catalogue. Coin-sized DFRobot board around the **ESP32-C6-FH4** — single-core 160 MHz RISC-V, WiFi 6, BLE 5.0, 802.15.4. 4 MB flash, no PSRAM, native USB-Serial-JTAG.
 
 ## At a glance
 
@@ -16,11 +16,11 @@ The RISC-V member of r2-compiler's carrier-board catalogue. Coin-sized DFRobot b
 | **Vendor wiki** | https://wiki.dfrobot.com/dfr1117/ |
 | **Board entry created** | 2026-05-31 |
 
-## Role in r2-compiler
+## Role in r2-composer
 
 The DFR1117 is r2-workshop's **non-Xtensa reference carrier** — it's the carrier that proves the firmware substrate is genuinely portable across instruction sets (RISC-V here, Xtensa on the DevKitC + XIAO). It's also r2-workshop's worked example of the **R2-PLUGIN §10 capability-vs-chip swap lever**: where the Xtensa carriers run the ADXL355 (precision SPI), this carrier ships the SEN0224 (LIS2DH, plug-and-play I²C). Same sentant binds both — `ai.reality2.cap.accel.triaxial` — different plugin under the hood.
 
-For r2-compiler's v0.1 success gate, this is the carrier that exercises the RISC-V build path. If r2-compiler can round-trip the rocker-sensor ensemble for both Xtensa (devkitc/xiao) and RISC-V (dfr1117) carriers from one score, the cross-architecture compile path is real.
+For r2-composer's v0.1 success gate, this is the carrier that exercises the RISC-V build path. If r2-composer can round-trip the rocker-sensor ensemble for both Xtensa (devkitc/xiao) and RISC-V (dfr1117) carriers from one score, the cross-architecture compile path is real.
 
 ## Where to wire what
 
@@ -43,7 +43,7 @@ Full wiring narrative — including the SEN0224 accelerometer setup, the SPI-vs-
 
 ## Build & flash
 
-The per-build crate is rendered by r2-compiler's orchestrator from [`templates/`](templates/). Manual flow (matches r2-workshop) once a crate has been produced:
+The per-build crate is rendered by r2-composer's orchestrator from [`templates/`](templates/). Manual flow (matches r2-workshop) once a crate has been produced:
 
 ```bash
 cd out/esp32-c6-dfr1117-<timestamp>/
@@ -62,7 +62,7 @@ After the first USB flash, subsequent updates can go over WiFi via OTA (R2-DEPLO
 
 | File | Purpose |
 |---|---|
-| `templates/Cargo.toml.tera` | crate manifest — dependencies, profile, bin target. **Path deps need re-anchoring** at render time: r2-workshop has `path = "../../../crates/r2-foo"`; r2-compiler builds emit into `out/<slug>-<ts>/` so the equivalent dep path differs. |
+| `templates/Cargo.toml.tera` | crate manifest — dependencies, profile, bin target. **Path deps need re-anchoring** at render time: r2-workshop has `path = "../../../crates/r2-foo"`; r2-composer builds emit into `out/<slug>-<ts>/` so the equivalent dep path differs. |
 | `templates/.cargo/config.toml` | sets target triple, `ldproxy` linker, `espflash` runner, MCU env vars |
 | `templates/sdkconfig.defaults` | ESP-IDF tuning: chip target, flash size, NimBLE host, FATFS LFN, USB-Serial-JTAG console |
 | `templates/partitions.csv` | two-OTA-slot layout sized for 4 MB flash (1.875 MB per slot, no factory, no internal FAT — capture data lives on external microSD) |
@@ -78,7 +78,7 @@ Spelled out in [`board.toml`](board.toml) `[notes].gotchas`. Re-read those befor
 
 The original DFR1117 firmware crate (`r2-workshop/firmware/esp32-c6/dfr1117/`) was authored over many r2-workshop sessions through May 2026 — see `r2-workshop/conversation/` for the trail.
 
-This `catalogue/boards/esp32-c6-dfr1117/` entry was scaffolded in r2-compiler design session 01 (2026-05-31) — see [`../../../conversation/2026-05-31-r2-compiler-design-01.md`](../../../conversation/2026-05-31-r2-compiler-design-01.md). The `board.toml` + this BOARD.md were manually authored (pre-authoring-flow) by reading the synced template files and the wiring guide.
+This `catalogue/boards/esp32-c6-dfr1117/` entry was scaffolded in r2-composer design session 01 (2026-05-31) — see [`../../../conversation/2026-05-31-r2-composer-design-01.md`](../../../conversation/2026-05-31-r2-composer-design-01.md). The `board.toml` + this BOARD.md were manually authored (pre-authoring-flow) by reading the synced template files and the wiring guide.
 
 ## See also
 

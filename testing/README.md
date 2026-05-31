@@ -1,10 +1,10 @@
 # testing/
 
-Conformance vectors and round-trip tests for r2-compiler.
+Conformance vectors and round-trip tests for r2-composer.
 
 ## round-trip/
 
-The v0.1 success gate (SPEC-R2-COMPILER §6) — behavioural-equivalence vectors for the three r2-workshop carriers.
+The v0.1 success gate (SPEC-R2-COMPOSER §6) — behavioural-equivalence vectors for the three r2-workshop carriers.
 
 Each `<carrier>.expected.toml` file records:
 - The R2-DEF §7 score that produced the firmware in r2-workshop.
@@ -14,7 +14,7 @@ Each `<carrier>.expected.toml` file records:
 - The plugin set the firmware should advertise as available.
 
 To pass:
-- For each carrier, build the firmware via r2-compiler with the recorded score.
+- For each carrier, build the firmware via r2-composer with the recorded score.
 - Run the firmware against a recorded input sequence (likely a small Rust test harness using `r2-harness`).
 - Confirm byte-equality on the announced payload and the R2-WIRE traffic.
 

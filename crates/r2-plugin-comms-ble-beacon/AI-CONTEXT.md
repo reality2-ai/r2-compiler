@@ -8,7 +8,7 @@ R2-BEACON advertiser (legacy mode, 28-byte AD: class hash + RBID + state). NimBL
 
 ## Reference
 
-Upstream `r2-core/crates/r2-esp/src/beacon.rs`. Vendoring r2-esp into r2-compiler's `crates/` is pending — currently the workshop firmware path-deps it from r2-core directly.
+Upstream `r2-core/crates/r2-esp/src/beacon.rs`. Vendoring r2-esp into r2-composer's `crates/` is pending — currently the workshop firmware path-deps it from r2-core directly.
 
 ## Read in order
 

@@ -1,7 +1,7 @@
-# r2-compiler-webapp — Rust crate compiled to wasm32-unknown-unknown,
+# r2-composer-webapp — Rust crate compiled to wasm32-unknown-unknown,
 # loaded by webapp/index.html. The browser-side foundation of the
-# r2-compiler ensemble (the future home of the browser R2 hive per
-# SPEC-R2-COMPILER §13 + [[project-r2-compiler-self-as-ensemble]] in
+# r2-composer ensemble (the future home of the browser R2 hive per
+# SPEC-R2-COMPOSER §13 + [[project-r2-composer-self-as-ensemble]] in
 # memory).
 #
 # Excluded from the host workspace (wasm32-only, wasm-bindgen). Build
@@ -15,11 +15,11 @@
 # Builder / Author / Apiary sentants) per Phase 2-full in plan/PLAN.md.
 
 [package]
-name        = "r2-compiler-webapp"
+name        = "r2-composer-webapp"
 version     = "0.1.0"
 edition     = "2021"
 license     = "MIT OR Apache-2.0"
-description = "r2-compiler browser-hive WASM module — class/capability hashing today; full R2 WASM hive in Phase 2-full."
+description = "r2-composer browser-hive WASM module — class/capability hashing today; full R2 WASM hive in Phase 2-full."
 publish     = false
 
 [lib]

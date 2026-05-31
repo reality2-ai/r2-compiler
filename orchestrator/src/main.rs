@@ -1,16 +1,16 @@
-//! r2-compiler orchestrator — workstation-side R2 hive.
+//! r2-composer orchestrator — workstation-side R2 hive.
 //!
 //! Phase 1.7a: real `r2-engine` EventBus running on a dedicated OS
 //! thread; mpsc/broadcast channels bridge the async axum WS handler
 //! to/from the engine; the [`Builder`](sentants::BuilderSentant)
-//! sentant responds to `r2.compiler.build.start` with synthetic
+//! sentant responds to `r2.composer.build.start` with synthetic
 //! progress events.
 //!
 //! Phase 1.7b wires in the `claude-code` plugin (subprocess driver
 //! for `claude -p '<brief>' --output-format=stream-json`) so the
 //! progress events come from a real build cycle. Phase 1.7+ adds
 //! Author / Deploy / Sync / Tg / Catalogue / Apiary sentants + their
-//! plugins per SPEC-R2-COMPILER §3.
+//! plugins per SPEC-R2-COMPOSER §3.
 
 mod bridge;
 mod hive;
@@ -38,7 +38,7 @@ use bridge::{envelope_to_queued, queued_to_envelope, WireEnvelope};
 use hive::EngineHandle;
 
 #[derive(Debug, Parser)]
-#[command(version, about = "r2-compiler workstation orchestrator hive")]
+#[command(version, about = "r2-composer workstation orchestrator hive")]
 struct Cli {
     #[arg(long, default_value_t = 21050)]
     port: u16,
@@ -121,7 +121,7 @@ async fn main() -> anyhow::Result<()> {
     let addr: SocketAddr = format!("{}:{}", cli.bind, cli.port).parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    info!("r2-compiler orchestrator listening on http://{addr}");
+    info!("r2-composer orchestrator listening on http://{addr}");
     info!("open: http://{}/webapp/index.html", addr);
 
     axum::serve(listener, app)
@@ -160,7 +160,7 @@ async fn handle_socket(mut socket: WebSocket, engine: EngineHandle) {
     let mut outbound_rx = engine.subscribe_outbound();
 
     let hello = WireEnvelope::Hello {
-        from: "r2-compiler-orchestrator".into(),
+        from: "r2-composer-orchestrator".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         note: Some("Phase 1.7a engine running — Builder sentant active".into()),
     };

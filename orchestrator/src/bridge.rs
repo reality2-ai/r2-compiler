@@ -7,8 +7,8 @@
 //! ## JSON envelope (browser-side wire format)
 //!
 //! ```json
-//! { "kind": "event", "name": "r2.compiler.build.start", "payload": "..." }
-//! { "kind": "event", "name": "r2.compiler.build.progress", "payload": "{\"phase\":\"compiling\"}" }
+//! { "kind": "event", "name": "r2.composer.build.start", "payload": "..." }
+//! { "kind": "event", "name": "r2.composer.build.progress", "payload": "{\"phase\":\"compiling\"}" }
 //! ```
 //!
 //! `name` is the canonical R2 event name; the orchestrator FNV-hashes
@@ -29,7 +29,7 @@ pub enum WireEnvelope {
     /// An R2 event traversing the bus.
     #[serde(rename = "event")]
     Event {
-        /// Canonical event name (e.g. `"r2.compiler.build.start"`).
+        /// Canonical event name (e.g. `"r2.composer.build.start"`).
         name: String,
         /// Opaque payload (Phase 1.7a: JSON-encoded UTF-8 string;
         /// Phase 1.7+: canonical CBOR encoded as base64).
@@ -63,7 +63,7 @@ pub struct EventNames {
 }
 
 impl EventNames {
-    /// Build the registry from the known r2.compiler.* names.
+    /// Build the registry from the known r2.composer.* names.
     pub fn new() -> Self {
         let mut by_name = HashMap::new();
         let mut by_hash = HashMap::new();
@@ -110,69 +110,69 @@ pub fn registry() -> &'static EventNames {
 /// whether the name is in this list.
 const KNOWN_EVENTS: &[&str] = &[
     // Apiary lifecycle (SPEC-APIARY-LAYOUT §7)
-    "r2.compiler.apiary.list",
-    "r2.compiler.apiary.entry",
-    "r2.compiler.apiary.open",
-    "r2.compiler.apiary.active",
-    "r2.compiler.apiary.create",
-    "r2.compiler.apiary.save",
-    "r2.compiler.apiary.close",
-    "r2.compiler.apiary.git.init",
-    "r2.compiler.apiary.git.publish",
+    "r2.composer.apiary.list",
+    "r2.composer.apiary.entry",
+    "r2.composer.apiary.open",
+    "r2.composer.apiary.active",
+    "r2.composer.apiary.create",
+    "r2.composer.apiary.save",
+    "r2.composer.apiary.close",
+    "r2.composer.apiary.git.init",
+    "r2.composer.apiary.git.publish",
 
-    // Build flow (SPEC-R2-COMPILER §4.3)
-    "r2.compiler.build.start",
-    "r2.compiler.build.progress",
-    "r2.compiler.build.done",
-    "r2.compiler.build.error",
+    // Build flow (SPEC-R2-COMPOSER §4.3)
+    "r2.composer.build.start",
+    "r2.composer.build.progress",
+    "r2.composer.build.done",
+    "r2.composer.build.error",
 
-    // Deploy flow (SPEC-R2-COMPILER §12.2)
-    "r2.compiler.flash.devices",
-    "r2.compiler.deploy.start",
-    "r2.compiler.deploy.progress",
-    "r2.compiler.deploy.done",
-    "r2.compiler.deploy.error",
+    // Deploy flow (SPEC-R2-COMPOSER §12.2)
+    "r2.composer.flash.devices",
+    "r2.composer.deploy.start",
+    "r2.composer.deploy.progress",
+    "r2.composer.deploy.done",
+    "r2.composer.deploy.error",
 
-    // Author flow (SPEC-R2-COMPILER §4.4)
-    "r2.compiler.author.start",
-    "r2.compiler.author.prompt",
-    "r2.compiler.author.reply",
-    "r2.compiler.author.file_added",
-    "r2.compiler.author.done",
-    "r2.compiler.author.error",
+    // Author flow (SPEC-R2-COMPOSER §4.4)
+    "r2.composer.author.start",
+    "r2.composer.author.prompt",
+    "r2.composer.author.reply",
+    "r2.composer.author.file_added",
+    "r2.composer.author.done",
+    "r2.composer.author.error",
 
-    // TG management (SPEC-R2-COMPILER §11)
-    "r2.compiler.tg.status",
-    "r2.compiler.tg.list_members",
-    "r2.compiler.tg.member",
-    "r2.compiler.tg.revoke_device",
-    "r2.compiler.tg.rotate_keyholder",
-    "r2.compiler.tg.reset",
-    "r2.compiler.tg.export_keyholder",
-    "r2.compiler.tg.import_keyholder",
+    // TG management (SPEC-R2-COMPOSER §11)
+    "r2.composer.tg.status",
+    "r2.composer.tg.list_members",
+    "r2.composer.tg.member",
+    "r2.composer.tg.revoke_device",
+    "r2.composer.tg.rotate_keyholder",
+    "r2.composer.tg.reset",
+    "r2.composer.tg.export_keyholder",
+    "r2.composer.tg.import_keyholder",
 
     // Catalogue
-    "r2.compiler.catalogue.list",
-    "r2.compiler.catalogue.entry",
-    "r2.compiler.source.request",
-    "r2.compiler.source.delivered",
+    "r2.composer.catalogue.list",
+    "r2.composer.catalogue.entry",
+    "r2.composer.source.request",
+    "r2.composer.source.delivered",
 
     // Sync
-    "r2.compiler.sync.start",
-    "r2.compiler.sync.progress",
-    "r2.compiler.sync.done",
+    "r2.composer.sync.start",
+    "r2.composer.sync.progress",
+    "r2.composer.sync.done",
 
     // Material collection + processing
-    "r2.compiler.material.upload",
-    "r2.compiler.material.link",
-    "r2.compiler.material.find",
-    "r2.compiler.material.found",
-    "r2.compiler.material.list",
-    "r2.compiler.material.item",
-    "r2.compiler.material.process.start",
-    "r2.compiler.material.process.progress",
-    "r2.compiler.material.process.done",
-    "r2.compiler.material.process.error",
+    "r2.composer.material.upload",
+    "r2.composer.material.link",
+    "r2.composer.material.find",
+    "r2.composer.material.found",
+    "r2.composer.material.list",
+    "r2.composer.material.item",
+    "r2.composer.material.process.start",
+    "r2.composer.material.process.progress",
+    "r2.composer.material.process.done",
+    "r2.composer.material.process.error",
 ];
 
 /// Translate a JSON envelope received from the WebSocket into a `QueuedEvent`
@@ -219,8 +219,8 @@ mod tests {
     #[test]
     fn unknown_event_name_still_hashes() {
         let reg = registry();
-        let h = reg.hash_of("r2.compiler.unknown.future-event").unwrap();
-        assert_eq!(h, r2_fnv::fnv1a_32(b"r2.compiler.unknown.future-event"));
+        let h = reg.hash_of("r2.composer.unknown.future-event").unwrap();
+        assert_eq!(h, r2_fnv::fnv1a_32(b"r2.composer.unknown.future-event"));
         // But the reverse lookup returns None for unknown hashes.
         assert!(reg.name_of(h).is_none());
     }
@@ -228,14 +228,14 @@ mod tests {
     #[test]
     fn envelope_round_trip() {
         let env = WireEnvelope::Event {
-            name: "r2.compiler.build.start".into(),
+            name: "r2.composer.build.start".into(),
             payload: serde_json::json!({"score": "rocker-sensor.yaml", "target": "esp32-c6-dfr1117"}),
         };
         let q = envelope_to_queued(&env).expect("known name converts");
         let back = queued_to_envelope(&q);
         match back {
             WireEnvelope::Event { name, payload } => {
-                assert_eq!(name, "r2.compiler.build.start");
+                assert_eq!(name, "r2.composer.build.start");
                 assert_eq!(payload["target"], "esp32-c6-dfr1117");
             }
             _ => panic!("unexpected kind"),

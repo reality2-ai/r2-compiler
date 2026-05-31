@@ -58,8 +58,8 @@ pub fn spawn() -> EngineHandle {
 
         // Register plugins FIRST — their IDs flow into the sentants that
         // dispatch to them. Two claude-code plugin instances: one for
-        // the build flow (emits r2.compiler.build.*) and one for the
-        // author / chat flow (emits r2.compiler.author.*). Same plugin
+        // the build flow (emits r2.composer.build.*) and one for the
+        // author / chat flow (emits r2.composer.author.*). Same plugin
         // impl; different event-name configuration at construction time.
         let build_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new(0)));
         info!("engine: registered claude-code plugin for build (id={build_pid})");

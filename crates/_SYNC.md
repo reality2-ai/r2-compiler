@@ -4,8 +4,8 @@ This directory holds vendored copies of the R2 protocol crates from `r2-core/cra
 
 ## Why vendor
 
-1. **Self-contained build.** r2-compiler must compile against a known-good snapshot of r2-core. A path dep would break whenever upstream's `Cargo.toml` reshuffles.
-2. **Audit gate.** Vendoring forces an explicit sync step — we see exactly which upstream changes land in r2-compiler.
+1. **Self-contained build.** r2-composer must compile against a known-good snapshot of r2-core. A path dep would break whenever upstream's `Cargo.toml` reshuffles.
+2. **Audit gate.** Vendoring forces an explicit sync step — we see exactly which upstream changes land in r2-composer.
 3. **Hermetic CI.** CI does not need access to r2-core's git history; the vendored crates are part of this repo.
 
 ## Which crates to vendor (v0.1)

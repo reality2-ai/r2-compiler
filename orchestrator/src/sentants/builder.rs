@@ -1,6 +1,6 @@
 //! `Builder` sentant — per-build state machine that drives a compile.
 //!
-//! **Phase 1.7b.** On `r2.compiler.build.start`, dispatches to the
+//! **Phase 1.7b.** On `r2.composer.build.start`, dispatches to the
 //! `claude-code` plugin (subprocess driver). The plugin's `poll()`
 //! emits progress / done / error events as the subprocess runs; the
 //! Builder sentant subscribes to those (only when sourced from a
@@ -44,23 +44,23 @@ impl BuilderSentant {
         Self {
             state: State::Idle,
             claude_code_plugin_id,
-            start_hash:    reg.hash_of("r2.compiler.build.start").unwrap(),
-            progress_hash: reg.hash_of("r2.compiler.build.progress").unwrap(),
-            done_hash:     reg.hash_of("r2.compiler.build.done").unwrap(),
-            error_hash:    reg.hash_of("r2.compiler.build.error").unwrap(),
+            start_hash:    reg.hash_of("r2.composer.build.start").unwrap(),
+            progress_hash: reg.hash_of("r2.composer.build.progress").unwrap(),
+            done_hash:     reg.hash_of("r2.composer.build.done").unwrap(),
+            error_hash:    reg.hash_of("r2.composer.build.error").unwrap(),
         }
     }
 }
 
 impl Sentant for BuilderSentant {
     fn handle_event(&mut self, event: &Event, actions: &mut ActionBuf) {
-        // r2.compiler.build.start  →  dispatch to claude-code plugin
+        // r2.composer.build.start  →  dispatch to claude-code plugin
         if event.hash == self.start_hash {
             self.state = State::Working;
             // The brief that goes to claude's stdin is the inbound JSON
             // payload — for v0.1 we forward it as-is. Phase 1.8+ wraps
             // it in a Tera-rendered prompt template per
-            // SPEC-R2-COMPILER §5.
+            // SPEC-R2-COMPOSER §5.
             actions.push(Action::PluginCall {
                 plugin_id: self.claude_code_plugin_id,
                 command: claude_code::CMD_START,
@@ -69,7 +69,7 @@ impl Sentant for BuilderSentant {
             return;
         }
 
-        // r2.compiler.build.{progress,done,error}  →  re-broadcast
+        // r2.composer.build.{progress,done,error}  →  re-broadcast
         // ONLY when sourced from a plugin (the claude-code plugin's
         // poll() output). This avoids the loop where our own broadcast
         // would re-trigger us.
@@ -106,7 +106,7 @@ impl Sentant for BuilderSentant {
     }
 
     fn class_hash(&self) -> u32 {
-        r2_fnv::fnv1a_32(b"ai.reality2.r2-compiler.builder")
+        r2_fnv::fnv1a_32(b"ai.reality2.r2-composer.builder")
     }
 
     fn name(&self) -> &str {
@@ -119,10 +119,10 @@ impl Sentant for BuilderSentant {
         SUBS.get_or_init(|| {
             let reg = registry();
             let subs = vec![
-                reg.hash_of("r2.compiler.build.start").unwrap(),
-                reg.hash_of("r2.compiler.build.progress").unwrap(),
-                reg.hash_of("r2.compiler.build.done").unwrap(),
-                reg.hash_of("r2.compiler.build.error").unwrap(),
+                reg.hash_of("r2.composer.build.start").unwrap(),
+                reg.hash_of("r2.composer.build.progress").unwrap(),
+                reg.hash_of("r2.composer.build.done").unwrap(),
+                reg.hash_of("r2.composer.build.error").unwrap(),
             ];
             Box::leak(subs.into_boxed_slice())
         })
@@ -141,7 +141,7 @@ mod tests {
     fn build_start_dispatches_plugin_call() {
         let mut b = BuilderSentant::new(7);
         let mut actions = ActionBuf::new();
-        let start_hash = r2_fnv::fnv1a_32(b"r2.compiler.build.start");
+        let start_hash = r2_fnv::fnv1a_32(b"r2.composer.build.start");
         let payload = br#"{"score":"x","target":"esp32-c6-dfr1117"}"#;
         b.handle_event(&ev(start_hash, payload, EventSource::Local(0)), &mut actions);
 
@@ -161,7 +161,7 @@ mod tests {
     fn plugin_sourced_progress_rebroadcasts() {
         let mut b = BuilderSentant::new(7);
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.build.progress");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.build.progress");
         b.handle_event(&ev(h, b"{}", EventSource::Plugin(0)), &mut actions);
         let collected: Vec<_> = actions.drain().collect();
         assert_eq!(collected.len(), 1);
@@ -179,7 +179,7 @@ mod tests {
         // Otherwise our own re-broadcast would re-trigger us.
         let mut b = BuilderSentant::new(7);
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.build.progress");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.build.progress");
         b.handle_event(&ev(h, b"{}", EventSource::Local(0)), &mut actions);
         assert!(actions.is_empty(), "must not re-broadcast our own emissions");
     }
@@ -189,7 +189,7 @@ mod tests {
         let mut b = BuilderSentant::new(7);
         b.state = State::Working;
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.build.done");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.build.done");
         b.handle_event(&ev(h, b"{}", EventSource::Plugin(0)), &mut actions);
         assert_eq!(b.state, State::Idle);
     }
@@ -199,7 +199,7 @@ mod tests {
         let mut b = BuilderSentant::new(7);
         b.state = State::Working;
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.build.error");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.build.error");
         b.handle_event(&ev(h, b"{}", EventSource::Plugin(0)), &mut actions);
         assert_eq!(b.state, State::Idle);
     }
@@ -208,7 +208,7 @@ mod tests {
     fn ignores_unrelated_events() {
         let mut b = BuilderSentant::new(7);
         let mut actions = ActionBuf::new();
-        let h = r2_fnv::fnv1a_32(b"r2.compiler.unrelated");
+        let h = r2_fnv::fnv1a_32(b"r2.composer.unrelated");
         b.handle_event(&ev(h, b"{}", EventSource::Local(0)), &mut actions);
         assert!(actions.is_empty());
     }

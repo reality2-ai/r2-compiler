@@ -1,6 +1,6 @@
 # webapp/
 
-The browser-side surface of r2-compiler. Currently **Phase 2-preview** — a static catalogue browser. The eventual **Phase 2-full** is a WASM R2 hive with the visual canvas, source viewer, build/author/deploy event flow.
+The browser-side surface of r2-composer. Currently **Phase 2-preview** — a static catalogue browser. The eventual **Phase 2-full** is a WASM R2 hive with the visual canvas, source viewer, build/author/deploy event flow.
 
 ## Status (2026-05-31): Phase 2-preview — static catalogue browser
 
@@ -65,7 +65,7 @@ When this preview is replaced by the real WASM-hive webapp:
 - `ui/app.js` becomes the JS glue around the WASM bundle (per the r2-workshop `webapp/` pattern using `crates/r2-wasm`).
 - `webapp/crate/` (currently empty) holds the Rust crate compiled to `wasm32-unknown-unknown` that runs the R2 hive (Catalogue / Composition / SourceViewer / Builder sentants).
 - The orchestrator binary (`orchestrator/`, currently empty) serves the WASM bundle from `localhost:21050` and hosts the workstation R2 hive.
-- `manifest.json` is replaced by a live `r2.compiler.catalogue.*` event stream the WASM hive consumes.
-- The project switcher becomes a working pane backed by `r2.compiler.project.*` events.
+- `manifest.json` is replaced by a live `r2.composer.catalogue.*` event stream the WASM hive consumes.
+- The project switcher becomes a working pane backed by `r2.composer.project.*` events.
 
 The static preview is throwaway — Phase 2-full is a clean rewrite from r2-workshop's `webapp/` as the template, not an evolution of this preview.

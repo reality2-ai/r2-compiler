@@ -11,11 +11,11 @@ Catalogue (boards/plugins/sentants — building blocks)
     ▼
 Composition (in-memory, in webapp hive)
     │
-    │ serialise on `r2.compiler.composition.preview` or build trigger
+    │ serialise on `r2.composer.composition.preview` or build trigger
     ▼
 scores/<name>.yaml  ←  this directory
     │
-    │ r2.compiler.build.start
+    │ r2.composer.build.start
     ▼
 out/<carrier>-<timestamp>/  (per-carrier firmware crate)
 ```
@@ -26,7 +26,7 @@ Every score in this directory MUST be a valid R2-DEF §7 ensemble — name, desc
 
 | File | Source | Purpose |
 |---|---|---|
-| `rocker-sensor.yaml` | synced from `r2-workshop/ensemble/sensor.yaml` | The first success-gate score. r2-compiler must round-trip the three r2-workshop carriers given this. |
+| `rocker-sensor.yaml` | synced from `r2-workshop/ensemble/sensor.yaml` | The first success-gate score. r2-composer must round-trip the three r2-workshop carriers given this. |
 
 ## Adding a score
 
@@ -37,4 +37,4 @@ Two paths:
 
 ## Conformance
 
-Scores in this directory MUST pass R2-DEF §7.10 validation. The orchestrator's compiler plugin refuses to build a non-conforming score and emits `r2.compiler.build.error{phase: "preparing"}` instead.
+Scores in this directory MUST pass R2-DEF §7.10 validation. The orchestrator's compiler plugin refuses to build a non-conforming score and emits `r2.composer.build.error{phase: "preparing"}` instead.

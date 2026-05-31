@@ -80,4 +80,4 @@ None.
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-05-31 | 0.1.0 | Metadata draft authored in r2-compiler session 02 alongside the rest of Phase 1.4-metadata-rest. |
+| 2026-05-31 | 0.1.0 | Metadata draft authored in r2-composer session 02 alongside the rest of Phase 1.4-metadata-rest. |

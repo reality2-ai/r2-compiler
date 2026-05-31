@@ -1,6 +1,6 @@
 # Seeed Studio XIAO ESP32-S3 (Pre-Soldered)
 
-The compact Xtensa carrier in r2-compiler's catalogue. Coin-sized 21 × 17.5 mm board around the ESP32-S3R8 die, with on-board LiPo charging + USB-C. Fully-supported alternative to the DevKitC; ADR-001 briefly made it default, ADR-002 reverted.
+The compact Xtensa carrier in r2-composer's catalogue. Coin-sized 21 × 17.5 mm board around the ESP32-S3R8 die, with on-board LiPo charging + USB-C. Fully-supported alternative to the DevKitC; ADR-001 briefly made it default, ADR-002 reverted.
 
 ## At a glance
 
@@ -20,11 +20,11 @@ The compact Xtensa carrier in r2-compiler's catalogue. Coin-sized 21 × 17.5 mm 
 | **Vendor docs** | https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/ |
 | **Board entry created** | 2026-05-31 |
 
-## Role in r2-compiler
+## Role in r2-composer
 
 The XIAO is r2-workshop's **compact alternative** to the DevKitC. ADR-001 promoted it to default during a parts-availability window (USB-C + on-board charging + small form factor were big draws); ADR-002 reverted to DevKitC once the external buck-boost and SD breakout for the lab's existing kit had arrived. The XIAO build stays fully supported — a future student or operator who values size, USB-C convenience, or on-board LiPo handling may legitimately pick it. Same R2-WIRE traffic, same sentants, same firmware codebase as the DevKitC build.
 
-For r2-compiler's v0.1 success gate, this carrier exercises the **constrained-GPIO** path. The XIAO has only 11 broken-out pins to the DevKitC's 45 — every pin is allocated, no headroom. The status LED is the on-board mono yellow LED on GPIO21 (LEDC PWM) — same mono-LED pattern as the dfr1117 carrier (GPIO15). No external WS2812 module is required, and the FSM does not surface colour on this carrier; states are distinguished by blink rate. If r2-compiler can produce working builds for the DevKitC (on-board WS2812) AND the XIAO + dfr1117 (mono LED) from the same score, the "carrier-as-substrate" abstraction with per-carrier LED driver selection is real.
+For r2-composer's v0.1 success gate, this carrier exercises the **constrained-GPIO** path. The XIAO has only 11 broken-out pins to the DevKitC's 45 — every pin is allocated, no headroom. The status LED is the on-board mono yellow LED on GPIO21 (LEDC PWM) — same mono-LED pattern as the dfr1117 carrier (GPIO15). No external WS2812 module is required, and the FSM does not surface colour on this carrier; states are distinguished by blink rate. If r2-composer can produce working builds for the DevKitC (on-board WS2812) AND the XIAO + dfr1117 (mono LED) from the same score, the "carrier-as-substrate" abstraction with per-carrier LED driver selection is real.
 
 ## Where to wire what
 

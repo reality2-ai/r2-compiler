@@ -1,6 +1,6 @@
 # Espressif ESP32-S3-DevKitC-1
 
-The current default Xtensa carrier in r2-compiler's catalogue (per `r2-workshop`'s ADR-002). High-GPIO-count Espressif reference board for the ESP32-S3 family.
+The current default Xtensa carrier in r2-composer's catalogue (per `r2-workshop`'s ADR-002). High-GPIO-count Espressif reference board for the ESP32-S3 family.
 
 ## At a glance
 
@@ -17,11 +17,11 @@ The current default Xtensa carrier in r2-compiler's catalogue (per `r2-workshop`
 | **Vendor docs** | https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/ |
 | **Board entry created** | 2026-05-31 |
 
-## Role in r2-compiler
+## Role in r2-composer
 
 The DevKitC-1 is **r2-workshop's current default carrier per ADR-002**. It was the original choice (Phase 0), briefly displaced by the XIAO under ADR-001 during a parts-availability window, and reverted to default once the buck-boost regulator and SD breakout for the XIAO build had arrived (ADR-002). It remains the high-GPIO-headroom option whenever pin count matters more than form factor.
 
-For r2-compiler's v0.1 success gate, this is the carrier most r2-workshop testing and OTA cycles have actually run on — the densest body of behavioural evidence. If the orchestrator's first end-to-end build doesn't reproduce this carrier exactly, that's the strongest signal of a regression vs the working baseline.
+For r2-composer's v0.1 success gate, this is the carrier most r2-workshop testing and OTA cycles have actually run on — the densest body of behavioural evidence. If the orchestrator's first end-to-end build doesn't reproduce this carrier exactly, that's the strongest signal of a regression vs the working baseline.
 
 ## Where to wire what (full table in [`board.toml`](board.toml) `[pinout]`)
 
@@ -80,7 +80,7 @@ See [`board.toml`](board.toml) `[notes].gotchas`. The big ones:
 
 The original DevKitC-1 firmware crate at `r2-workshop/firmware/esp32-s3/devkitc/` was r2-workshop's first carrier — months of session work captured in `r2-workshop/conversation/`.
 
-This `catalogue/boards/esp32-s3-devkitc/` entry was scaffolded in r2-compiler design session 01 (2026-05-31), board.toml + BOARD.md authored as part of Phase 1.3 (the same pattern exercised first on the dfr1117 entry).
+This `catalogue/boards/esp32-s3-devkitc/` entry was scaffolded in r2-composer design session 01 (2026-05-31), board.toml + BOARD.md authored as part of Phase 1.3 (the same pattern exercised first on the dfr1117 entry).
 
 ## See also
 
