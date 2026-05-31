@@ -1,0 +1,76 @@
+{% include "_base.md.tera" %}
+
+## This session: author a new CARRIER BOARD
+
+You are authoring a new carrier-board catalogue entry under
+`catalogue/boards/<arch>-<chip>-<carrier>/`.
+
+## Read these FIRST, in this order
+
+1. `specifications/SPEC-CATALOGUE-LAYOUT.md` §3 — **the normative
+   board-authoring spec**. The full RFC 2119 schema for `board.toml`,
+   the canonical BOARD.md + AI-CONTEXT.md section structures, the
+   `templates/` file inventory, the §3.3.9 validation rules.
+
+2. `specifications/SPEC-APIARY-FLASH.md` §4.1 — the REQUIRED `[usb]`
+   table that every MCU board.toml carries.
+
+3. The canonical example: `catalogue/boards/esp32-c6-dfr1117/`. Read
+   `board.toml` (full schema including `[pinout.*]`, `[capabilities]`,
+   `[references]`, `[compulsory_plugins]`, `[notes]`); `BOARD.md`
+   (8 required H2 sections); `AI-CONTEXT.md` (10 required H2 sections);
+   `templates/` (full inventory).
+
+4. Upstream R2 references cited by §3:
+   - R2-COMPILE §4 (platform tags: `esp32`, `nrf`, `rp2`, `avr`,
+     `linux-embedded`).
+   - R2-BUILD §2 (target triples table).
+   - R2-HW (multi-processor, pin remapping, USB topology).
+
+## What you MUST produce
+
+Per SPEC-CATALOGUE-LAYOUT §3.1:
+
+- `catalogue/boards/<slug>/board.toml` — full schema per §3.3.
+- `catalogue/boards/<slug>/BOARD.md` — 8 H2 sections in fixed order
+  (At a glance / Role in r2-composer / Where to wire what / Build & flash
+  / Templates / Known gotchas / Authoring history / See also).
+- `catalogue/boards/<slug>/AI-CONTEXT.md` — 10 H2 sections in fixed
+  order per §3.5.
+- `catalogue/boards/<slug>/datasheets/HARDWARE-WIRING-<UPPER>.md` —
+  the wiring guide referenced by `[references].wiring_guide`.
+- `catalogue/boards/<slug>/templates/` — `Cargo.toml.tera`, `.cargo/config.toml`,
+  `build.rs`, `rust-toolchain.toml`. ESP-IDF carriers additionally need
+  `sdkconfig.defaults` + `partitions.csv`. WiFi-capable carriers also
+  `wifi_config.toml.example`.
+- `catalogue/boards/<slug>/conversation/<date>-author-board-NN.md` — transcript.
+
+## Constraints
+
+- Directory name: `<arch>-<chip>-<carrier>`, kebab-case (per §3.1).
+- `[board].name` MUST equal the directory name.
+- Class string is implicit: `ai.reality2.board.<carrier>` — DO NOT
+  hard-code its hash in board.toml (§3.2).
+- `[build].target_triple` MUST appear in R2-BUILD §2.
+- `[compile_target].tag` MUST appear in R2-DEF §7.7 (or be a new tag
+  you're claiming — flag this case in `[notes].gotchas` and surface it
+  to the operator before committing).
+- `[compulsory_plugins].capabilities` MUST contain
+  `"ai.reality2.deploy.ota"` (SPEC-CATALOGUE-LAYOUT §3.3.7).
+- For ESP carriers: `[usb]` table per SPEC-APIARY-FLASH §4.1 with the
+  correct VID/PID, `chip_id_probe`, `esptool_chip_arg`,
+  `reset_strategy`, `flash_offsets`. The disambiguator matters —
+  ESP32-S3 and ESP32-C6 both report VID 0x303a PID 0x1001 for native
+  USB-Serial-JTAG.
+
+## How to ask clarifying questions
+
+Per the calm-computing posture: short questions, one fact at a time.
+Confirm vendor URL, chip family, USB topology, available peripherals,
+flash size, PSRAM presence before generating `board.toml`. WebFetch the
+vendor's page if the operator gave you a URL. If they gave you a PDF
+path, Read it.
+
+## Operator's message
+
+{{ message }}

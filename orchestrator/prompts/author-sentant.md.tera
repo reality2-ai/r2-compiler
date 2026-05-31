@@ -1,0 +1,81 @@
+{% include "_base.md.tera" %}
+
+## This session: author a new SENTANT
+
+You are authoring a new sentant catalogue entry under
+`catalogue/ensembles/<ensemble>/sentants/<Name>/`. Sentants live
+EXCLUSIVELY inside an ensemble; there is no top-level sentant tree.
+
+The OPERATOR must have an ensemble open as the scope. If none, ASK
+which ensemble this sentant belongs to before proceeding.
+
+## Read these FIRST, in this order
+
+1. `specifications/SPEC-CATALOGUE-LAYOUT.md` §6 — **the normative
+   sentant-authoring spec**. The `sentant.yaml` schema (REQUIRED
+   keys, conditional `data` field, `automations[]`), the SENTANT.md
+   6 REQUIRED H2 sections (Purpose / FSM / Plugins used / Events
+   emitted-consumed / Reference / Authoring status) + the optional
+   sections, the AI-CONTEXT.md structure, validation rules.
+
+2. Upstream R2 references cited by §6:
+   - R2-DEF §2 (sentant schema + load-time validation).
+   - R2-DEF §2.4 (automations + transitions).
+   - R2-DEF §2.5 (action types: plugin call, bus send, transition).
+   - R2-COMPILE §3.1 (compilable subset for AOT targets — NO API
+     plugins, NO dynamic sentant creation, NO swarm loading).
+   - R2-PLUGIN §10 (capability-based plugin swap; bind plugins by
+     capability where possible).
+
+3. Per [[feedback-sentants-vs-plugins-terminology]] in memory: a
+   sentant is a thin FSM router. The IMPERATIVE work lives in
+   plugins. If you find yourself writing imperative logic into a
+   sentant's transitions, you probably want a new plugin instead.
+
+4. The canonical example: `catalogue/ensembles/rocker-sensor/sentants/Accelerometer/`
+   (the closest-to-canonical SENTANT.md structure of the 15 in the
+   rocker-sensor ensemble).
+
+## What you MUST produce
+
+Per SPEC-CATALOGUE-LAYOUT §6.1:
+
+- `sentants/<Name>/sentant.yaml` — top-level `sentant:` key per §6.3.
+  Includes `name` (PascalCase, equals directory), `class` (reverse-DNS),
+  `description`, `storage` (ephemeral / durable / durable-state), `data`
+  (REQUIRED if storage=durable-state), `plugins[]` (OPTIONAL, by name OR
+  capability), `automations[]` (REQUIRED, ≥1 with `name` and
+  `transitions[]`).
+- `sentants/<Name>/SENTANT.md` — 6 REQUIRED H2 sections per §6.4 in
+  fixed order; OPTIONAL sub-sections between Reference and Authoring
+  status. Mermaid `stateDiagram-v2` RECOMMENDED for non-trivial FSMs.
+- `sentants/<Name>/AI-CONTEXT.md` — 10 H2 sections per §6.5.
+- `sentants/<Name>/conversation/<date>-author-sentant-NN.md` — transcript.
+
+## Constraints
+
+- Directory name = `sentant.name` in PascalCase (e.g. `Accelerometer`).
+- Sentant class is reverse-DNS; substrate sentants conventionally use
+  the ensemble's class namespace (e.g. `ai.reality2.workshop.sensor.bootstrap`);
+  domain sentants use the deployment's namespace (e.g.
+  `nz.ac.auckland.rocker.accelerometer`).
+- For AOT carriers: stay in the R2-COMPILE §3.1 compilable subset.
+- `automations[].transitions[]`: prefer `{plugin: <slug>, command: <op>}`
+  over plain `{command: "send", parameters: {event: ...}}` when the
+  work belongs in a plugin (the IMPERATIVE rule above).
+- Flag explicitly whether this sentant is SUBSTRATE (reusable across
+  sibling deployments) or DOMAIN (deployment-specific). The AI-CONTEXT.md
+  §"Substrate vs domain" section is mandatory and load-bearing for the
+  ensemble's reusability.
+
+## How to ask clarifying questions
+
+What event(s) does this sentant subscribe to? What state machine does
+it own (Idle → ... → ?)? What plugin(s) does it call? Is it durable-
+state (FSM checkpoints survive reboot) or ephemeral? Is the FSM trivial
+(start → idle, always-on emitter) or non-trivial (multiple states with
+guard conditions)?
+
+## Operator's message
+
+{{ message }}

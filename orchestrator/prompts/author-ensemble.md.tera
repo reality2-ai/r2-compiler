@@ -1,0 +1,78 @@
+{% include "_base.md.tera" %}
+
+## This session: author a new ENSEMBLE
+
+You are authoring a new ensemble catalogue entry under
+`catalogue/ensembles/<name>/`. An ensemble is a complete R2-DEF §7 unit:
+a class string + sentants + plugins + UI registrations + capability
+declarations. It binds to one role within an apiary.
+
+## Read these FIRST, in this order
+
+1. `specifications/SPEC-CATALOGUE-LAYOUT.md` §4 — **the normative
+   ensemble-authoring spec**. The `ensemble.yaml` schema (top-level key
+   `ensemble:`, REQUIRED sub-keys), the `ENSEMBLE.md` H2 section list,
+   the `AI-CONTEXT.md` structure, validation rules.
+
+2. `specifications/SPEC-APIARY-COMPOSE.md` §2 — the role-ensemble model
+   that explains how this ensemble will eventually be referenced by an
+   apiary's `[[role_ensembles]]`.
+
+3. The canonical example: `catalogue/ensembles/rocker-sensor/`. Read
+   `ensemble.yaml` (15 sentants + 12 plugins), `ENSEMBLE.md`,
+   `AI-CONTEXT.md`. Note the substrate-vs-domain distinction (most
+   sentants are reusable substrate; ONE is the deployment-specific
+   domain logic).
+
+4. Upstream R2 references cited by §4:
+   - R2-ENSEMBLE §2.1.2 (ensemble-owned vs hive-shared plugins).
+   - R2-DEF §7 (ensemble score schema).
+   - R2-DEF §7.10 (load-time validation).
+   - R2-CAP §3 (reverse-DNS class convention).
+
+## What you MUST produce
+
+Per SPEC-CATALOGUE-LAYOUT §4.1:
+
+- `catalogue/ensembles/<name>/ensemble.yaml` — full R2-DEF §7 score.
+- `catalogue/ensembles/<name>/ENSEMBLE.md` — 8 H2 sections per §4.4.
+- `catalogue/ensembles/<name>/AI-CONTEXT.md` — 9 H2 sections per §4.5.
+- `catalogue/ensembles/<name>/sentants/` — at least one sentant
+  subdirectory (one per `ensemble.sentants[]` entry). EACH sentant
+  conforms to SPEC-CATALOGUE-LAYOUT §6 (separate authoring step —
+  may follow this one).
+- `catalogue/ensembles/<name>/plugins/` — OPTIONAL — only for
+  ensemble-owned plugins (per R2-ENSEMBLE §2.1.2). Each plugin conforms
+  to §5.
+- `catalogue/ensembles/<name>/conversation/<date>-author-ensemble-NN.md`
+  — transcript.
+
+## Constraints
+
+- Directory name = `ensemble.name` in kebab-case (e.g. `rocker-sensor`).
+- Class string is reverse-DNS per R2-CAP §3 (NOT prefixed automatically
+  by `ai.reality2.*` — operator chooses the namespace; e.g.
+  `nz.ac.auckland.rocker`).
+- `compile_target` array MUST overlap with at least one carrier in
+  `catalogue/boards/`.
+- Plugin references in sentants are by NAME or by CAPABILITY string
+  (per R2-PLUGIN §10). Capability-references survive carrier swaps;
+  prefer them for the domain-relevant sentant binding (e.g. the
+  Accelerometer sentant binds `ai.reality2.cap.accel.triaxial`, not
+  `adxl355`).
+- Per SPEC-APIARY-COMPOSE [[project-multi-board-apiary-compose]]: an
+  ensemble's `plugins[]` lists the capability requirements; the per-
+  target plugin choices live in the APIARY's `[[role_ensembles.targets.plugin_overrides]]`.
+
+## How to ask clarifying questions
+
+What role does this ensemble fulfil (sensor / controller / viewer /
+keyholder / other)? What target type (mcu-fw / native / beam / wasm)?
+What capabilities does it require from the carrier? What events does
+it emit / consume across the apiary's other role-ensembles? Is there
+a deployment-specific domain sentant + reusable substrate sentants
+distinction (per the rocker-sensor convention)?
+
+## Operator's message
+
+{{ message }}

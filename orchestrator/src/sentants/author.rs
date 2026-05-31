@@ -138,60 +138,95 @@ impl Sentant for AuthorSentant {
     }
 }
 
-/// Build the prompt that goes to `claude -p`'s stdin. v0.1: lean
-/// context-priming + chat history + the new user message. Phase 1.8
-/// will replace this with a Tera template that splices in the relevant
-/// SPEC-CATALOGUE-LAYOUT section per §7.1.
+/// Build the prompt that goes to `claude -p`'s stdin via Tera template
+/// dispatch (per SPEC-CATALOGUE-LAYOUT §7.1 + SPEC-APIARY-CREATE §1.3).
+/// Templates live under `orchestrator/prompts/` and are baked into the
+/// binary at build time via `include_str!`.
 ///
-/// The webapp's `sendChat` sends:
-///   {
-///     "message": "<user text>",
-///     "canvas":  {"board": "<slug>"|null, "ensemble": "<slug>"|null},
-///     "history": [{"role": "user"|"assistant", "content": "..."}, ...]
-///   }
+/// Dispatch: the prompt payload carries an OPTIONAL `kind` field; we
+/// pick the matching template, defaulting to the freeform `chat` case.
+///
+///   "kind": "chat"     →  author-chat.md.tera     (default — open chat)
+///   "kind": "apiary"   →  author-apiary.md.tera   (new apiary)
+///   "kind": "board"    →  author-board.md.tera    (new carrier board)
+///   "kind": "ensemble" →  author-ensemble.md.tera (new ensemble)
+///   "kind": "plugin"   →  author-plugin.md.tera   (new plugin)
+///   "kind": "sentant"  →  author-sentant.md.tera  (new sentant)
+///
+/// The webapp's `sendChat` currently emits no `kind`, so chat behaviour
+/// is preserved unchanged. Kind-specific dispatch is opt-in by the
+/// webapp / AI tool-call channel — set `kind` in the payload to switch.
 fn construct_brief(payload: &[u8]) -> String {
     let v: serde_json::Value =
         serde_json::from_slice(payload).unwrap_or(serde_json::Value::Null);
-    let message = v.get("message").and_then(|x| x.as_str()).unwrap_or("");
-    let board = v
-        .get("canvas")
-        .and_then(|c| c.get("board"))
-        .and_then(|x| x.as_str())
-        .unwrap_or("(none selected)");
-    let ensemble = v
-        .get("canvas")
-        .and_then(|c| c.get("ensemble"))
-        .and_then(|x| x.as_str())
-        .unwrap_or("(none selected)");
-    let history = v.get("history").and_then(|h| h.as_array());
+    let kind = v.get("kind").and_then(|x| x.as_str()).unwrap_or("chat");
 
-    let mut brief = String::new();
-    brief.push_str(
-        "You are Claude Code assisting an operator using r2-composer — \
-         a visual composer for Reality2 firmware. The operator drags a \
-         carrier board and an ensemble onto a canvas; the canvas plus \
-         their chat with you produces the build brief for the per-carrier \
-         firmware crate.\n\n",
-    );
-    brief.push_str("Canvas state right now:\n");
-    brief.push_str(&format!("  Board:    {board}\n"));
-    brief.push_str(&format!("  Ensemble: {ensemble}\n\n"));
+    let template_name = match kind {
+        "apiary"   => "author-apiary.md.tera",
+        "board"    => "author-board.md.tera",
+        "ensemble" => "author-ensemble.md.tera",
+        "plugin"   => "author-plugin.md.tera",
+        "sentant"  => "author-sentant.md.tera",
+        _          => "author-chat.md.tera",
+    };
 
-    if let Some(history_arr) = history {
-        if !history_arr.is_empty() {
-            brief.push_str("Prior conversation:\n\n");
-            for turn in history_arr {
-                let role = turn.get("role").and_then(|x| x.as_str()).unwrap_or("?");
-                let content = turn.get("content").and_then(|x| x.as_str()).unwrap_or("");
-                brief.push_str(&format!("--- {role} ---\n{content}\n\n"));
-            }
+    let mut ctx = tera::Context::new();
+    ctx.insert("kind", kind);
+    ctx.insert("message", v.get("message").and_then(|x| x.as_str()).unwrap_or(""));
+    let canvas = v.get("canvas").cloned().unwrap_or(serde_json::Value::Null);
+    ctx.insert("canvas", &canvas);
+    let history = v
+        .get("history")
+        .cloned()
+        .unwrap_or(serde_json::Value::Array(Vec::new()));
+    ctx.insert("history", &history);
+
+    match template_engine().render(template_name, &ctx) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(
+                "author brief: template '{template_name}' failed to render ({e}); \
+                 falling back to minimal brief"
+            );
+            // Calm-degradation fallback if a template parse / render fails.
+            format!(
+                "You are Claude Code, assisting an operator using r2-composer.\n\
+                 Operator says:\n\n{}\n",
+                v.get("message").and_then(|x| x.as_str()).unwrap_or("")
+            )
         }
     }
+}
 
-    brief.push_str("--- operator now says ---\n");
-    brief.push_str(message);
-    brief.push('\n');
-    brief
+/// Lazy singleton — parses the six baked-in `.tera` templates once and
+/// reuses them for every brief construction.
+fn template_engine() -> &'static tera::Tera {
+    use std::sync::OnceLock;
+    static ENGINE: OnceLock<tera::Tera> = OnceLock::new();
+    ENGINE.get_or_init(|| {
+        // Baked into the binary at build time. The compiler embeds the
+        // bytes directly from `orchestrator/prompts/*.md.tera`.
+        const T_BASE:     &str = include_str!("../../prompts/_base.md.tera");
+        const T_CHAT:     &str = include_str!("../../prompts/author-chat.md.tera");
+        const T_APIARY:   &str = include_str!("../../prompts/author-apiary.md.tera");
+        const T_BOARD:    &str = include_str!("../../prompts/author-board.md.tera");
+        const T_ENSEMBLE: &str = include_str!("../../prompts/author-ensemble.md.tera");
+        const T_PLUGIN:   &str = include_str!("../../prompts/author-plugin.md.tera");
+        const T_SENTANT:  &str = include_str!("../../prompts/author-sentant.md.tera");
+
+        let mut tera = tera::Tera::default();
+        tera.add_raw_templates(vec![
+            ("_base.md.tera",           T_BASE),
+            ("author-chat.md.tera",     T_CHAT),
+            ("author-apiary.md.tera",   T_APIARY),
+            ("author-board.md.tera",    T_BOARD),
+            ("author-ensemble.md.tera", T_ENSEMBLE),
+            ("author-plugin.md.tera",   T_PLUGIN),
+            ("author-sentant.md.tera",  T_SENTANT),
+        ])
+        .expect("Tera template parse failed — fix the .tera files");
+        tera
+    })
 }
 
 #[cfg(test)]
@@ -250,27 +285,69 @@ mod tests {
 
     #[test]
     fn brief_includes_canvas_and_history() {
+        // Chat-mode brief (default — no `kind` field) must surface the
+        // canvas state + chat history + the new user message.
         let payload = br#"{
             "message":"add an OTA plugin",
             "canvas":{"board":"esp32-c6-dfr1117","ensemble":"rocker-sensor"},
             "history":[{"role":"user","content":"hello"},{"role":"assistant","content":"hi back"}]
         }"#;
         let brief = construct_brief(payload);
-        assert!(brief.contains("Board:    esp32-c6-dfr1117"));
-        assert!(brief.contains("Ensemble: rocker-sensor"));
-        assert!(brief.contains("--- user ---"));
-        assert!(brief.contains("hello"));
-        assert!(brief.contains("--- assistant ---"));
-        assert!(brief.contains("hi back"));
-        assert!(brief.contains("add an OTA plugin"));
+        assert!(brief.contains("esp32-c6-dfr1117"), "board surfaces");
+        assert!(brief.contains("rocker-sensor"),   "ensemble surfaces");
+        assert!(brief.contains("hello"),           "user history line");
+        assert!(brief.contains("hi back"),         "assistant history line");
+        assert!(brief.contains("add an OTA plugin"), "current message");
+        assert!(brief.contains("open chat"),       "chat-template marker");
     }
 
     #[test]
     fn brief_with_empty_canvas() {
+        // Empty canvas object should still render — _base.md.tera's
+        // `{%- if canvas.board ... %}` falls through to the
+        // "(empty — no apiary open, no canvas selection)" branch.
         let payload = br#"{"message":"hi","canvas":{},"history":[]}"#;
         let brief = construct_brief(payload);
-        assert!(brief.contains("Board:    (none selected)"));
-        assert!(brief.contains("Ensemble: (none selected)"));
+        assert!(brief.contains("empty"),                "empty-canvas marker");
+        assert!(brief.contains("no apiary open"),       "empty-canvas marker 2");
+    }
+
+    #[test]
+    fn kind_dispatch_apiary() {
+        // kind: "apiary" picks the apiary template, which mentions
+        // SPEC-APIARY-CREATE.md.
+        let payload = br#"{"kind":"apiary","message":"new greenhouse rig","canvas":{},"history":[]}"#;
+        let brief = construct_brief(payload);
+        assert!(brief.contains("author a new APIARY"));
+        assert!(brief.contains("SPEC-APIARY-CREATE.md"));
+        assert!(brief.contains("new greenhouse rig"));
+    }
+
+    #[test]
+    fn kind_dispatch_board() {
+        let payload = br#"{"kind":"board","message":"add esp32-s3-xiao-sense","canvas":{},"history":[]}"#;
+        let brief = construct_brief(payload);
+        assert!(brief.contains("author a new CARRIER BOARD"));
+        assert!(brief.contains("SPEC-CATALOGUE-LAYOUT.md"));
+        assert!(brief.contains("add esp32-s3-xiao-sense"));
+    }
+
+    #[test]
+    fn kind_dispatch_plugin() {
+        let payload = br#"{"kind":"plugin","message":"i2c temperature sensor","canvas":{"ensemble":"rocker-sensor"},"history":[]}"#;
+        let brief = construct_brief(payload);
+        assert!(brief.contains("author a new PLUGIN"));
+        assert!(brief.contains("R2-PLUGIN §12"));
+        assert!(brief.contains("rocker-sensor"));
+    }
+
+    #[test]
+    fn kind_dispatch_unknown_falls_back_to_chat() {
+        // An unknown kind silently uses the chat template — never
+        // refuse a brief.
+        let payload = br#"{"kind":"future-thing","message":"hi","canvas":{},"history":[]}"#;
+        let brief = construct_brief(payload);
+        assert!(brief.contains("open chat"));
     }
 
     #[test]

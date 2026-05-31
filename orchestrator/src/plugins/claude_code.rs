@@ -282,7 +282,7 @@ impl ClaudeCodePlugin {
         // surface as Meta so the build console can observe the cadence
         // without flooding the chat.
         let tx_rd = tx.clone();
-        thread::spawn(move || {
+        let reader_handle = thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines() {
                 match line {
@@ -312,13 +312,21 @@ impl ClaudeCodePlugin {
                 }
             }
             // Reader thread ends when the child closes its stdout. The
-            // wait thread below sends the Done/Error message based on
-            // the actual exit code.
+            // wait thread below joins on this handle before sending the
+            // terminal Done/Error so Meta/Text events can never race
+            // behind Done into the channel.
         });
 
-        // Wait thread: drain the child + report exit.
+        // Wait thread: drain the child, join the reader, THEN report exit.
         thread::spawn(move || {
             let status = child.wait();
+            // CRITICAL: join the reader before signalling completion.
+            // Without this, fast-exiting children (printf in tests; one-
+            // shot tool invocations in prod) emit Done into the channel
+            // BEFORE the reader has finished draining stdout. The poll
+            // loop then early-exits on Done and the trailing Meta/Text
+            // events are never observed.
+            let _ = reader_handle.join();
             match status {
                 Ok(s) => {
                     let code = s.code().unwrap_or(-1);

@@ -1,0 +1,76 @@
+{% include "_base.md.tera" %}
+
+## This session: author a new PLUGIN
+
+You are authoring a new plugin catalogue entry. Plugins live in ONE OF
+three locations (SPEC-CATALOGUE-LAYOUT §5.1):
+
+1. **Ensemble-owned**: `catalogue/ensembles/<ensemble>/plugins/<category>/<slug>/`
+2. **Hive-shared singleton on a carrier**: `catalogue/boards/<carrier>/plugins/<category>/<slug>/`
+3. **Always-linked core**: `crates/r2-plugin-<category>-<slug>/`
+
+The OPERATOR must have an ensemble or board open as the scope, OR
+explicitly say "this is a core plugin". If neither, ASK before
+proceeding.
+
+## Read these FIRST, in this order
+
+1. `specifications/SPEC-CATALOGUE-LAYOUT.md` §5 — **the normative
+   plugin-authoring spec**. Two-stage lifecycle (metadata-only vs
+   ready), `plugin.toml` schema, R2-PLUGIN §12.8's 10 mandatory
+   PLUGIN.md sections, the AI-CONTEXT.md structure, validation rules.
+
+2. Upstream R2 references cited by §5:
+   - R2-PLUGIN §12 (manifest, README, source layout, feature flags).
+   - R2-PLUGIN §12.2 (canonical category list).
+   - R2-PLUGIN §12.5 (Cargo feature-flag rules + mutual exclusion).
+   - R2-PLUGIN §12.8 (the 10 numbered PLUGIN.md sections).
+   - R2-PLUGIN §10 (capability-based plugin swap pattern).
+   - R2-PLUGIN §13 (web-plugin runtime contract — only if `[modes.web]`).
+
+3. The canonical example for your category:
+   - sensor → `catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/`
+   - storage → `catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/`
+   - comms → `catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/`
+   - indicator → `catalogue/ensembles/rocker-sensor/plugins/indicator/led/`
+   - crypto / time / etc. → look in `crates/r2-plugin-<category>-*`.
+
+## What you MUST produce
+
+Per SPEC-CATALOGUE-LAYOUT §5.2 — STAGE 1 (metadata-only — the default for
+new plugins until source extraction lands):
+
+- `<slug>/plugin.toml` — full R2-PLUGIN §12.3 schema; MUST set
+  `[plugin].status = "metadata-only"`.
+- `<slug>/PLUGIN.md` — R2-PLUGIN §12.8's 10 numbered sections in
+  fixed order.
+- `<slug>/AI-CONTEXT.md` — 10 H2 sections per §5.5.
+- `<slug>/conversation/<date>-author-plugin-NN.md` — transcript.
+
+Stage 2 (fully realised) adds `Cargo.toml`, `src/lib.rs`, `README.md`,
+optionally `tests/`, `datasheets/` (REQUIRED if wraps a specific chip),
+`assets/` (REQUIRED for `[modes.web]`). Don't do Stage 2 unless the
+operator explicitly asks — "metadata first, source later" is the
+default discipline (see [[project-r2-composer-purpose]]).
+
+## Constraints
+
+- `[plugin].name` MUST equal the directory slug.
+- `[plugin].category` MUST be in R2-PLUGIN §12.2's list (sensor /
+  actuator / storage / comms / crypto / indicator / time / webapp / …).
+- `[modes]` MUST declare at least one of aot/nif/web as non-false.
+- `[capabilities].provides` and `.requires` SHOULD use the canonical
+  `ai.reality2.cap.<noun>` namespace.
+- If wrapping a specific chip, `datasheets/` MUST contain the vendor's
+  PDF and `PLUGIN.md §7` MUST cite it.
+
+## How to ask clarifying questions
+
+What category? Which build modes (aot / nif / web)? What capability
+does it provide (so other plugins / sentants can require it generically
+per R2-PLUGIN §10)? What hardware/SDK does it wrap? Is there an
+existing plugin providing the same capability that this one swaps with?
+
+## Operator's message
+
+{{ message }}
