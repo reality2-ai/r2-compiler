@@ -64,6 +64,11 @@ let wasmReady = false;
   // Compile dispatches the composition over /r2.
   attachCanvas();
 
+  // C-1: apiary canvas frame + mode switcher between Apiary and
+  // Quick build. Mocked state for v0.1; C-2 wires to apiary.toml.
+  attachApiaryCanvas();
+  attachCanvasModeSwitcher();
+
   // Phase 1.7b: connect to the orchestrator's /r2 WebSocket and wire
   // the bottom panel (tabbed: Chat | Build). The catalogue browser
   // above stays fully usable even if the WS fails.
@@ -1265,4 +1270,199 @@ function consoleLine(cls, text) {
   pane.scrollTop = pane.scrollHeight;
   // Keep the log bounded — drop oldest lines past 500.
   while (pane.childNodes.length > 500) pane.removeChild(pane.firstChild);
+}
+
+// ── Apiary canvas (C-1 — mocked rocker-rig) ───────────────────────────
+//
+// Per SPEC-APIARY-COMPOSE.md §5. Renders the apiary header + role-
+// ensemble cards + per-target rows from a hardcoded mock state. C-2
+// will replace the mock with real `r2.composer.apiary.active` payload.
+//
+// The mock is the worked example from §12 — r2-workshop's rocker rig:
+// 4 role-ensembles, 6 compile targets, controller + webapp-server
+// co-located on one linux box.
+
+const MOCK_APIARY = {
+  name: "rocker-rig",
+  class: "nz.ac.auckland.rocker",
+  classHash: "0x624c47bc",
+  version: "0.2.0",
+  tg: { keyholderFingerprint: "ab12…cd34" },
+  roles: [
+    {
+      role: "sensor",
+      ensemble: "rocker-sensor",
+      sentantCount: 15,
+      targets: [
+        { id: "sensor:esp32-s3-devkitc",
+          type: "mcu-fw",  host: "esp32-s3-devkitc",
+          overrides: { "ai.reality2.cap.accel.triaxial": "adxl355" },
+          status: "ready",  lastBuilt: "2h ago" },
+        { id: "sensor:esp32-s3-xiao",
+          type: "mcu-fw",  host: "esp32-s3-xiao",
+          overrides: { "ai.reality2.cap.accel.triaxial": "adxl355" },
+          status: "ready",  lastBuilt: "2h ago" },
+        { id: "sensor:esp32-c6-dfr1117",
+          type: "mcu-fw",  host: "esp32-c6-dfr1117",
+          overrides: { "ai.reality2.cap.accel.triaxial": "lis2dh" },
+          status: "warning",  warning: "ensemble compile_target excludes esp32-c6" },
+      ],
+    },
+    {
+      role: "controller",
+      ensemble: "rocker-controller",
+      sentantCount: 8,
+      targets: [
+        { id: "controller:linux-x86_64",
+          type: "native",  host: "linux-x86_64",
+          status: "metadata-only",  note: "ensemble pending source extraction" },
+      ],
+    },
+    {
+      role: "webapp-server",
+      ensemble: "rocker-webapp-server",
+      sentantCount: 4,
+      targets: [
+        { id: "webapp-server:linux-x86_64",
+          type: "beam",    host: "linux-x86_64",
+          coLocatedWith: "controller",
+          status: "metadata-only" },
+      ],
+    },
+    {
+      role: "viewer",
+      ensemble: "rocker-viewer",
+      sentantCount: 5,
+      targets: [
+        { id: "viewer:wasm32-browser",
+          type: "wasm",    host: "wasm32-browser",
+          status: "metadata-only" },
+      ],
+    },
+    {
+      role: "keyholder",
+      ensemble: "rocker-keyholder",
+      sentantCount: 3,
+      targets: [
+        { id: "keyholder:esp32-s3-keyholder-tag",
+          type: "mcu-fw",  host: "esp32-s3-keyholder-tag",
+          status: "metadata-only" },
+      ],
+    },
+  ],
+};
+
+function attachApiaryCanvas() {
+  renderApiaryHeader(MOCK_APIARY);
+  renderApiaryRoles(MOCK_APIARY);
+  renderApiarySummary(MOCK_APIARY);
+
+  $("apiary-compile-all").addEventListener("click", () => {
+    // C-3 will fire r2.composer.apiary.build.start here.
+    consoleLine("sys", `(mock) compile-all clicked — ${countTargets(MOCK_APIARY)} targets would dispatch`);
+    switchTab("build");
+  });
+}
+
+function renderApiaryHeader(apiary) {
+  const el = $("apiary-header");
+  el.innerHTML = `
+    <div class="apiary-id">
+      <span class="apiary-label">Apiary</span>
+      <span class="apiary-name">${escape(apiary.name)}</span>
+    </div>
+    <div class="apiary-tg">
+      <span class="apiary-tg-label">TG</span>
+      <span class="apiary-tg-class">${escape(apiary.class)}</span>
+      <span class="apiary-tg-hash" title="FNV-1a-32 of class string">${escape(apiary.classHash)}</span>
+    </div>
+    <div class="apiary-kh">
+      <span class="apiary-kh-label">KeyHolder</span>
+      <span class="apiary-kh-fp" title="SHA-256 prefix of the KeyHolder public key">${escape(apiary.tg.keyholderFingerprint)}</span>
+    </div>
+    <div class="apiary-version">v${escape(apiary.version)}</div>
+  `;
+}
+
+function renderApiaryRoles(apiary) {
+  const root = $("apiary-roles");
+  root.innerHTML = "";
+  for (const role of apiary.roles) {
+    const card = document.createElement("div");
+    card.className = "apiary-role";
+    card.dataset.role = role.role;
+
+    const header = document.createElement("div");
+    header.className = "apiary-role-header";
+    header.innerHTML = `
+      <span class="apiary-role-name">${escape(role.role)}</span>
+      <span class="apiary-role-ensemble">${escape(role.ensemble)}</span>
+      <span class="apiary-role-meta">${role.sentantCount} sentants · ${role.targets.length} target${role.targets.length === 1 ? "" : "s"}</span>
+    `;
+    card.appendChild(header);
+
+    const targets = document.createElement("div");
+    targets.className = "apiary-targets";
+    for (const t of role.targets) {
+      const row = document.createElement("div");
+      row.className = "apiary-target";
+      row.dataset.targetId = t.id;
+      row.dataset.status = t.status;
+
+      const left = `
+        <span class="target-type" data-type="${t.type}">${escape(t.type)}</span>
+        <span class="target-host">${escape(t.host)}</span>
+      `;
+      const overrides = t.overrides ? Object.entries(t.overrides)
+        .map(([cap, plugin]) => `<span class="target-override"><code>${escape(shortCap(cap))}</code>=${escape(plugin)}</span>`)
+        .join(" ") : "";
+      const status = `<span class="target-status" data-status="${t.status}">${escape(t.status)}</span>`;
+      const aux = t.coLocatedWith
+        ? `<span class="target-coloc">co-located with <em>${escape(t.coLocatedWith)}</em></span>`
+        : (t.warning ? `<span class="target-warn">⚠ ${escape(t.warning)}</span>`
+        : (t.note ? `<span class="target-note">${escape(t.note)}</span>`
+        : (t.lastBuilt ? `<span class="target-lastbuilt">built ${escape(t.lastBuilt)}</span>` : "")));
+
+      row.innerHTML = `
+        <div class="target-row-main">${left}${overrides}</div>
+        <div class="target-row-meta">${status}${aux}</div>
+      `;
+      targets.appendChild(row);
+    }
+    card.appendChild(targets);
+
+    root.appendChild(card);
+  }
+}
+
+function renderApiarySummary(apiary) {
+  const n = countTargets(apiary);
+  $("apiary-summary").textContent = `${apiary.roles.length} role-ensembles · ${n} target${n === 1 ? "" : "s"}`;
+  $("apiary-compile-all").disabled = false;
+}
+
+function countTargets(apiary) {
+  return apiary.roles.reduce((acc, r) => acc + r.targets.length, 0);
+}
+
+// Trim a capability string for compact display: keep the last 2 path segments.
+function shortCap(s) {
+  const parts = s.split(".");
+  return parts.length > 2 ? parts.slice(-2).join(".") : s;
+}
+
+// ── Canvas mode switcher (Apiary | Quick build) ───────────────────────
+
+function attachCanvasModeSwitcher() {
+  for (const btn of document.querySelectorAll(".mode-tab")) {
+    btn.addEventListener("click", () => switchCanvasMode(btn.dataset.mode));
+  }
+}
+
+function switchCanvasMode(mode) {
+  document.querySelectorAll(".mode-tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.mode === mode);
+  });
+  $("canvas-apiary").classList.toggle("hidden", mode !== "apiary");
+  $("canvas").classList.toggle("hidden", mode !== "quick");
 }

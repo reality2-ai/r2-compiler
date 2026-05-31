@@ -38,14 +38,42 @@
         <!-- Wrapper for placeholder + entry-detail so the Build pane
              can sit beneath them in the column. -->
         <div class="workspace-top">
-        <div class="canvas" id="canvas">
+        <!-- Canvas modes — Apiary (the full multi-role composition surface)
+             and Quick build (the v0.1 single board+ensemble debug path).
+             Per SPEC-APIARY-COMPOSE §8, both surfaces coexist; Apiary is
+             the destination and the default. -->
+        <div class="canvas-mode-strip">
+          <button class="mode-tab active" data-mode="apiary" id="mode-apiary">Apiary</button>
+          <button class="mode-tab" data-mode="quick" id="mode-quick">Quick build</button>
+          <span class="mode-flex"></span>
+          <span class="mode-hint" id="mode-hint">v0.1 mock — open an apiary later via <code>r2.composer.apiary.open</code></span>
+        </div>
+
+        <!-- Apiary canvas — the destination per SPEC-APIARY-COMPOSE.
+             v0.1: mocked rocker-rig state hardcoded in app.js.
+             v0.2: orchestrator parses apiary.toml + emits state. -->
+        <div class="canvas-apiary" id="canvas-apiary">
+          <div class="apiary-header" id="apiary-header"></div>
+          <div class="apiary-roles" id="apiary-roles"></div>
+          <div class="apiary-actions">
+            <span class="apiary-summary" id="apiary-summary"></span>
+            <span class="apiary-flex"></span>
+            <button class="btn-primary" id="apiary-compile-all" disabled
+              title="Compile all targets in this apiary (Phase 2-canvas-c — currently mocked)">Compile all →</button>
+          </div>
+        </div>
+
+        <!-- Quick-build canvas — preserved per SPEC-APIARY-COMPOSE §8 as
+             the stepping-stone debug surface (one role-ensemble, one
+             carrier, no apiary required). -->
+        <div class="canvas canvas-quick hidden" id="canvas">
           <div class="canvas-header">
-            <h2>Compose</h2>
+            <h2>Quick build</h2>
             <p class="canvas-hint">
               Drag a carrier board from the left, an ensemble from the right.
               Compile sends the composition over <code>/r2</code> to the
-              <code>claude-code</code> plugin. Phase 1.7d adds the AI chat pane
-              that reads + mutates this canvas.
+              <code>claude-code</code> plugin. This is the v0.1 single-target
+              debug surface — the Apiary tab is the destination for real work.
             </p>
           </div>
 
