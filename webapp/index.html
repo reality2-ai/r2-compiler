@@ -11,10 +11,12 @@
       <div class="header-inner">
         <h1>r2-composer</h1>
         <p class="tagline">Visual composer for Reality2 firmware — catalogue preview</p>
-        <div class="project-pill" title="Apiary concept (TG-bound set of role-ensembles; open / resume / git-repo) settled in second pass. Switcher implemented in Phase 2-full.">
+        <div class="project-pill" id="apiary-pill" title="Open or create an apiary">
           <span class="project-label">Apiary</span>
-          <span class="project-name">(none open)</span>
+          <span class="project-name" id="apiary-pill-name">(none open)</span>
         </div>
+        <button class="header-action" id="new-apiary-pill"
+          title="Start a new apiary — seeds the chat with a new-apiary prompt">+ New apiary…</button>
         <div class="r2-status" id="r2-status" title="/r2 WebSocket status">
           <span class="r2-dot" id="r2-dot"></span>
           <span class="r2-label" id="r2-label">connecting…</span>
@@ -50,8 +52,9 @@
         </div>
 
         <!-- Apiary canvas — the destination per SPEC-APIARY-COMPOSE.
-             v0.1: mocked rocker-rig state hardcoded in app.js.
-             v0.2: orchestrator parses apiary.toml + emits state. -->
+             C-2 wires real state from `r2.composer.apiary.active`.
+             C-A1 adds the empty-canvas state (#canvas-apiary-empty)
+             that renders when no apiary is open. -->
         <div class="canvas-apiary" id="canvas-apiary">
           <div class="apiary-header" id="apiary-header"></div>
           <div class="apiary-roles" id="apiary-roles"></div>
@@ -60,6 +63,31 @@
             <span class="apiary-flex"></span>
             <button class="btn-primary" id="apiary-compile-all" disabled
               title="Compile all targets in this apiary (Phase 2-canvas-c — currently mocked)">Compile all →</button>
+          </div>
+        </div>
+
+        <!-- Empty-canvas state (C-A1) — shown when apiaryState is null
+             (i.e. orchestrator has not emitted `r2.composer.apiary.active`).
+             Lists known apiaries from `r2.composer.apiary.entry` events. -->
+        <div class="canvas-apiary-empty hidden" id="canvas-apiary-empty">
+          <div class="empty-hero">
+            <h2>No apiary open</h2>
+            <p>
+              An <strong>apiary</strong> is the unit of work in r2-composer — one
+              deployment, one Trust Group, one class string, one or more
+              cooperating hives. Open an existing apiary below, or start a new
+              one via the <em>+ New apiary…</em> pill in the header (or just
+              type <code>I want to start a new apiary for …</code> in the chat).
+            </p>
+          </div>
+          <div class="empty-known-apiaries">
+            <div class="empty-known-header">
+              <h3>Known apiaries</h3>
+              <span class="empty-known-count" id="empty-known-count">—</span>
+            </div>
+            <ul class="empty-apiary-list" id="empty-apiary-list">
+              <li class="empty-apiary-pending">scanning <code>apiaries/</code>…</li>
+            </ul>
           </div>
         </div>
 

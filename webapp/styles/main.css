@@ -240,6 +240,148 @@ main {
   border-radius: 3px;
 }
 
+/* ── Header "+ New apiary…" pill (C-A1) ─────────────────────────────── */
+.header-action {
+  appearance: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.header-action:hover { background: var(--bg-hover); color: var(--fg); }
+
+/* ── Empty-canvas surface (C-A1) ────────────────────────────────────── */
+.canvas-apiary-empty {
+  padding: 32px 40px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.canvas-apiary-empty.hidden { display: none; }
+
+.empty-hero h2 {
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+.empty-hero p {
+  margin: 0;
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 72ch;
+}
+.empty-hero p code,
+.empty-hero p em {
+  font-family: var(--font-mono);
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-style: normal;
+}
+.empty-hero p strong { color: var(--fg); font-weight: 600; }
+
+.empty-known-apiaries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.empty-known-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.empty-known-header h3 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  font-weight: 600;
+}
+.empty-known-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  background: var(--bg-elevated);
+  padding: 1px 8px;
+  border-radius: 8px;
+}
+
+.empty-apiary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.empty-apiary-pending {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 12px 14px;
+  background: var(--bg-panel);
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+}
+.empty-apiary-pending code {
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.empty-apiary-row {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.empty-apiary-row:hover {
+  border-color: var(--accent-dim);
+  background: var(--bg-elevated);
+}
+.empty-apiary-main {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.empty-apiary-name    { color: var(--accent); font-weight: 600; }
+.empty-apiary-class   { color: var(--ensemble); }
+.empty-apiary-hash    { color: var(--accent-dim); font-size: 11px; }
+.empty-apiary-meta {
+  display: flex;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.empty-apiary-desc {
+  font-size: 12px;
+  color: var(--fg-dim);
+  line-height: 1.45;
+  max-width: 72ch;
+}
+
 /* ── Apiary canvas (C-1) ────────────────────────────────────────────── */
 .canvas-apiary {
   padding: 24px 32px 16px;

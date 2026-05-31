@@ -895,6 +895,11 @@ function onEvent(name, payload) {
     onApiaryActive(payload);
     return;
   }
+  // Per-known-apiary picker entry → empty-canvas list (C-A1)
+  if (name === "r2.composer.apiary.entry") {
+    onApiaryEntry(payload);
+    return;
+  }
   // Author flow → chat pane
   if (name.startsWith("r2.composer.author.")) {
     onAuthorEvent(name, payload);
@@ -1357,34 +1362,111 @@ const MOCK_APIARY = {
   ],
 };
 
-// Live apiary state. Starts as MOCK_APIARY so the canvas has something
-// to render even before the orchestrator emits `r2.composer.apiary.active`.
-// When the orchestrator IS launched with `--apiary <name>`, it sends the
-// real state right after hello and we swap.
-let apiaryState = MOCK_APIARY;
+// C-A1 — Live apiary state. By default no apiary is open and the canvas
+// renders the empty-canvas surface (peripheral list of known apiaries +
+// "no apiary open" hero). The orchestrator emits `r2.composer.apiary.entry`
+// per known apiary at WS-connect time, and `r2.composer.apiary.active` if
+// one is launched with --apiary. The legacy MOCK_APIARY behaviour is
+// preserved behind the `?mock` URL flag for design demos.
+let apiaryState = (new URLSearchParams(location.search).get("mock") !== null)
+  ? MOCK_APIARY
+  : null;
 let apiaryIsLive = false;
+const knownApiaries = [];   // [{name, class, class_hash, version, description, path, last_modified}]
 
 function attachApiaryCanvas() {
   renderApiaryAll();
 
   $("apiary-compile-all").addEventListener("click", () => {
+    if (!apiaryState) return;
     // C-3 will fire r2.composer.apiary.build.start here.
     const tag = apiaryIsLive ? "" : "(mock) ";
     consoleLine("sys", `${tag}compile-all clicked — ${countTargets(apiaryState)} targets would dispatch`);
     switchTab("build");
   });
+
+  // C-A1 "+ New apiary…" pill — seeds the chat input per
+  // SPEC-APIARY-CREATE §2.1 (initiate via chat utterance OR pill).
+  $("new-apiary-pill").addEventListener("click", () => {
+    const input = $("chat-input");
+    if (!input) return;
+    input.value = "I want to start a new apiary for ";
+    // Place caret at end so the operator can keep typing.
+    input.focus();
+    input.selectionStart = input.selectionEnd = input.value.length;
+    refreshChatSendButton();
+  });
 }
 
 function renderApiaryAll() {
-  renderApiaryHeader(apiaryState);
-  renderApiaryRoles(apiaryState);
-  renderApiarySummary(apiaryState);
-  // Update the mode-hint chip to reflect whether we're live or mocked.
+  const emptyPane = $("canvas-apiary-empty");
+  const livePane  = $("canvas-apiary");
+  if (apiaryState) {
+    emptyPane.classList.add("hidden");
+    livePane.classList.remove("hidden");
+    renderApiaryHeader(apiaryState);
+    renderApiaryRoles(apiaryState);
+    renderApiarySummary(apiaryState);
+  } else {
+    livePane.classList.add("hidden");
+    emptyPane.classList.remove("hidden");
+    renderKnownApiaries();
+  }
+  // Header pill + mode hint reflect live status.
+  const pillName = $("apiary-pill-name");
+  if (pillName) {
+    pillName.textContent = apiaryState
+      ? apiaryState.name
+      : "(none open)";
+  }
   const hint = $("mode-hint");
   if (hint) {
     hint.innerHTML = apiaryIsLive
       ? `live · <code>${escape(apiaryState.name)}</code>`
-      : `v0.1 mock — open an apiary later via <code>r2.composer.apiary.open</code>`;
+      : (apiaryState
+          ? `mock · pass <code>?mock</code> off the URL to clear`
+          : `no apiary — open via the list, or <code>+ New apiary…</code>`);
+  }
+}
+
+function renderKnownApiaries() {
+  const list = $("empty-apiary-list");
+  const count = $("empty-known-count");
+  if (!list) return;
+  count.textContent = String(knownApiaries.length);
+  if (knownApiaries.length === 0) {
+    list.innerHTML = `<li class="empty-apiary-pending">none yet — start one via <code>+ New apiary…</code></li>`;
+    return;
+  }
+  list.innerHTML = "";
+  for (const a of knownApiaries) {
+    const li = document.createElement("li");
+    li.className = "empty-apiary-row";
+    li.dataset.apiaryName = a.name;
+    li.innerHTML = `
+      <div class="empty-apiary-main">
+        <span class="empty-apiary-name">${escape(a.name)}</span>
+        <span class="empty-apiary-class">${escape(a.class)}</span>
+        <span class="empty-apiary-hash" title="FNV-1a-32(class)">${escape(a.class_hash)}</span>
+      </div>
+      <div class="empty-apiary-meta">
+        <span class="empty-apiary-version">v${escape(a.version || "?")}</span>
+        ${a.last_modified ? `<span class="empty-apiary-mtime">${escape(a.last_modified)}</span>` : ""}
+      </div>
+      ${a.description ? `<div class="empty-apiary-desc">${escape(firstSentence(a.description))}</div>` : ""}
+    `;
+    // Click = seed chat with "open" intent. AI-chat-primary per
+    // feedback_ai_chat_primary.md: we don't directly fire apiary.open;
+    // the AI does that as a tool-call after confirming.
+    li.addEventListener("click", () => {
+      const input = $("chat-input");
+      if (!input) return;
+      input.value = `open the ${a.name} apiary`;
+      input.focus();
+      input.selectionStart = input.selectionEnd = input.value.length;
+      refreshChatSendButton();
+    });
+    list.appendChild(li);
   }
 }
 
@@ -1396,6 +1478,23 @@ function onApiaryActive(payload) {
   apiaryIsLive = true;
   renderApiaryAll();
   consoleLine("sys", `apiary loaded — ${escape(payload.name)} (${countTargets(payload)} targets)`);
+}
+
+// Called per `r2.composer.apiary.entry` event from the orchestrator at
+// WS-connect time. Builds the empty-canvas picker list.
+function onApiaryEntry(payload) {
+  if (!payload || typeof payload !== "object" || !payload.name) return;
+  // Dedup on `name` — the orchestrator emits one per scanned directory,
+  // and reconnects re-emit the same set.
+  const existing = knownApiaries.findIndex((a) => a.name === payload.name);
+  if (existing >= 0) {
+    knownApiaries[existing] = payload;
+  } else {
+    knownApiaries.push(payload);
+  }
+  // Most-recent first (orchestrator already sorts, but keep deterministic).
+  knownApiaries.sort((a, b) => (b.last_modified || "").localeCompare(a.last_modified || ""));
+  if (!apiaryState) renderKnownApiaries();
 }
 
 function renderApiaryHeader(apiary) {

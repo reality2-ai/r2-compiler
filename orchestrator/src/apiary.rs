@@ -105,7 +105,92 @@ struct TomlTarget {
     co_located_with: Option<String>,
 }
 
+/// Lightweight per-apiary summary for the empty-canvas picker.
+/// Avoids loading the full `[[role_ensembles]]` tree just to list
+/// what apiaries exist under `apiaries/`.
+#[derive(Debug, Clone, Serialize)]
+pub struct ApiarySummary {
+    pub name: String,
+    pub class: String,
+    pub class_hash: String,
+    pub version: String,
+    pub description: String,
+    /// Absolute path on disk.
+    pub path: String,
+    /// ISO 8601 UTC of `apiary.toml`'s mtime. Best-effort.
+    pub last_modified: String,
+}
+
 // ── Public API ─────────────────────────────────────────────────────────
+
+/// Scan `apiaries/` under the given repo root and return one summary
+/// per directory that contains a parseable `apiary.toml`. Used by the
+/// empty-canvas surface to populate the peripheral list of known
+/// apiaries the operator can open.
+pub fn list_entries(repo_root: &Path) -> Vec<ApiarySummary> {
+    let apiaries_dir = repo_root.join("apiaries");
+    let entries = match std::fs::read_dir(&apiaries_dir) {
+        Ok(it) => it,
+        Err(_) => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let toml_path = path.join("apiary.toml");
+        let Ok(raw) = std::fs::read_to_string(&toml_path) else { continue };
+        let Ok(parsed) = toml::from_str::<TomlApiary>(&raw) else { continue };
+
+        let last_modified = std::fs::metadata(&toml_path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| format_iso8601(d.as_secs()))
+            .unwrap_or_default();
+
+        out.push(ApiarySummary {
+            name:          parsed.apiary.name,
+            class_hash:    format!("0x{:08x}", r2_fnv::fnv1a_32(parsed.apiary.class.as_bytes())),
+            class:         parsed.apiary.class,
+            version:       parsed.apiary.version,
+            description:   parsed.apiary.description,
+            path:          path.display().to_string(),
+            last_modified,
+        });
+    }
+    // Most-recent first — operators usually want their active workpiece up top.
+    out.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+    out
+}
+
+/// Minimal ISO 8601 UTC formatter for an mtime-as-unix-seconds. We
+/// avoid pulling in chrono just for this; the format only needs to be
+/// sortable and human-readable.
+fn format_iso8601(unix_secs: u64) -> String {
+    // Civil-date math via the standard `days from epoch` algorithm.
+    let days = (unix_secs / 86_400) as i64;
+    let sec_of_day = (unix_secs % 86_400) as u32;
+    let (h, m, s) = (sec_of_day / 3600, (sec_of_day / 60) % 60, sec_of_day % 60);
+    let (y, mo, d) = civil_from_days(days);
+    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
+}
+
+/// Howard Hinnant's days→civil algorithm. Public-domain, well-tested.
+fn civil_from_days(z: i64) -> (i64, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
+}
 
 /// Load + parse an `apiary.toml` from the given apiary directory.
 pub fn load(apiary_dir: &Path) -> Result<ApiaryState, String> {

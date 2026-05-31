@@ -67,6 +67,9 @@ struct AppState {
     /// Sent to each /r2 client as `r2.composer.apiary.active` right after
     /// the hello so the webapp's apiary canvas hydrates without polling.
     apiary_state: Option<Arc<ApiaryState>>,
+    /// Repo root — used by the WS handler to scan `apiaries/` for the
+    /// empty-canvas listing per SPEC-APIARY-CREATE C-A1.
+    repo_root: PathBuf,
     engine: EngineHandle,
 }
 
@@ -133,6 +136,7 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState {
         apiary_path,
         apiary_state,
+        repo_root: repo_root.clone(),
         engine,
     };
 
@@ -184,13 +188,19 @@ async fn websocket_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket, state.engine, state.apiary_state))
+    ws.on_upgrade(move |socket| handle_socket(
+        socket,
+        state.engine,
+        state.apiary_state,
+        state.repo_root,
+    ))
 }
 
 async fn handle_socket(
     mut socket: WebSocket,
     engine: EngineHandle,
     apiary_state: Option<Arc<ApiaryState>>,
+    repo_root: PathBuf,
 ) {
     info!("/r2 client connected");
 
@@ -209,8 +219,30 @@ async fn handle_socket(
         return;
     }
 
-    // Emit the active apiary state right after hello so the webapp's
-    // canvas hydrates without polling.
+    // Emit one r2.composer.apiary.entry per known apiary so the webapp
+    // can populate the empty-canvas picker per SPEC-APIARY-CREATE §2.1
+    // / C-A1. The active apiary (if any) appears here AND as
+    // apiary.active below — the entry is the picker row; the active is
+    // the hydration payload.
+    let entries = apiary::list_entries(&repo_root);
+    info!(
+        "/r2 → emitting {} apiary.entry events (active: {})",
+        entries.len(),
+        if apiary_state.is_some() { "yes" } else { "no" },
+    );
+    for entry in &entries {
+        let env = WireEnvelope::Event {
+            name: "r2.composer.apiary.entry".into(),
+            payload: serde_json::to_value(entry).unwrap_or(serde_json::Value::Null),
+        };
+        let text = serde_json::to_string(&env).unwrap_or_else(|_| "{}".into());
+        if socket.send(Message::Text(text.into())).await.is_err() {
+            return;
+        }
+    }
+
+    // Emit the active apiary state right after the entries so the
+    // webapp's canvas hydrates without polling.
     if let Some(ap) = apiary_state.as_ref() {
         let env = WireEnvelope::Event {
             name: "r2.composer.apiary.active".into(),
