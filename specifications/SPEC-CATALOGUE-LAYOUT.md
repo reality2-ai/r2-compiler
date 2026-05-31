@@ -1,6 +1,6 @@
 # SPEC-CATALOGUE-LAYOUT: directory shape and authoring rules for r2-compiler's catalogue
 
-**Version:** 0.3 Draft
+**Version:** 0.4 Draft
 **Date:** 2026-06-01
 **Status:** Normative Draft
 **Depends on:**
@@ -280,185 +280,411 @@ The `templates/` files **MUST** lint cleanly: a `cargo build` from a fresh check
 
 ```
 catalogue/ensembles/<name>/
-  ensemble.yaml               # REQUIRED — R2-DEF §7 score, the canonical artefact
-  ENSEMBLE.md                 # REQUIRED — narrative + composition diagram
-  AI-CONTEXT.md               # REQUIRED — fresh-CC brief
-  plugins/                    # ensemble-owned plugins (R2-ENSEMBLE §2.1.2)
-    <category>/<name>/        # e.g. sensor/adxl355, storage/sd-card
-  sentants/                   # the ensemble's sentants
-    <Name>/                   # PascalCase, must equal sentant.name
+  ensemble.yaml               # REQUIRED — canonical artefact (§4.3)
+  ENSEMBLE.md                 # REQUIRED — narrative (§4.4)
+  AI-CONTEXT.md               # REQUIRED — fresh-CC brief (§4.5)
+  plugins/                    # OPTIONAL — ensemble-owned plugins (layout per §5)
+    <category>/<name>/
+  sentants/                   # REQUIRED ≥1 — the ensemble's sentants (layout per §6)
+    <Name>/
   datasheets/                 # OPTIONAL — ensemble-level reference PDFs (rare)
-  conversation/               # REQUIRED — authoring transcripts
+  material/                   # OPTIONAL — raw uploaded references awaiting processing
+  conversation/               # REQUIRED ≥1 — authoring transcripts
+    YYYY-MM-DD-<topic>-NN.md
 ```
 
-Directory NAME = the ensemble's `name` field (kebab-case). e.g. `rocker-sensor`, `notekeeper`, `photo-share`.
+The directory name **MUST** equal the ensemble's `name` field in kebab-case (e.g. `rocker-sensor`).
 
-### 4.2 `ensemble.yaml`
+### 4.2 Class string and hash
 
-Conforms to R2-DEF §7 exactly. The orchestrator MUST run R2-DEF §7.10 load-time validation.
+An ensemble's R2 class string is the `class:` field in `ensemble.yaml` (reverse-DNS per R2-CAP §3). Examples: `nz.ac.auckland.rocker`, `ai.reality2.notekeeper`. The class hash is `FNV-1a-32(class_string_utf8_bytes)`; `ensemble.yaml` **SHOULD NOT** include a hard-coded hash.
 
-Extra checks for r2-compiler:
+### 4.3 `ensemble.yaml` — REQUIRED canonical artefact
+
+Conforms to R2-DEF §7. The top-level key **MUST** be `ensemble:`. The orchestrator **MUST** run R2-DEF §7.10 load-time validation in addition to the r2-compiler rules below.
+
+#### 4.3.1 Keys under `ensemble:` — REQUIRED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `name` | string | **REQUIRED** | Kebab-case. **MUST** equal the directory name. |
+| `description` | string | **REQUIRED** | Paragraph describing the ensemble's role. |
+| `version` | string | **REQUIRED** | Semver of the ensemble entry. |
+| `class` | string | **REQUIRED** | Reverse-DNS class string per R2-CAP §3. |
+| `ensemble_version` | string | **REQUIRED** | Schema version of `ensemble.yaml` (R2-DEF §7). |
+| `compile_target` | array&lt;string&gt; | **REQUIRED** | Carrier tags (R2-DEF §7.7) this ensemble works on. **MUST** overlap with at least one carrier in the catalogue. |
+| `sentants` | array | **REQUIRED**, **MUST** have ≥1 entry | Each entry's `name` **MUST** match a directory under `sentants/`. |
+| `plugins` | array | **OPTIONAL** | Each entry's `name` **MUST** match a directory under `plugins/` OR resolve via the carrier / `crates/` (§5.1). |
+| `trust_group` | table | **OPTIONAL** | `roles_allowed: ["member" \| "owner" \| ...]`. |
+| `registrations` | table | **OPTIONAL** | Hive-shared-singleton registrations (R2-DEF §7.4). |
+| `capabilities` | table | **RECOMMENDED** | `emits` + `consumes` aggregate lists for the whole ensemble. |
+| `signatures` | array | **RECOMMENDED** | Trust signatures per R2-DEF §7.9. **MAY** be `[]` until the ensemble is shipped. |
+
+#### 4.3.2 Sentant entries (inside `sentants:` array)
+
+Each sentant entry under `ensemble.sentants[]` is a lightweight reference that the full `sentants/<Name>/sentant.yaml` (§6) elaborates. The in-yaml entry **MUST** contain at minimum:
+
+```yaml
+- name: <PascalCase>
+  description: <paragraph>
+  class: <reverse-DNS>
+  storage: ephemeral | durable | durable-state
+  plugins: [ { name: <slug> }, { capability: <cap-string> }, … ]   # OPTIONAL
+  automations: [ { name: main, … } ]                                # OPTIONAL — full FSM lives in sentants/<Name>/
+```
+
+Sentants **MAY** be referenced by `capability:` rather than `name:` per R2-PLUGIN §10 — the orchestrator resolves to a concrete plugin at compile time.
+
+#### 4.3.3 Plugin entries (inside `plugins:` array)
+
+```yaml
+- name: <slug>
+  description: <paragraph>
+  kind: native | webapp
+  compile_target: [...]
+  capabilities:
+    provides: [...]
+    requires: [...]
+  events:
+    handled: [...]
+    emitted: [...]
+```
+
+#### 4.3.4 Validation
 
 | Rule | Error |
 |---|---|
-| `class` follows R2-CAP §3 reverse-DNS convention | `E_ENS_CLASS` |
-| `compile_target` overlaps with at least one board in the catalogue | `E_ENS_NO_TARGET` |
-| Every plugin name referenced in any sentant resolves either to (a) this ensemble's own `plugins/`, (b) the chosen carrier's `plugins/`, or (c) a core crate under `crates/r2-plugin-*` | `E_ENS_PLUGIN_UNRESOLVED` |
-| Every sentant uses only the R2-COMPILE §3.1 compilable subset (for AOT carriers) | `E_ENS_NOT_COMPILABLE` |
+| `ensemble.name` equals the directory name | `E_ENS_NAME` |
+| `ensemble.class` follows R2-CAP §3 reverse-DNS convention | `E_ENS_CLASS` |
+| `ensemble.compile_target` overlaps with at least one carrier in `catalogue/boards/` | `E_ENS_NO_TARGET` |
+| Every `sentants[].name` resolves to a directory under `sentants/` | `E_ENS_SENTANT_UNRESOLVED` |
+| Every `plugins[].name` resolves under (this ensemble's `plugins/`) ∪ (any carrier's `plugins/`) ∪ (`crates/r2-plugin-*`) | `E_ENS_PLUGIN_UNRESOLVED` |
+| Every sentant uses only the R2-COMPILE §3.1 compilable subset for AOT carriers | `E_ENS_NOT_COMPILABLE` |
 
-### 4.3 Nested plugins (`catalogue/ensembles/<name>/plugins/`)
+### 4.4 `ENSEMBLE.md` — REQUIRED narrative
 
-Per R2-PLUGIN §12 — same layout as the upstream catalogue at `r2-core/plugins/`:
+An ENSEMBLE.md **MUST** open with an `# H1` heading naming the ensemble (long form acceptable).
+
+The following `## H2` sections **MUST** appear in this order:
+
+| Section | Purpose |
+|---|---|
+| `## At a glance` | Bulleted summary — role, deployment context, primary capability. |
+| `## Composition` | Sentant + plugin inventory at a paragraph level; **MAY** include a composition diagram (Mermaid `flowchart` **RECOMMENDED**). |
+| `## Sentants` | One sub-heading or table-row per sentant — name + one-sentence role. |
+| `## Plugins` | Ensemble-owned plugins (NOT hive-shared singletons). One sub-heading or row per plugin. |
+| `## Compile targets` | Which carriers the ensemble compiles on; rationale for any restrictions. |
+| `## Coupling` | Other ensembles in the catalogue this one interacts with (shared events, entanglement). |
+| `## Authoring history` | Pointer into `conversation/`. |
+| `## See also` | Sibling ensembles, relevant upstream specs. |
+
+### 4.5 `AI-CONTEXT.md` — REQUIRED fresh-CC brief
+
+Opens with an `# H1` heading `AI-CONTEXT.md — <ensemble name>`.
+
+REQUIRED `## H2` sections in this order:
+
+1. **`## Purpose`** — one paragraph.
+2. **`## Class + version`** — class string, FNV hash, `version`, `ensemble_version`.
+3. **`## Where the canonical artefact lives`** — `ensemble.yaml`.
+4. **`## Composition summary`** — sentants + plugins in plain language, with file-reference pointers into `sentants/<Name>/AI-CONTEXT.md` and `plugins/<cat>/<name>/AI-CONTEXT.md`.
+5. **`## Compile targets`** — carriers + rationale.
+6. **`## Known coupling`** — interactions with sibling ensembles.
+7. **`## Known gotchas`** — things a future CC session would benefit from knowing.
+8. **`## Read these files in this order (cold-start resume)`** — ordered file list.
+9. **`## Authoring status`** — state of completion.
+
+## 5. Plugins
+
+### 5.1 Where plugins live
+
+Plugin entries appear in **three** locations in the source tree:
+
+1. **Ensemble-owned** — `catalogue/ensembles/<ensemble>/plugins/<category>/<slug>/` — the plugin belongs to a single ensemble (R2-ENSEMBLE §2.1.2 "ensemble-owned"). Visible on the canvas only through the ensemble.
+2. **Hive-shared singletons on a carrier** — `catalogue/boards/<carrier>/plugins/<category>/<slug>/` — the plugin is a one-per-hive resource (BLE radio, WiFi radio, R2-WEB, audio mixer) belonging to the carrier. Per R2-ENSEMBLE §2.1.2. Visible on the canvas only through the carrier.
+3. **Always-linked core plugins** — `crates/r2-plugin-<category>-<slug>/` — infrastructure (crypto, FNV/CBOR, …) linked into every build. **NOT** visible on the canvas; per [[feedback-core-vs-optin-plugins]].
+
+The directory layout (§5.2), `plugin.toml` schema (§5.3), `PLUGIN.md` structure (§5.4), and `AI-CONTEXT.md` structure (§5.5) are identical across all three locations.
+
+### 5.2 Directory layout
+
+A plugin entry **MAY** exist in two stages of completeness:
+
+**Stage 1 — Metadata-only** (minimum; the state most catalogue plugins are in for v0.1):
 
 ```
-plugins/<category>/<name>/
-  plugin.toml                 # REQUIRED — R2-PLUGIN §12.3, with [modes] table
-  PLUGIN.md                   # REQUIRED — R2-PLUGIN §12.8 — all 10 sections mandatory
+<slug>/
+  plugin.toml                 # REQUIRED — §5.3
+  PLUGIN.md                   # REQUIRED — §5.4
+  AI-CONTEXT.md               # REQUIRED — §5.5
+  conversation/               # REQUIRED ≥1 — authoring transcripts
+    YYYY-MM-DD-<topic>-NN.md
+```
+
+A metadata-only plugin **MUST** declare `[plugin].status = "metadata-only"` so validators and the canvas can flag it as "source extraction pending" (Phase 1.4-source) and prevent it from being selected for a compile.
+
+**Stage 2 — Fully realised**:
+
+```
+<slug>/
+  plugin.toml                 # REQUIRED — §5.3 with [plugin].status = "ready"
+  PLUGIN.md                   # REQUIRED — §5.4
+  AI-CONTEXT.md               # REQUIRED — §5.5
+  Cargo.toml                  # REQUIRED — feature flags matching declared modes (§5.3.2)
   README.md                   # REQUIRED — crate-level doc
-  Cargo.toml                  # REQUIRED — feature flags one per declared mode
-  AI-CONTEXT.md               # REQUIRED — fresh-CC brief
-  src/                        # REQUIRED — lib.rs + plugin.rs + driver.rs (as applicable)
-  assets/                     # REQUIRED for category=webapp — static bundle content (§4.3.1)
+  src/                        # REQUIRED — lib.rs + driver.rs / plugin.rs as applicable
+    lib.rs
+    …
+  tests/                      # OPTIONAL — integration tests
   datasheets/                 # REQUIRED if the plugin wraps a specific chip / SDK
-  tests/                      # OPTIONAL — native integration tests
+  assets/                     # REQUIRED for category=webapp — static bundle (§5.3.4)
+  material/                   # OPTIONAL — raw uploads awaiting processing
   conversation/               # REQUIRED — authoring transcripts
 ```
 
-Category MUST be one of R2-PLUGIN §12.2's categories. Crate name in `Cargo.toml` MUST be `r2-plugin-<category>-<name>` per R2-PLUGIN §12.5.
+Category **MUST** be one of R2-PLUGIN §12.2's categories. Crate name in `Cargo.toml` **MUST** be `r2-plugin-<category>-<slug>` per R2-PLUGIN §12.5.
 
-#### 4.3.1 Modes — `aot`, `nif`, `web`
+### 5.3 `plugin.toml` — REQUIRED canonical artefact
 
-A plugin declares which build modes it supports via `plugin.toml [modes]`. Three modes are defined:
+Conforms to R2-PLUGIN §12.3. The orchestrator **MUST** run R2-PLUGIN's load-time validation in addition to the rules below.
 
-| Mode | Target hive | Cargo target | Output | Toolchain |
-|---|---|---|---|---|
-| `aot` | MCU (firmware) | `xtensa-esp32s3-espidf`, `riscv32imac-esp-espidf`, `thumbv8m.main-none-eabihf`, … (per R2-COMPILE §4) | `no_std` static lib linked into a flashed .bin | `cargo build --release --target=<triple>` |
-| `nif` | BEAM (workstation) | host triple | `std` cdylib via `r2-nif` wrapper | `cargo build --release` |
-| `web` | Browser (WASM hive) | `wasm32-unknown-unknown` | Static bundle directory (HTML + CSS + JS + .wasm + assets) served by R2-WEB per R2-PLUGIN §13 | `wasm-pack build --target web` (or Trunk / esbuild equivalent) |
+#### 5.3.1 `[plugin]` — REQUIRED
 
-`web` mode generalises R2-PLUGIN §11's future-work WASM mode + §13's web-plugin runtime contract. A plugin MAY declare multiple modes; modes are NOT mutually-exclusive at the manifest level (only at the Cargo build level, where mode-specific feature flags ARE mutually exclusive per R2-PLUGIN §12.5).
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `name` | string | **REQUIRED** | Plugin slug. **MUST** equal the directory name. |
+| `category` | string | **REQUIRED** | R2-PLUGIN §12.2 category (`sensor`, `actuator`, `storage`, `comms`, `crypto`, `indicator`, `time`, `webapp`, …). |
+| `version` | string | **REQUIRED** | Semver. |
+| `description` | string | **REQUIRED** | Paragraph — what the plugin does, what hardware/SDK it wraps, swap-pair notes (per R2-PLUGIN §10). |
+| `status` | string | **REQUIRED** | One of `"metadata-only"`, `"ready"`, `"deprecated"`. Validators **MUST** refuse to compile a plugin with `metadata-only` status. |
 
-Example `[modes]` declarations:
+#### 5.3.2 `[modes]` — REQUIRED
+
+A plugin declares which build modes it supports. Three modes are defined:
+
+| Mode | Target hive | Cargo target | Output |
+|---|---|---|---|
+| `aot` | MCU (firmware) | per R2-COMPILE §4 (`xtensa-esp32s3-espidf`, `riscv32imac-esp-espidf`, …) | `no_std` static lib linked into the flashed image |
+| `nif` | BEAM (workstation) | host triple | `std` cdylib via `r2-nif` wrapper |
+| `web` | Browser (WASM hive) | `wasm32-unknown-unknown` | Static bundle served by R2-WEB per R2-PLUGIN §13 |
+
+Each key **MUST** be either `false` (mode not supported) or an inline table:
 
 ```toml
-# A sensor driver — MCU only.
 [modes]
 aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
 nif = false
 web = false
-
-# A crypto primitive — works everywhere.
-[modes]
-aot = { targets = ["esp32-s3", "esp32-c6", "linux-embedded"], no_std = true }
-nif = { targets = ["linux-embedded", "server"] }
-web = { targets = ["wasm32-unknown-unknown"] }
-
-# A webapp dashboard — browser only.
-[modes]
-aot = false
-nif = false
-web = { targets = ["wasm32-unknown-unknown"], bundler = "wasm-pack", graphql_fragment = "graphql/schema.graphql" }
 ```
 
-For webapp plugins (category `webapp`), `[modes.web]` MAY carry extra keys:
+For `web` mode (webapp plugins), `[modes.web]` **MAY** carry additional keys: `bundler` (default `"wasm-pack"`), `graphql_fragment` (path to schema fragment per R2-PLUGIN §13.7), `mount` (URL mount, default `/plugin/<plugin-name>`).
 
-| Key | Purpose |
-|---|---|
-| `bundler` | Which build tool emits the bundle (`wasm-pack`, `trunk`, `esbuild`, …). Default `wasm-pack`. |
-| `graphql_fragment` | Path (relative to plugin dir) of a GraphQL schema fragment per R2-PLUGIN §13.7. |
-| `mount` | Default URL mount; can be overridden per R2-PLUGIN §13.2. Default: `/plugin/<plugin-name>`. |
+#### 5.3.3 `[commands]` — REQUIRED for plugins with a command interface
 
-#### 4.3.2 The `assets/` directory (webapp plugins only)
+A flat map of `<command-name> = <opcode>` per R2-PLUGIN §12.3. Opcodes **MUST** be unique within a plugin. Each command **MUST** have a matching opcode constant in `src/lib.rs` (Stage 2).
 
-Required when `[modes.web]` is declared. Holds the static bundle content per R2-PLUGIN §13.3:
+#### 5.3.4 `[capabilities]` — REQUIRED
 
-```
-assets/
-  index.html                  # REQUIRED — bundle root
-  app.js                      # JS entry (loads the .wasm)
-  styles.css
-  images/                     # optional
-  …
-```
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `provides` | array&lt;string&gt; | **REQUIRED** | Capability strings the plugin supplies (`ai.reality2.cap.*`). |
+| `requires` | array&lt;string&gt; | **REQUIRED** | Capabilities the plugin needs at runtime (hardware via `r2.hw.*` or other plugins via `ai.reality2.*`). |
 
-`wasm-pack` (or the configured bundler) emits the .wasm + glue JS into a `dist/` subdirectory at build time, which the compiler plugin copies alongside the `assets/` content into the bundle directory the orchestrator hands to R2-WEB.
+#### 5.3.5 `[events]` — REQUIRED
 
-`assets/` MUST NOT contain symlinks that escape it (R2-PLUGIN §13.3). The compiler plugin rejects such builds.
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `handled` | array&lt;string&gt; | **REQUIRED** | Event-name strings the plugin processes. **MAY** be `[]` if the plugin is purely command-driven (method-style). |
+| `emitted` | array&lt;string&gt; | **REQUIRED** | Event-name strings the plugin produces. **MAY** be `[]`. |
 
-#### 4.3.3 Conformance checks (run at sync + composition time)
+#### 5.3.6 `[credentials]` — RECOMMENDED
 
-1. `plugin.toml` parses cleanly with all REQUIRED fields per R2-PLUGIN §12.3.
-2. `Cargo.toml` declares feature flags matching every declared mode (e.g. `[features] aot = []`, `web = []`, `nif = ["std"]`); they MUST be mutually exclusive per R2-PLUGIN §12.5.
-3. `src/lib.rs` exports a type implementing `r2_engine::plugin::Plugin` (for `aot` and `nif`) and/or `wasm-bindgen` entry points (for `web`).
-4. `PLUGIN.md` contains all 10 mandatory sections per R2-PLUGIN §12.8.
-5. Every command listed in `plugin.toml` `[commands]` has a matching opcode constant in `src/lib.rs`.
-6. Every datasheet referenced in `PLUGIN.md` §7 exists under `datasheets/`.
-7. For `web` mode: `assets/index.html` exists (R2-PLUGIN §13.3).
-8. No symlinks escape `assets/`.
+A descriptive table listing per-call credential requirements (KeyHolder, member, none). Format follows R2-PLUGIN §12.3 — verifiers consult this to pre-check capability before dispatching commands.
 
-### 4.4 Nested sentants (`catalogue/ensembles/<name>/sentants/`)
+#### 5.3.7 `[notes]` — OPTIONAL
 
-```
-sentants/<Name>/
-  sentant.yaml                # REQUIRED — R2-DEF §2 schema
-  SENTANT.md                  # REQUIRED — narrative + FSM diagram (Mermaid recommended)
-  AI-CONTEXT.md               # REQUIRED
-  conversation/               # REQUIRED — authoring transcripts
-  examples/                   # OPTIONAL — example invocations / event sequences
-```
+Free-form `gotchas` array (same convention as boards in §3.3.8).
 
-`<Name>` is PascalCase and MUST equal `sentant.name`.
-
-Additional r2-compiler checks:
+#### 5.3.8 Validation
 
 | Rule | Error |
 |---|---|
+| `plugin.name` equals the directory name | `E_PLUG_NAME` |
+| `plugin.category` is in R2-PLUGIN §12.2 | `E_PLUG_CATEGORY` |
+| `plugin.status` is `"ready"` for any plugin selected for a compile | `E_PLUG_NOT_READY` |
+| At least one `[modes]` entry is **not** `false` | `E_PLUG_NO_MODE` |
+| For Stage 2: `Cargo.toml` declares feature flags matching declared modes, mutually exclusive per R2-PLUGIN §12.5 | `E_PLUG_FEATURES` |
+| For Stage 2: `src/lib.rs` exports a type implementing `r2_engine::plugin::Plugin` (aot/nif) and/or `wasm-bindgen` entry points (web) | `E_PLUG_TRAIT` |
+| Every `[commands]` entry has a matching opcode constant in `src/lib.rs` (Stage 2) | `E_PLUG_COMMAND_CONST` |
+| Every datasheet referenced in `PLUGIN.md` §7 exists under `datasheets/` (Stage 2) | `E_PLUG_DS` |
+| For `web` mode (Stage 2): `assets/index.html` exists; no symlinks escape `assets/` | `E_PLUG_WEB_ASSETS` |
+
+### 5.4 `PLUGIN.md` — REQUIRED narrative
+
+Defers to R2-PLUGIN §12.8. PLUGIN.md **MUST** contain all 10 numbered sections in this exact order:
+
+```
+# <slug>
+## 1. Purpose
+## 2. Modes & Platforms
+## 3. Events Handled
+## 4. Events Emitted
+## 5. Configuration
+## 6. Example Sentants
+## 7. Hardware / Host Requirements
+## 8. Credentials
+## 9. Known Limitations
+## 10. Changelog
+```
+
+Sections **MAY** be amplified (e.g. `## 3. Events Handled (Inbound)`) but the numbering + order **MUST** be preserved.
+
+### 5.5 `AI-CONTEXT.md` — REQUIRED fresh-CC brief
+
+Opens with an `# H1` heading `AI-CONTEXT.md — <plugin slug>`.
+
+REQUIRED `## H2` sections in this order:
+
+1. **`## Purpose`** — one paragraph.
+2. **`## Class + status`** — category, FNV hash, mode set, status (`metadata-only` / `ready`).
+3. **`## Where the canonical artefact lives`** — `plugin.toml`.
+4. **`## Capability surface`** — `[capabilities].provides` + `requires` summary.
+5. **`## Where this plugin lives`** — ensemble-owned vs hive-shared-singleton vs core-crate; rationale.
+6. **`## Vendor refs`** — datasheets / SDK references; filenames under `datasheets/` if present.
+7. **`## Swap pairs`** — other plugins providing the same capability per R2-PLUGIN §10 (e.g. `lis2dh` for `adxl355`).
+8. **`## Known gotchas`** — concise list.
+9. **`## Read these files in this order (cold-start resume)`** — ordered file list.
+10. **`## Authoring status`** — completion state, source-extraction status.
+
+## 6. Sentants
+
+### 6.1 Directory layout
+
+```
+catalogue/ensembles/<ensemble>/sentants/<Name>/
+  sentant.yaml                # REQUIRED — canonical artefact (§6.3)
+  SENTANT.md                  # REQUIRED — narrative (§6.4)
+  AI-CONTEXT.md               # REQUIRED — fresh-CC brief (§6.5)
+  examples/                   # OPTIONAL — example event sequences / FSM traces
+  material/                   # OPTIONAL — raw uploads awaiting processing
+  conversation/               # REQUIRED ≥1 — authoring transcripts
+    YYYY-MM-DD-<topic>-NN.md
+```
+
+The directory name **MUST** be PascalCase and **MUST** equal `sentant.name`. Sentants live exclusively inside an ensemble; there is no top-level sentant tree.
+
+### 6.2 Class string and hash
+
+A sentant's R2 class string is the `class:` field in `sentant.yaml` (reverse-DNS per R2-CAP §3). The class hash is `FNV-1a-32(class_string_utf8_bytes)`; `sentant.yaml` **SHOULD NOT** include a hard-coded hash.
+
+### 6.3 `sentant.yaml` — REQUIRED canonical artefact
+
+Conforms to R2-DEF §2. The top-level key **MUST** be `sentant:`. The orchestrator **MUST** run R2-DEF §2 load-time validation in addition to the rules below.
+
+#### 6.3.1 Keys under `sentant:` — REQUIRED
+
+| Key | Type | Status | Notes |
+|---|---|---|---|
+| `name` | string | **REQUIRED** | PascalCase. **MUST** equal the directory name. |
+| `class` | string | **REQUIRED** | Reverse-DNS class string per R2-CAP §3. |
+| `description` | string | **REQUIRED** | Paragraph. |
+| `storage` | string | **REQUIRED** | One of `ephemeral`, `durable`, `durable-state`. |
+| `data` | mapping | **REQUIRED** if `storage = durable-state`, otherwise **OPTIONAL** | Initial values for state variables persisted across reboots. |
+| `plugins` | array | **OPTIONAL** | Plugin references — each entry is `{name: <slug>}` OR `{capability: <cap-string>}` per R2-PLUGIN §10. **MAY** be absent for sentants that emit/consume only and don't drive plugins. |
+| `automations` | array | **REQUIRED**, **MUST** have ≥1 entry | State machine definition per R2-DEF §2.4. Each automation **MUST** have a `name` (typically `main`) and a `transitions` array. |
+
+#### 6.3.2 `automations[].transitions[]` schema
+
+Each transition declares: `from`, `event`, `to`, optional `to_states` (multi-target), optional `actions[]`, optional `guards[]`. Actions support `{plugin, command, parameters}` for plugin calls and `{command: "send", parameters: {event, …}}` for bus emissions per R2-DEF §2.5.
+
+#### 6.3.3 Validation
+
+| Rule | Error |
+|---|---|
+| `sentant.name` equals the directory name | `E_SENT_NAME` |
+| `sentant.class` follows R2-CAP §3 reverse-DNS convention | `E_SENT_CLASS` |
+| `storage = durable-state` ⇒ `data` is present and non-empty | `E_SENT_DATA_MISSING` |
 | Compilable subset per R2-COMPILE §3.1 (for AOT targets) — no API plugins, no dynamic sentant creation, no swarm loading | `E_SENT_NOT_COMPILABLE` |
-| Every `plugin:` reference resolves to a plugin under this ensemble's `plugins/`, the carrier's `plugins/`, or a core crate | `E_SENT_PLUGIN_UNRESOLVED` |
+| Every `plugin:` reference resolves to (this ensemble's `plugins/`) ∪ (any carrier's `plugins/`) ∪ (`crates/r2-plugin-*`) | `E_SENT_PLUGIN_UNRESOLVED` |
+| Every `capability:` reference resolves to **at least one** plugin in scope providing that capability | `E_SENT_CAP_UNRESOLVED` |
 
-### 4.5 `AI-CONTEXT.md` (per ensemble)
+### 6.4 `SENTANT.md` — REQUIRED narrative
 
-MUST contain:
+A SENTANT.md **MUST** open with an `# H1` heading `<Name> sentant`.
 
-1. **Purpose** — one paragraph.
-2. **Class + version** — quoted from `ensemble.yaml`.
-3. **Where the canonical artefact lives** — `ensemble.yaml`.
-4. **Composition summary** — sentants + plugins listed in plain language; reference each `sentants/<Name>/AI-CONTEXT.md` and `plugins/<cat>/<name>/AI-CONTEXT.md`.
-5. **Compile targets** — which carriers this ensemble works on.
-6. **Known coupling** — other ensembles in the catalogue this one interacts with (entanglement, shared events).
-7. **Read these files in this order** for a fresh CC session.
+The following `## H2` sections **MUST** appear in this order:
 
-## 5. Hive-shared singleton plugins on a carrier (`catalogue/boards/<carrier>/plugins/`)
+| Section | Status | Purpose |
+|---|---|---|
+| `## Purpose` | **REQUIRED** | One paragraph — what role this sentant plays in the ensemble. |
+| `## FSM` | **REQUIRED** | State diagram + transition descriptions. **RECOMMENDED**: Mermaid `stateDiagram-v2`. If the sentant has no FSM beyond `start → idle` (one-shot / always-on / pure-emitter), state that explicitly. |
+| `## Plugins used` | **REQUIRED** | One row per plugin or capability reference — by name or capability — with role. **MAY** be "(none — pure router)" for sentants that emit/consume only. |
+| `## Events emitted / consumed` | **REQUIRED** | Lists with one line per event name + one-sentence purpose. |
+| `## Reference` | **REQUIRED** | Pointers into upstream specs (R2-DEF, R2-WORKSHOP-SENSOR, etc.) and sibling sentants. |
+| `## Authoring status` | **REQUIRED** | Completion state. |
 
-Per R2-ENSEMBLE §2.1.2, transports and other "one per hive" resources (BLE radio, WiFi radio, R2-WEB, audio mixer) belong to the carrier, not to any single ensemble. They live under the board entry's `plugins/` subtree.
+The following sub-sections are **OPTIONAL** and **SHOULD** appear between `## Reference` and `## Authoring status` when relevant:
 
-Same layout as §4.3 (a plugin is a plugin). The orchestrator's compose-step resolves an ensemble's `requires:` against (this ensemble's plugins) ∪ (the chosen carrier's plugins) ∪ (core plugins in `crates/`).
+- `## Storage semantics` — for `durable-state` sentants, what's persisted and why.
+- `## Context exposed` — for sentants that populate the hive context (Identity, …).
+- `## Health behaviour` — for sentants with degraded-mode fall-backs.
+- `## FSM gotchas` — non-obvious transition rules, framing edge-cases.
+- `## Platform-extension tokens` — bindings into the per-carrier firmware (`{{platform.*}}` Tera tokens).
+- `## AOT compilation notes` — sentant-specific R2-COMPILE §3.1 considerations.
 
-## 6. Authoring flow (normative — referenced from SPEC-R2-COMPILER §7)
+### 6.5 `AI-CONTEXT.md` — REQUIRED fresh-CC brief
 
-When the operator initiates `r2.compiler.author.start{kind, description}`, the orchestrator's `the Author sentant (calling the `claude-code` plugin)` MUST:
+Opens with an `# H1` heading `AI-CONTEXT.md — <Name>`.
 
-1. **Create the entry directory** per §3.1 / §4.1 — empty, just the shell.
-2. **Spawn `claude -p`** with the entry's parent directory as cwd + a system prompt template from `orchestrator/prompts/author-<kind>.md` that cites the relevant upstream spec.
+REQUIRED `## H2` sections in this order:
+
+1. **`## Purpose`** — one paragraph.
+2. **`## Class + storage`** — class string, FNV hash, storage mode, and initial `data` snapshot for durable-state sentants.
+3. **`## Where the canonical artefact lives`** — `sentant.yaml`.
+4. **`## FSM at a glance`** — state list + one-line trigger summary per transition.
+5. **`## Plugins / capabilities used`** — name + role.
+6. **`## Events`** — emitted + consumed lists.
+7. **`## Substrate vs domain`** — explicitly flag whether this sentant is reusable substrate or deployment-specific domain logic (per the rocker-sensor convention).
+8. **`## Known gotchas`** — concise list.
+9. **`## Read these files in this order (cold-start resume)`** — ordered file list.
+10. **`## Authoring status`** — completion state.
+
+## 7. Authoring flow (normative — referenced from SPEC-R2-COMPILER §7)
+
+**This document IS the authoring brief.** §3 (Boards), §4 (Ensembles), §5 (Plugins), and §6 (Sentants) each define a kind's REQUIRED schema, file shape, narrative structure, and AI-CONTEXT.md structure. When the operator initiates `r2.compiler.author.start{kind, description}`, the orchestrator's Author sentant (calling the `claude-code` plugin) constructs a brief from these sections and dispatches it to the AI — there is no separate authoring document.
+
+When the operator initiates `r2.compiler.author.start{kind, description}`, the Author sentant **MUST**:
+
+1. **Create the entry directory** per §3.1 / §4.1 / §5.2 / §6.1 — empty, just the shell.
+2. **Spawn `claude -p`** with the entry's parent directory as cwd + a Tera-rendered brief from `orchestrator/prompts/author-<kind>.md.tera`. The brief **MUST** splice in the matching SPEC-CATALOGUE-LAYOUT section verbatim — §3 for boards, §4 for ensembles, §5 for plugins, §6 for sentants — plus a pointer to one canonical example already in the catalogue to imitate.
 3. **Stream the agent's clarifying questions** via `r2.compiler.author.prompt` to the operator. Operator replies via `r2.compiler.author.reply`.
-4. **Allow the agent to use WebFetch** for vendor datasheets and Write for files under the new entry directory ONLY. Writes outside MUST be surfaced to the operator, not silently performed.
-5. **Inside an ensemble authoring session**, the operator MAY further request "add a new plugin/sentant to this ensemble" — the the Author sentant (calling the `claude-code` plugin) spawns a nested authoring flow scoped to `catalogue/ensembles/<name>/plugins/...` or `.../sentants/...`.
-6. **On completion**, validate against §3.2 / §4.2 / §4.3 / §4.4. On failure, re-enter the loop with the validation error surfaced to the operator. On success, emit `r2.compiler.author.done`.
-7. **On error/abandonment**, run the §7 decommission flow before emitting `r2.compiler.author.error`.
+4. **Allow the agent to use WebFetch** for vendor datasheets and Write for files under the new entry directory ONLY. Writes outside **MUST** be surfaced to the operator, not silently performed.
+5. **Inside an ensemble authoring session**, the operator **MAY** further request "add a new plugin/sentant to this ensemble" — the Author sentant spawns a nested authoring flow scoped to `catalogue/ensembles/<name>/plugins/...` or `.../sentants/...`.
+6. **On completion**, validate against the spec's validation table for the kind (§3.3.9 / §4.3.4 / §5.3.8 / §6.3.3). On failure, re-enter the loop with the validation error surfaced to the operator. On success, emit `r2.compiler.author.done`.
+7. **On error/abandonment**, run §8 (decommission) before emitting `r2.compiler.author.error`.
 
-### 6.1 New-board flow
+### 7.1 Brief templates
 
-System prompt: `orchestrator/prompts/author-board.md`. Cites R2-COMPILE §4, R2-BUILD §2, R2-HW. Outputs: `board.toml`, `BOARD.md`, `templates/*`, `datasheets/*`, `AI-CONTEXT.md`, `conversation/*`.
+| Kind | Template path | Spec section to splice |
+|---|---|---|
+| `board` | `orchestrator/prompts/author-board.md.tera` | §3 |
+| `ensemble` | `orchestrator/prompts/author-ensemble.md.tera` | §4 |
+| `plugin` | `orchestrator/prompts/author-plugin.md.tera` | §5 |
+| `sentant` | `orchestrator/prompts/author-sentant.md.tera` | §6 |
 
-### 6.2 New-ensemble flow
+Each brief **MUST** include:
 
-System prompt: `orchestrator/prompts/author-ensemble.md`. Cites R2-ENSEMBLE, R2-DEF §7. Outputs: `ensemble.yaml`, `ENSEMBLE.md`, optionally seed sentants/plugins, `AI-CONTEXT.md`, `conversation/*`. The agent SHOULD ask whether the operator wants to start with a copy of an existing ensemble (e.g. fork rocker-sensor).
+- The full RFC 2119 schema for the kind (the relevant §3 / §4 / §5 / §6).
+- A pointer to one canonical existing entry to imitate (board → `esp32-c6-dfr1117`, ensemble → `rocker-sensor`, plugin → `sensor/adxl355`, sentant → `Accelerometer`).
+- The operator's request (free text — provided in the `description` field of `r2.compiler.author.start`).
+- The applicable upstream-R2 spec citations (R2-COMPILE §4 + R2-BUILD §2 for boards, R2-ENSEMBLE + R2-DEF §7 for ensembles, R2-PLUGIN §12 + §13 for plugins, R2-DEF §2 + R2-COMPILE §3.1 for sentants).
+- A list of files the AI **MUST** produce, with a one-line purpose per file.
 
-### 6.3 New-plugin / new-sentant flow (always inside an ensemble or board)
+### 7.2 Scope enforcement
 
-System prompts: `orchestrator/prompts/author-plugin.md`, `orchestrator/prompts/author-sentant.md`. These are NEVER invoked at top level — the operator must first have an ensemble (or carrier) open as the scope. The agent enforces this by examining the cwd.
+The plugin and sentant authoring flows are NEVER invoked at top level — they **MUST** be scoped to an existing ensemble (or, for hive-shared plugins, an existing carrier board). The Author sentant enforces this by examining `cwd` before dispatch and refuses to start a nested flow without an open scope.
 
-## 7. Decommissioning
+## 8. Decommissioning
 
 Removing a catalogue entry requires:
 
@@ -466,7 +692,7 @@ Removing a catalogue entry requires:
 2. A `conversation/YYYY-MM-DD-decommission-<topic>-NN.md` transcript documenting the reason.
 3. `git rm -r catalogue/<branch>/<entry>/` — NOT soft-delete via renaming.
 
-## 8. Conformance
+## 9. Conformance
 
 A `catalogue/` tree conforms when:
 
@@ -479,10 +705,11 @@ The orchestrator's `catalogue plugin` MUST report any non-conforming entry as `d
 
 ---
 
-## 9. Change log
+## 10. Change log
 
 | Date | Version | Change |
 |---|---|---|
 | 2026-05-31 | 0.1 | Initial draft. Three-branch catalogue (boards/plugins/sentants). |
 | 2026-05-31 | 0.2 | **Restructured to two-part canvas model** per `[[feedback-two-part-canvas]]`. Plugins and sentants are no longer top-level catalogue trees — they live inside ensembles (ensemble-owned) or boards (hive-shared singletons). Always-available infrastructure including the crypto plugin lives in `crates/`. |
 | 2026-06-01 | 0.3 | **§3 (Boards) rewritten** as the canonical board-authoring spec, with RFC 2119 (BCP 14) normative keywords throughout. Full `board.toml` schema documented (every section + key with REQUIRED / OPTIONAL / CONDITIONAL status); canonical BOARD.md + AI-CONTEXT.md section structure; canonical `templates/` file list; expanded validation rules. Authored by reading the three existing carrier entries (esp32-s3-devkitc, esp32-s3-xiao, esp32-c6-dfr1117) and codifying the conventions they collectively used. Sweep of those three entries to bring them into full conformance committed alongside this revision. |
+| 2026-06-01 | 0.4 | **§4 (Ensembles), §5 (Plugins), §6 (Sentants) rewritten** as canonical authoring specs alongside §3 (Boards), with RFC 2119 normative keywords throughout. Full `ensemble.yaml`, `plugin.toml`, `sentant.yaml` schemas documented. Canonical `ENSEMBLE.md` + `PLUGIN.md` (defers to R2-PLUGIN §12.8) + `SENTANT.md` section structures. Per-kind `AI-CONTEXT.md` structures. Plugin two-stage lifecycle (`metadata-only` vs `ready`) codified with a REQUIRED `[plugin].status` field. §7 (Authoring flow) rewritten to make the spec-as-brief connection explicit — the Author sentant splices the relevant SPEC-CATALOGUE-LAYOUT section into the Tera-rendered prompt, so this document IS the authoring instruction document for the AI. Renumbered §6 (Authoring) → §7, §7 (Decommissioning) → §8, §8 (Conformance) → §9, §9 (Change log) → §10. |
