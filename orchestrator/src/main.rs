@@ -12,6 +12,7 @@
 //! Author / Deploy / Sync / Tg / Catalogue / Apiary sentants + their
 //! plugins per SPEC-R2-COMPOSER §3.
 
+mod apiary;
 mod bridge;
 mod hive;
 mod plugins;
@@ -34,8 +35,11 @@ use serde::Serialize;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 use tracing::{info, warn};
 
+use apiary::ApiaryState;
 use bridge::{envelope_to_queued, queued_to_envelope, WireEnvelope};
 use hive::EngineHandle;
+
+use std::sync::Arc;
 
 #[derive(Debug, Parser)]
 #[command(version, about = "r2-composer workstation orchestrator hive")]
@@ -59,6 +63,10 @@ struct Cli {
 #[derive(Clone)]
 struct AppState {
     apiary_path: Option<PathBuf>,
+    /// Cached apiary state — populated at startup when `--apiary` is set.
+    /// Sent to each /r2 client as `r2.composer.apiary.active` right after
+    /// the hello so the webapp's apiary canvas hydrates without polling.
+    apiary_state: Option<Arc<ApiaryState>>,
     engine: EngineHandle,
 }
 
@@ -86,20 +94,45 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| PathBuf::from("."));
     info!("repo root:   {}", repo_root.display());
 
-    if let Some(ap) = cli.apiary.as_ref() {
-        info!("apiary:      {}", ap.display());
+    // Resolve the apiary path. If `--apiary` is a bare name with no
+    // separator, prepend the repo's `apiaries/` directory so the user
+    // can pass `--apiary rocker-rig` rather than the full path.
+    let apiary_path = cli.apiary.as_ref().map(|p| {
+        if p.components().count() == 1 {
+            repo_root.join("apiaries").join(p)
+        } else {
+            p.clone()
+        }
+    });
+
+    let apiary_state = if let Some(ap) = apiary_path.as_ref() {
+        match apiary::load(ap) {
+            Ok(state) => {
+                info!(
+                    "apiary:      {} ({} role-ensembles, {} targets)",
+                    ap.display(),
+                    state.roles.len(),
+                    state.roles.iter().map(|r| r.targets.len()).sum::<usize>(),
+                );
+                Some(Arc::new(state))
+            }
+            Err(e) => {
+                warn!("apiary load failed for {}: {e}", ap.display());
+                None
+            }
+        }
     } else {
-        warn!(
-            "apiary:      (none open — open via the webapp's apiary switcher when Phase 1.7+ lands)"
-        );
-    }
+        warn!("apiary:      (none open — pass --apiary <name> or open via the webapp)");
+        None
+    };
 
     // Spawn the engine thread.
     let engine = hive::spawn();
     info!("engine thread spawned");
 
     let state = AppState {
-        apiary_path: cli.apiary.clone(),
+        apiary_path,
+        apiary_state,
         engine,
     };
 
@@ -151,10 +184,14 @@ async fn websocket_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket, state.engine))
+    ws.on_upgrade(|socket| handle_socket(socket, state.engine, state.apiary_state))
 }
 
-async fn handle_socket(mut socket: WebSocket, engine: EngineHandle) {
+async fn handle_socket(
+    mut socket: WebSocket,
+    engine: EngineHandle,
+    apiary_state: Option<Arc<ApiaryState>>,
+) {
     info!("/r2 client connected");
 
     let mut outbound_rx = engine.subscribe_outbound();
@@ -170,6 +207,19 @@ async fn handle_socket(mut socket: WebSocket, engine: EngineHandle) {
         .is_err()
     {
         return;
+    }
+
+    // Emit the active apiary state right after hello so the webapp's
+    // canvas hydrates without polling.
+    if let Some(ap) = apiary_state.as_ref() {
+        let env = WireEnvelope::Event {
+            name: "r2.composer.apiary.active".into(),
+            payload: serde_json::to_value(ap.as_ref()).unwrap_or(serde_json::Value::Null),
+        };
+        let text = serde_json::to_string(&env).unwrap_or_else(|_| "{}".into());
+        if socket.send(Message::Text(text.into())).await.is_err() {
+            return;
+        }
     }
 
     loop {

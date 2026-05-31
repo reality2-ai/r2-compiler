@@ -890,6 +890,11 @@ function handleEnvelope(env) {
 }
 
 function onEvent(name, payload) {
+  // Apiary state hydration → apiary canvas
+  if (name === "r2.composer.apiary.active") {
+    onApiaryActive(payload);
+    return;
+  }
   // Author flow → chat pane
   if (name.startsWith("r2.composer.author.")) {
     onAuthorEvent(name, payload);
@@ -1352,16 +1357,45 @@ const MOCK_APIARY = {
   ],
 };
 
+// Live apiary state. Starts as MOCK_APIARY so the canvas has something
+// to render even before the orchestrator emits `r2.composer.apiary.active`.
+// When the orchestrator IS launched with `--apiary <name>`, it sends the
+// real state right after hello and we swap.
+let apiaryState = MOCK_APIARY;
+let apiaryIsLive = false;
+
 function attachApiaryCanvas() {
-  renderApiaryHeader(MOCK_APIARY);
-  renderApiaryRoles(MOCK_APIARY);
-  renderApiarySummary(MOCK_APIARY);
+  renderApiaryAll();
 
   $("apiary-compile-all").addEventListener("click", () => {
     // C-3 will fire r2.composer.apiary.build.start here.
-    consoleLine("sys", `(mock) compile-all clicked — ${countTargets(MOCK_APIARY)} targets would dispatch`);
+    const tag = apiaryIsLive ? "" : "(mock) ";
+    consoleLine("sys", `${tag}compile-all clicked — ${countTargets(apiaryState)} targets would dispatch`);
     switchTab("build");
   });
+}
+
+function renderApiaryAll() {
+  renderApiaryHeader(apiaryState);
+  renderApiaryRoles(apiaryState);
+  renderApiarySummary(apiaryState);
+  // Update the mode-hint chip to reflect whether we're live or mocked.
+  const hint = $("mode-hint");
+  if (hint) {
+    hint.innerHTML = apiaryIsLive
+      ? `live · <code>${escape(apiaryState.name)}</code>`
+      : `v0.1 mock — open an apiary later via <code>r2.composer.apiary.open</code>`;
+  }
+}
+
+// Called from the /r2 onEvent dispatch when the orchestrator emits
+// `r2.composer.apiary.active`.
+function onApiaryActive(payload) {
+  if (!payload || typeof payload !== "object") return;
+  apiaryState = payload;
+  apiaryIsLive = true;
+  renderApiaryAll();
+  consoleLine("sys", `apiary loaded — ${escape(payload.name)} (${countTargets(payload)} targets)`);
 }
 
 function renderApiaryHeader(apiary) {

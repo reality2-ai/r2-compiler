@@ -58,6 +58,9 @@ anyhow     = "1"
 r2-engine = { workspace = true, features = ["alloc", "std", "large-payloads"] }
 r2-fnv    = { workspace = true, features = ["std"] }
 
+[dev-dependencies]
+tempfile = "3"
+
 [profile.release]
 opt-level = "z"
 lto       = true
