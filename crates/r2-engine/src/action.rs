@@ -11,9 +11,18 @@ use crate::sentant::StateId;
 /// Maximum payload size for an action (bytes).
 ///
 /// This bounds the CBOR payload that a sentant can attach to a Send action.
-/// 256 bytes covers most R2 events. Larger payloads (e.g., firmware chunks)
-/// bypass the sentant engine entirely (plugin-to-transport direct path).
+/// 256 bytes covers most R2 events on MCU. Larger payloads (e.g., firmware
+/// chunks) bypass the sentant engine entirely (plugin-to-transport direct
+/// path) on MCU; workstation consumers enable the `large-payloads` feature
+/// (see queue.rs) to bump this to 16 KiB so chat / build / author flows
+/// can carry kilobyte-scale briefs and stream chunks through the bus.
+#[cfg(not(feature = "large-payloads"))]
 pub const MAX_ACTION_PAYLOAD: usize = 256;
+
+/// Maximum payload size for an action (bytes) — large-payloads
+/// workstation build. See the non-feature variant for rationale.
+#[cfg(feature = "large-payloads")]
+pub const MAX_ACTION_PAYLOAD: usize = 4 * 1024;
 
 /// An action produced by a sentant's event handler.
 ///

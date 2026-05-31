@@ -9,6 +9,10 @@ license = "MIT OR Apache-2.0"
 default = ["alloc"]
 alloc = []
 std = ["alloc"]
+# Enlarge MAX_QUEUED_PAYLOAD + MAX_ACTION_PAYLOAD for workstation use
+# (orchestrator etc.) — MCU firmware leaves this off and keeps the
+# 256B caps appropriate for flash + RAM budgets.
+large-payloads = []
 
 [dependencies]
 r2-fnv = { path = "../r2-fnv" }

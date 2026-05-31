@@ -55,7 +55,7 @@ toml       = "0.8"
 anyhow     = "1"
 
 # Vendored R2 protocol crates (Phase 1.7a+ — engine + naming).
-r2-engine = { workspace = true, features = ["alloc", "std"] }
+r2-engine = { workspace = true, features = ["alloc", "std", "large-payloads"] }
 r2-fnv    = { workspace = true, features = ["std"] }
 
 [profile.release]

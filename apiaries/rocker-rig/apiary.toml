@@ -1,0 +1,64 @@
+# rocker-rig apiary — reproduces SPEC-APIARY-COMPOSE §12 worked example.
+# Full [[role_ensembles.targets]] form (not the carriers=[...] shorthand)
+# because the sensor role swaps the accelerometer plugin per carrier.
+
+[apiary]
+name        = "rocker-rig"
+description = "The Reality2 workshop rocker — accelerometer-driven rocker chair people-counter."
+class       = "nz.ac.auckland.rocker"
+version     = "0.2.0"
+created     = "2026-06-01T00:00:00Z"
+
+[tg]
+public_key     = "trust_keys/tg_pub.bin"
+keyholder_path = "~/.config/r2-composer/apiaries/rocker-rig/tg_signer/"
+keyholder_fp   = "<sha256>"                # filled when the TG keypair is generated
+
+# Sensor role: 3 MCU targets. The sensing sentant binds the generic
+# capability; each target picks the concrete plugin (R2-PLUGIN §10 swap).
+[[role_ensembles]]
+role     = "sensor"
+ensemble = "rocker-sensor"
+
+[[role_ensembles.targets]]
+target_type      = "mcu-fw"
+host             = "esp32-s3-devkitc"
+plugin_overrides = { "ai.reality2.cap.accel.triaxial" = "adxl355" }
+
+[[role_ensembles.targets]]
+target_type      = "mcu-fw"
+host             = "esp32-s3-xiao"
+plugin_overrides = { "ai.reality2.cap.accel.triaxial" = "adxl355" }
+
+[[role_ensembles.targets]]
+target_type      = "mcu-fw"
+host             = "esp32-c6-dfr1117"
+plugin_overrides = { "ai.reality2.cap.accel.triaxial" = "lis2dh" }   # C6 carrier swaps to lis2dh
+
+# Controller role: native binary on the workshop linux box.
+[[role_ensembles]]
+role     = "controller"
+ensemble = "rocker-controller"            # TODO: not yet in catalogue
+
+[[role_ensembles.targets]]
+target_type = "native"
+host        = "linux-x86_64"
+
+# Webapp-server role: BEAM release sharing the controller's linux box.
+[[role_ensembles]]
+role     = "webapp-server"
+ensemble = "rocker-webapp-server"         # TODO: not yet in catalogue
+
+[[role_ensembles.targets]]
+target_type     = "beam"
+host            = "linux-x86_64"
+co_located_with = "controller"            # same physical host as the controller hive
+
+# Viewer role: browser WASM bundle, unbounded instances served by webapp-server.
+[[role_ensembles]]
+role     = "viewer"
+ensemble = "rocker-viewer"                # TODO: not yet in catalogue
+
+[[role_ensembles.targets]]
+target_type = "wasm"
+host        = "wasm32-browser"

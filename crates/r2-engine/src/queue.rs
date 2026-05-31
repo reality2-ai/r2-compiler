@@ -16,7 +16,19 @@ use crate::event::EventHash;
 pub const DEFAULT_QUEUE_CAPACITY: usize = 32;
 
 /// Maximum payload bytes per queued event.
+///
+/// 256 bytes is the default — sized for MCU flash + RAM budgets where
+/// every fixed-size buffer matters. Workstation consumers (the
+/// orchestrator) enable the `large-payloads` feature to bump this to
+/// 16 KiB so large chat briefs and structured payloads survive
+/// round-tripping through the bus.
+#[cfg(not(feature = "large-payloads"))]
 pub const MAX_QUEUED_PAYLOAD: usize = 256;
+
+/// Maximum payload bytes per queued event (large-payloads workstation
+/// build). See the non-feature variant for rationale.
+#[cfg(feature = "large-payloads")]
+pub const MAX_QUEUED_PAYLOAD: usize = 4 * 1024;
 
 /// A queued event (owned data).
 #[derive(Clone)]
