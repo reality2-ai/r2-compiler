@@ -39,8 +39,17 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
-use std::sync::{mpsc, OnceLock};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
+
+/// Side-channel slot for delivering a brief from a sentant to this
+/// plugin out-of-band of the bus's `Action::PluginCall { data }`, which
+/// caps at `MAX_ACTION_PAYLOAD = 256` bytes — too small for a real
+/// authoring brief (system prompt + canvas state + chat history + user
+/// message). The sentant `lock().unwrap().replace(brief)` before firing
+/// PluginCall; the plugin's `start()` does `lock().unwrap().take()` to
+/// consume it. Same engine thread, no contention.
+pub type BriefSlot = Arc<Mutex<Option<String>>>;
 
 use r2_engine::plugin::{
     Plugin, PluginCommand, PluginError, PluginId, PluginResponse, PluginResult,
@@ -124,6 +133,8 @@ pub struct ClaudeCodePlugin {
     /// Tests override with `echo` / `printf` against fixtures.
     command_program: String,
     command_args: Vec<String>,
+    /// Out-of-band brief slot for large prompts. See [`BriefSlot`].
+    brief_slot: Option<BriefSlot>,
 }
 
 impl ClaudeCodePlugin {
@@ -149,8 +160,14 @@ impl ClaudeCodePlugin {
     /// `r2.compiler.author.error`. Same subprocess shape; different
     /// event names so the webapp can route the stream into the chat
     /// pane rather than the build console.
-    pub fn new_author(id: PluginId) -> Self {
-        Self::with_events(
+    ///
+    /// `brief_slot` is the out-of-band slot the `AuthorSentant` writes
+    /// the prompt into; the bus's `Action::PluginCall { data }` is
+    /// capped at `MAX_ACTION_PAYLOAD = 256` bytes, far too small for a
+    /// real authoring brief (system prompt + canvas state + chat
+    /// history + user message — kilobytes).
+    pub fn new_author(id: PluginId, brief_slot: BriefSlot) -> Self {
+        let mut p = Self::with_events(
             id,
             "claude",
             vec![
@@ -161,7 +178,9 @@ impl ClaudeCodePlugin {
             "r2.compiler.author.reply",
             "r2.compiler.author.done",
             "r2.compiler.author.error",
-        )
+        );
+        p.brief_slot = Some(brief_slot);
+        p
     }
 
     /// Construct with a custom command (used by tests with fixture scripts).
@@ -197,13 +216,25 @@ impl ClaudeCodePlugin {
             out_buf: Vec::with_capacity(256),
             command_program: program.into(),
             command_args: args,
+            brief_slot: None,
         }
     }
 
-    fn start(&mut self, brief: &[u8]) -> PluginResult {
+    fn start(&mut self, data: &[u8]) -> PluginResult {
         if self.rx.is_some() {
             return PluginResult::Error(PluginError::new(ERR_BUSY, "session already running"));
         }
+        // Pull the brief out of the side-channel slot when configured
+        // (the chat / author flow uses this — bus payload is capped at
+        // 256B, too small for real briefs). Fall back to the bus
+        // payload for the build flow which still fits.
+        let brief: Vec<u8> = self
+            .brief_slot
+            .as_ref()
+            .and_then(|slot| slot.lock().unwrap().take())
+            .map(String::into_bytes)
+            .unwrap_or_else(|| data.to_vec());
+        let brief = brief.as_slice();
         let mut cmd = Command::new(&self.command_program);
         cmd.args(&self.command_args);
         cmd.stdin(Stdio::piped());

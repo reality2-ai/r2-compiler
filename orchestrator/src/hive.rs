@@ -18,6 +18,7 @@
 //! Phase 1.7+ adds the rest of the sentant + plugin set; this scaffold
 //! doesn't change.
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use r2_engine::EventBus;
@@ -62,13 +63,22 @@ pub fn spawn() -> EngineHandle {
         // impl; different event-name configuration at construction time.
         let build_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new(0)));
         info!("engine: registered claude-code plugin for build (id={build_pid})");
-        let author_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new_author(0)));
+
+        // Author brief is delivered through a shared slot rather than
+        // the bus's PluginCall data (which caps at 256B). Both sides
+        // hold a clone of the same Arc<Mutex<Option<String>>>.
+        let author_brief: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let author_pid = bus.register_plugin(Box::new(
+            ClaudeCodePlugin::new_author(0, author_brief.clone())
+        ));
         info!("engine: registered claude-code plugin for author (id={author_pid})");
 
         // Register sentants.
         let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));
         info!("engine: registered Builder sentant (id={build_sid})");
-        let author_sid = bus.register_sentant(Box::new(AuthorSentant::new(author_pid)));
+        let author_sid = bus.register_sentant(Box::new(
+            AuthorSentant::new(author_pid, author_brief)
+        ));
         info!("engine: registered Author sentant (id={author_sid})");
 
         bus.init_all();

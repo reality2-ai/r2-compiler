@@ -24,7 +24,7 @@ use r2_engine::plugin::PluginId;
 use r2_engine::{Action, ActionBuf, Event, EventSource, Sentant, StateId, Target};
 
 use crate::bridge::registry;
-use crate::plugins::claude_code;
+use crate::plugins::claude_code::{self, BriefSlot};
 
 /// Idle → Working → Idle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +37,10 @@ enum State {
 pub struct AuthorSentant {
     state: State,
     author_plugin_id: PluginId,
+    /// Brief delivery slot shared with the `claude-code` plugin
+    /// instance. Bus payload is capped at 256 bytes; real briefs are
+    /// kilobytes, so the brief goes through this slot instead.
+    brief_slot: BriefSlot,
     prompt_hash: u32,
     reply_hash: u32,
     done_hash: u32,
@@ -44,11 +48,12 @@ pub struct AuthorSentant {
 }
 
 impl AuthorSentant {
-    pub fn new(author_plugin_id: PluginId) -> Self {
+    pub fn new(author_plugin_id: PluginId, brief_slot: BriefSlot) -> Self {
         let reg = registry();
         Self {
             state: State::Idle,
             author_plugin_id,
+            brief_slot,
             prompt_hash: reg.hash_of("r2.compiler.author.prompt").unwrap(),
             reply_hash:  reg.hash_of("r2.compiler.author.reply").unwrap(),
             done_hash:   reg.hash_of("r2.compiler.author.done").unwrap(),
@@ -59,14 +64,17 @@ impl AuthorSentant {
 
 impl Sentant for AuthorSentant {
     fn handle_event(&mut self, event: &Event, actions: &mut ActionBuf) {
-        // r2.compiler.author.prompt  →  build brief + dispatch to claude-code
+        // r2.compiler.author.prompt  →  build brief + dispatch to claude-code.
+        // Brief goes into the side-channel slot (bus payload caps at 256B,
+        // way too small); the PluginCall data is just a trigger.
         if event.hash == self.prompt_hash {
             self.state = State::Working;
             let brief = construct_brief(event.payload);
+            *self.brief_slot.lock().unwrap() = Some(brief);
             actions.push(Action::PluginCall {
                 plugin_id: self.author_plugin_id,
                 command: claude_code::CMD_START,
-                data: PayloadBuf::from_slice(brief.as_bytes()),
+                data: PayloadBuf::empty(),
             });
             return;
         }
@@ -196,7 +204,7 @@ mod tests {
 
     #[test]
     fn author_prompt_dispatches_plugin_call() {
-        let mut a = AuthorSentant::new(11);
+        let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         let mut actions = ActionBuf::new();
         let prompt_hash = r2_fnv::fnv1a_32(b"r2.compiler.author.prompt");
         let payload = br#"{"message":"hi","canvas":{"board":"x","ensemble":"y"},"history":[]}"#;
@@ -216,7 +224,7 @@ mod tests {
 
     #[test]
     fn plugin_sourced_reply_rebroadcasts() {
-        let mut a = AuthorSentant::new(11);
+        let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         let mut actions = ActionBuf::new();
         let h = r2_fnv::fnv1a_32(b"r2.compiler.author.reply");
         a.handle_event(&ev(h, b"{}", EventSource::Plugin(0)), &mut actions);
@@ -233,7 +241,7 @@ mod tests {
 
     #[test]
     fn locally_sourced_reply_does_not_rebroadcast() {
-        let mut a = AuthorSentant::new(11);
+        let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         let mut actions = ActionBuf::new();
         let h = r2_fnv::fnv1a_32(b"r2.compiler.author.reply");
         a.handle_event(&ev(h, b"{}", EventSource::Local(0)), &mut actions);
@@ -267,7 +275,7 @@ mod tests {
 
     #[test]
     fn plugin_sourced_done_transitions_to_idle() {
-        let mut a = AuthorSentant::new(11);
+        let mut a = AuthorSentant::new(11, std::sync::Arc::new(std::sync::Mutex::new(None)));
         a.state = State::Working;
         let mut actions = ActionBuf::new();
         let h = r2_fnv::fnv1a_32(b"r2.compiler.author.done");
