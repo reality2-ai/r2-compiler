@@ -200,26 +200,154 @@ main {
   overflow: auto;
 }
 
-.workspace-placeholder {
-  padding: 48px 64px;
-  color: var(--fg-dim);
+/* Canvas — Phase 1.7c. The structured-prompt builder. */
+.canvas {
+  padding: 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
 }
-.workspace-placeholder h2 {
+.canvas.hidden { display: none; }
+.canvas-header h2 {
   color: var(--fg);
   font-family: var(--font-mono);
   font-size: 16px;
   font-weight: 500;
-  margin-top: 0;
+  margin: 0 0 6px;
 }
-.workspace-placeholder p { line-height: 1.6; max-width: 60ch; }
-.workspace-placeholder .hint { color: var(--fg-muted); font-size: 12px; }
-.workspace-placeholder code {
+.canvas-hint { margin: 0; color: var(--fg-muted); font-size: 12px; line-height: 1.5; max-width: 70ch; }
+.canvas-hint code {
   font-family: var(--font-mono);
   background: var(--bg-elevated);
   padding: 1px 6px;
   border-radius: 3px;
+  font-size: 11px;
+}
+
+.canvas-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.canvas-slot {
+  min-height: 160px;
+  border: 2px dashed var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  padding: 16px;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.canvas-slot.over {
+  border-color: var(--accent);
+  background: rgba(121,184,255,0.08);
+  border-style: solid;
+}
+.canvas-slot.filled {
+  border-style: solid;
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.slot-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
   font-size: 12px;
 }
+.slot-kind {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+}
+.slot-kind.board    { color: var(--board); }
+.slot-kind.ensemble { color: var(--ensemble); }
+.slot-hint { font-size: 11px; color: var(--fg-muted); }
+
+.canvas-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tile-title {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.tile-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-dim);
+  line-height: 1.4;
+  max-height: 3em;
+  overflow: hidden;
+}
+.tile-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.tile-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  color: var(--fg-dim);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.tile-remove:hover { color: #ff8a8a; border-color: #ff8a8a; }
+
+.canvas-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+.canvas-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 3px;
+  background: var(--bg-panel);
+  color: var(--fg-muted);
+  margin-right: auto;
+}
+.canvas-status[data-state="ready"]        { color: var(--ensemble); }
+.canvas-status[data-state="incomplete"]   { color: var(--fg-muted); }
+.canvas-status[data-state="disconnected"] { color: #ff8a8a; }
+
+/* Catalogue entries: subtle drag affordance + drag visual */
+.entry { cursor: grab; }
+.entry:active { cursor: grabbing; }
+.entry.dragging { opacity: 0.4; }
 
 /* Entry detail */
 .entry-detail.hidden { display: none; }
@@ -390,6 +518,153 @@ main {
   tab-size: 4;
 }
 
+/* ── Code syntax highlighting ────────────────────────────────────────── */
+.file-viewer-body.rendered-code { /* base monospace stays */ }
+.tok-comment  { color: var(--fg-muted); font-style: italic; }
+.tok-string   { color: var(--ensemble); }
+.tok-key      { color: var(--board); }
+.tok-section  { color: var(--accent); font-weight: 600; }
+.tok-num      { color: var(--sentant); }
+.tok-bool     { color: var(--plugin); }
+.tok-kw       { color: var(--accent); font-weight: 600; }
+.tok-type     { color: var(--board); }
+.tok-attr     { color: var(--plugin); }
+.tok-lifetime { color: var(--sentant); font-style: italic; }
+
+/* ── Markdown rendering ──────────────────────────────────────────────── */
+.file-viewer-body.rendered-md {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: normal;
+  padding: 28px 36px;
+}
+.rendered-md h1, .rendered-md h2, .rendered-md h3,
+.rendered-md h4, .rendered-md h5, .rendered-md h6 {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  margin: 1.6em 0 0.5em;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.rendered-md h1 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 0; }
+.rendered-md h2 { font-size: 16px; }
+.rendered-md h3 { font-size: 14px; }
+.rendered-md h4 { font-size: 13px; color: var(--fg); }
+.rendered-md h5, .rendered-md h6 { font-size: 12px; color: var(--fg-dim); }
+
+.rendered-md p { margin: 0.8em 0; }
+.rendered-md a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--accent-dim);
+}
+.rendered-md a:hover { border-bottom-style: solid; }
+
+.rendered-md ul, .rendered-md ol { margin: 0.6em 0; padding-left: 1.6em; }
+.rendered-md li { margin: 0.25em 0; }
+
+.rendered-md blockquote {
+  border-left: 3px solid var(--border-strong);
+  margin: 0.8em 0;
+  padding: 0.2em 0 0.2em 1em;
+  color: var(--fg-dim);
+}
+
+.rendered-md hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.6em 0;
+}
+
+.rendered-md code.md-code-inline {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--accent);
+}
+
+.rendered-md pre.md-code {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin: 0.9em 0;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rendered-md pre.md-code code {
+  font-family: var(--font-mono);
+  color: var(--fg);
+  background: transparent;
+  white-space: pre;
+  display: block;
+}
+
+.rendered-md table.md-table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 12px;
+}
+.rendered-md table.md-table th,
+.rendered-md table.md-table td {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.rendered-md table.md-table th {
+  background: var(--bg-elevated);
+  color: var(--fg-dim);
+  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rendered-md strong { color: var(--fg); font-weight: 600; }
+.rendered-md em     { color: var(--fg); font-style: italic; }
+
+/* ── CSV rendering ───────────────────────────────────────────────────── */
+.file-viewer-body.rendered-csv {
+  font-family: var(--font-sans);
+  white-space: normal;
+  padding: 20px 24px;
+}
+table.csv-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: var(--bg-panel);
+  margin: 0;
+}
+table.csv-table th,
+table.csv-table td {
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+table.csv-table th {
+  background: var(--bg-elevated);
+  color: var(--fg-dim);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+}
+table.csv-table tbody tr:nth-child(even) { background: var(--bg); }
+table.csv-table tbody tr:hover { background: var(--bg-hover); }
+.csv-meta { margin-top: 8px; font-size: 11px; color: var(--fg-muted); font-family: var(--font-mono); }
+.csv-empty { color: var(--fg-muted); font-style: italic; }
+
 /* Build pane — bottom strip of the workspace, surfaces /r2 WS traffic
  * and the Compile button. Phase 1.7b makes this visible. */
 .build-pane {
@@ -424,17 +699,7 @@ main {
   text-transform: uppercase;
   color: var(--fg-muted);
 }
-.build-controls select {
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border-strong);
-  border-radius: 3px;
-  padding: 4px 8px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  min-width: 180px;
-}
-.build-controls select:focus { outline: 1px solid var(--accent); }
+.build-controls .build-flex { flex: 1; }
 
 .btn-primary, .btn-secondary {
   font-family: var(--font-mono);
@@ -459,7 +724,6 @@ main {
 .btn-secondary:hover { background: var(--bg-hover); color: var(--fg); }
 
 .build-status {
-  margin-left: auto;
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 8px;

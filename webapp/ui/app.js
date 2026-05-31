@@ -59,11 +59,16 @@ let wasmReady = false;
   renderEnsembles(manifest.ensembles);
   attachGlobalHandlers();
 
+  // Phase 1.7c: canvas + drag-and-drop. The catalogue panels become
+  // the drag SOURCES; the canvas in the centre is the drop TARGET;
+  // Compile dispatches the composition over /r2.
+  attachCanvas();
+
   // Phase 1.7b: connect to the orchestrator's /r2 WebSocket and wire
   // the Build pane to it. The catalogue browser above stays
   // fully usable even if the WS fails (e.g. when serving the webapp
   // statically without the orchestrator).
-  populateBuildSelects(manifest);
+  attachBuildPane();
   connectR2();
 })();
 
@@ -101,6 +106,7 @@ function renderBoards(boards) {
   for (const b of boards) {
     const li = document.createElement("li");
     li.className = "entry";
+    li.draggable = true;
     li.dataset.entryKind = "board";
     li.dataset.entrySlug = b.slug;
     li.innerHTML = `
@@ -109,6 +115,8 @@ function renderBoards(boards) {
       <div class="entry-meta">${b.target_triple || ""}</div>
     `;
     li.addEventListener("click", () => showEntry(b, li));
+    li.addEventListener("dragstart", (ev) => onEntryDragStart(ev, li, b, "board"));
+    li.addEventListener("dragend", () => li.classList.remove("dragging"));
     ul.appendChild(li);
   }
 }
@@ -122,6 +130,7 @@ function renderEnsembles(ensembles) {
     const li = document.createElement("li");
     const ensembleEl = document.createElement("div");
     ensembleEl.className = "entry";
+    ensembleEl.draggable = true;
     ensembleEl.dataset.entryKind = "ensemble";
     ensembleEl.dataset.entrySlug = e.slug;
     ensembleEl.innerHTML = `
@@ -130,6 +139,8 @@ function renderEnsembles(ensembles) {
       <div class="entry-meta">${renderClass(e.class)}</div>
     `;
     ensembleEl.addEventListener("click", () => showEntry(e, ensembleEl));
+    ensembleEl.addEventListener("dragstart", (ev) => onEntryDragStart(ev, ensembleEl, e, "ensemble"));
+    ensembleEl.addEventListener("dragend", () => ensembleEl.classList.remove("dragging"));
     li.appendChild(ensembleEl);
 
     if (e.plugins.length || e.sentants.length) {
@@ -198,7 +209,7 @@ function showEntry(entry, listEl) {
   document.querySelectorAll(".entry.selected").forEach((el) => el.classList.remove("selected"));
   if (listEl) listEl.classList.add("selected");
 
-  $("workspace-placeholder").classList.add("hidden");
+  $("canvas").classList.add("hidden");
   $("entry-detail").classList.remove("hidden");
 
   $("detail-kind").className = `kind-chip ${entry.kind}`;
@@ -316,17 +327,399 @@ async function loadFile(f) {
 
   $("viewer-path").textContent = f.path;
   const body = $("viewer-body");
+  body.classList.remove("rendered-md", "rendered-code", "rendered-csv");
   body.textContent = "Loading…";
 
   try {
     const res = await fetch("../" + f.path, { cache: "no-store" });
     if (!res.ok) throw new Error(`fetch ${res.status}`);
-    const text = await res.text();
-    // Truncate truly huge files (defensive — shouldn't happen in practice).
-    body.textContent = text.length > 500_000 ? text.slice(0, 500_000) + "\n\n…[truncated]" : text;
+    let text = await res.text();
+    if (text.length > 500_000) text = text.slice(0, 500_000) + "\n\n…[truncated]";
+
+    // Effective extension: strip suffixes like `.example` / `.sample` /
+    // `.template` so `wifi_config.toml.example` gets the TOML highlighter
+    // (the suffix is just an indication that this is a committable copy,
+    // not a different file shape).
+    const parts = f.name.toLowerCase().split(".");
+    const SUFFIX_PASSTHROUGH = new Set(["example", "exam", "sample", "template", "tmpl", "tpl", "in"]);
+    let ext = parts.pop() || "";
+    while (SUFFIX_PASSTHROUGH.has(ext) && parts.length > 0) {
+      ext = parts.pop();
+    }
+    if (ext === "md") {
+      body.classList.add("rendered-md");
+      body.innerHTML = renderMarkdown(text);
+    } else if (ext === "csv") {
+      body.classList.add("rendered-csv");
+      body.innerHTML = renderCsv(text);
+    } else if (HIGHLIGHTERS[ext]) {
+      body.classList.add("rendered-code");
+      body.innerHTML = renderCode(text, ext);
+    } else {
+      body.textContent = text;
+    }
   } catch (err) {
     body.textContent = `Failed to load ${f.path}\n${err.message}`;
   }
+}
+
+// ── Minimal markdown renderer ─────────────────────────────────────────
+//
+// Hand-rolled to keep the webapp dep-free. Covers the markdown shapes
+// our catalogue + spec docs actually use: ATX headings, fenced code,
+// tables, blockquotes, lists, paragraphs, inline code / bold / italic /
+// links. Not a CommonMark-compliant parser — if a doc needs richer
+// markup, we'll switch to a vendored `marked` build.
+
+function renderMarkdown(src) {
+  const lines = src.split(/\r?\n/);
+  let out = "";
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Fenced code block
+    const fence = line.match(/^```\s*([\w-]*)\s*$/);
+    if (fence) {
+      const lang = fence[1] || "";
+      const buf = [];
+      i++;
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+        buf.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing fence (if present)
+      out += `<pre class="md-code"><code class="lang-${escapeAttr(lang)}">${renderCode(buf.join("\n"), lang)}</code></pre>`;
+      continue;
+    }
+
+    // ATX heading
+    const h = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (h) {
+      const lvl = h[1].length;
+      out += `<h${lvl} class="md-h${lvl}">${renderInline(h[2])}</h${lvl}>`;
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^\s*(-{3,}|_{3,}|\*{3,})\s*$/.test(line)) {
+      out += "<hr class='md-hr'>";
+      i++;
+      continue;
+    }
+
+    // Table — header row, then alignment row, then body rows
+    if (/^\s*\|.+\|\s*$/.test(line)
+        && i + 1 < lines.length
+        && /^\s*\|?\s*:?-{2,}:?(\s*\|\s*:?-{2,}:?)+\s*\|?\s*$/.test(lines[i + 1])) {
+      const headers = splitTableRow(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.+\|\s*$/.test(lines[i])) {
+        rows.push(splitTableRow(lines[i]));
+        i++;
+      }
+      let t = "<table class='md-table'><thead><tr>";
+      for (const c of headers) t += `<th>${renderInline(c)}</th>`;
+      t += "</tr></thead><tbody>";
+      for (const r of rows) {
+        t += "<tr>";
+        for (const c of r) t += `<td>${renderInline(c)}</td>`;
+        t += "</tr>";
+      }
+      t += "</tbody></table>";
+      out += t;
+      continue;
+    }
+
+    // Blockquote
+    if (/^>\s?/.test(line)) {
+      const buf = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        buf.push(lines[i].replace(/^>\s?/, ""));
+        i++;
+      }
+      out += `<blockquote class="md-quote">${renderInline(buf.join(" "))}</blockquote>`;
+      continue;
+    }
+
+    // Unordered list
+    if (/^[-*+]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^[-*+]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^[-*+]\s+/, ""));
+        i++;
+      }
+      out += "<ul class='md-list'>" + items.map((it) => `<li>${renderInline(it)}</li>`).join("") + "</ul>";
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\.\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\d+\.\s+/, ""));
+        i++;
+      }
+      out += "<ol class='md-list'>" + items.map((it) => `<li>${renderInline(it)}</li>`).join("") + "</ol>";
+      continue;
+    }
+
+    // Blank line
+    if (/^\s*$/.test(line)) {
+      i++;
+      continue;
+    }
+
+    // Paragraph — accumulate until blank line or block-starter
+    const buf = [line];
+    i++;
+    while (i < lines.length
+           && !/^\s*$/.test(lines[i])
+           && !/^(#{1,6}\s|>|```|[-*+]\s+|\d+\.\s+|\|.+\|)/.test(lines[i])) {
+      buf.push(lines[i]);
+      i++;
+    }
+    out += `<p>${renderInline(buf.join(" "))}</p>`;
+  }
+  return out;
+}
+
+function renderInline(text) {
+  // Stash inline code spans first so their content is preserved verbatim
+  // and not double-processed by the bold/italic/link substitutions.
+  const codes = [];
+  text = text.replace(/`([^`]+)`/g, (_, c) => {
+    codes.push(c);
+    return `C${codes.length - 1}`;
+  });
+  // Escape everything else
+  text = escapeHtml(text);
+  // Links [text](url) — must run before bold/italic so the brackets/parens
+  // aren't munged.
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, lbl, url) => {
+    return `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${lbl}</a>`;
+  });
+  // Bold **...**
+  text = text.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  // Italic *...* — guarded so `**bold**` isn't matched here too
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+  // Restore code spans
+  text = text.replace(/C(\d+)/g, (_, n) => {
+    return `<code class="md-code-inline">${escapeHtml(codes[parseInt(n, 10)])}</code>`;
+  });
+  return text;
+}
+
+function splitTableRow(line) {
+  return line.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+function escapeAttr(s) {
+  return escapeHtml(s).replaceAll('"', "&quot;");
+}
+
+// ── Code syntax highlighting ──────────────────────────────────────────
+//
+// Minimal per-language tokenisers. Each highlighter returns escaped
+// HTML with <span class="tok-...">...</span> markers; absent languages
+// fall back to plain-text escape. Multiline regexes use the `m` flag
+// so `^` matches at every line start.
+
+const HIGHLIGHTERS = {
+  toml:     renderToml,
+  // ESP-IDF sdkconfig.defaults — same shape as TOML (KEY = value, # comments,
+  // quoted strings, numbers); no [sections], which TOML's regex degrades on
+  // gracefully (no false-positives).
+  defaults: renderToml,
+  cfg:      renderToml,
+  ini:      renderToml,
+  yaml:     renderYaml,
+  yml:      renderYaml,
+  json:     renderJson,
+  rust:     renderRust,
+  rs:       renderRust,
+};
+
+function renderCode(src, lang) {
+  const fn = HIGHLIGHTERS[lang];
+  return fn ? fn(src) : escapeHtml(src);
+}
+
+function tokensToHtml(tokens) {
+  return tokens.map((t) => {
+    const text = escapeHtml(t.text);
+    return t.type === "plain" ? text : `<span class="tok-${t.type}">${text}</span>`;
+  }).join("");
+}
+
+function tokenize(src, re, classify) {
+  const tokens = [];
+  let lastIdx = 0;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    if (m.index === re.lastIndex) { re.lastIndex++; continue; } // zero-length safeguard
+    if (m.index > lastIdx) tokens.push({ type: "plain", text: src.slice(lastIdx, m.index) });
+    const emitted = classify(m);
+    if (emitted) tokens.push(...emitted);
+    lastIdx = re.lastIndex;
+  }
+  if (lastIdx < src.length) tokens.push({ type: "plain", text: src.slice(lastIdx) });
+  return tokens;
+}
+
+function renderToml(src) {
+  const re = /(#[^\n]*)|("(?:[^"\\\n]|\\.)*"|'[^'\n]*')|^(\s*)(\[\[?[^\]\n]+\]\]?)|\b(true|false)\b|\b(-?\d[\d_.eE+\-]*)\b|^(\s*)([A-Za-z0-9_.\-]+)(?=\s*=)/gm;
+  return tokensToHtml(tokenize(src, re, (m) => {
+    if (m[1]) return [{ type: "comment", text: m[1] }];
+    if (m[2]) return [{ type: "string",  text: m[2] }];
+    if (m[4]) return [{ type: "plain",   text: m[3] }, { type: "section", text: m[4] }];
+    if (m[5]) return [{ type: "bool",    text: m[5] }];
+    if (m[6]) return [{ type: "num",     text: m[6] }];
+    if (m[8]) return [{ type: "plain",   text: m[7] }, { type: "key",     text: m[8] }];
+    return [];
+  }));
+}
+
+function renderYaml(src) {
+  const re = /(#[^\n]*)|("(?:[^"\\\n]|\\.)*"|'[^'\n]*')|\b(true|false|null|yes|no|True|False|Null|None)\b|\b(-?\d[\d.eE+\-]*)\b|^(\s*-?\s*)([A-Za-z0-9_./\-]+)(?=:)/gm;
+  return tokensToHtml(tokenize(src, re, (m) => {
+    if (m[1]) return [{ type: "comment", text: m[1] }];
+    if (m[2]) return [{ type: "string",  text: m[2] }];
+    if (m[3]) return [{ type: "bool",    text: m[3] }];
+    if (m[4]) return [{ type: "num",     text: m[4] }];
+    if (m[6]) return [{ type: "plain",   text: m[5] }, { type: "key", text: m[6] }];
+    return [];
+  }));
+}
+
+function renderJson(src) {
+  const re = /("(?:[^"\\]|\\.)*")(\s*:)?|\b(true|false|null)\b|(-?\b\d[\d.eE+\-]*\b)/g;
+  return tokensToHtml(tokenize(src, re, (m) => {
+    if (m[1]) {
+      if (m[2]) return [{ type: "key", text: m[1] }, { type: "plain", text: m[2] }];
+      return [{ type: "string", text: m[1] }];
+    }
+    if (m[3]) return [{ type: "bool", text: m[3] }];
+    if (m[4]) return [{ type: "num",  text: m[4] }];
+    return [];
+  }));
+}
+
+// Rust: keywords, types, lifetimes, strings, char literals, attrs, numbers, comments.
+// Pragmatic — not a full grammar, but covers the visual shape of our plugin/sentant source.
+const RUST_KEYWORDS = new Set([
+  "as","async","await","break","const","continue","crate","dyn","else","enum","extern","false",
+  "fn","for","if","impl","in","let","loop","match","mod","move","mut","pub","ref","return",
+  "self","Self","static","struct","super","trait","true","type","union","unsafe","use","where",
+  "while","yield","box","macro","try",
+]);
+const RUST_TYPES = new Set([
+  "bool","char","i8","i16","i32","i64","i128","isize","u8","u16","u32","u64","u128","usize",
+  "f32","f64","str","String","Vec","Option","Result","Box","Rc","Arc","Cell","RefCell","Mutex",
+  "HashMap","BTreeMap","HashSet","BTreeSet",
+]);
+
+// ── CSV ───────────────────────────────────────────────────────────────
+//
+// CSV gets a real HTML table (not just colour tokens) because that's
+// how a developer expects to read tabular data. The parser handles
+// quoted fields and embedded "" escapes; it does NOT handle multi-line
+// quoted fields (rare in the kinds of CSVs we ship — pinouts, manifests,
+// roster files).
+
+function parseCsv(src) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuote = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (inQuote) {
+      if (c === '"') {
+        if (src[i + 1] === '"') { field += '"'; i++; continue; }
+        inQuote = false;
+        continue;
+      }
+      field += c;
+      continue;
+    }
+    if (c === '"' && field === "") { inQuote = true; continue; }
+    if (c === ",") { row.push(field); field = ""; continue; }
+    if (c === "\r") continue;
+    if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; continue; }
+    field += c;
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function renderCsv(src) {
+  const rows = parseCsv(src);
+  if (rows.length === 0) return "<p class='csv-empty'>(empty)</p>";
+  const [head, ...body] = rows;
+  let html = `<table class="csv-table"><thead><tr>`;
+  for (const c of head) html += `<th>${escapeHtml(c)}</th>`;
+  html += "</tr></thead><tbody>";
+  for (const r of body) {
+    html += "<tr>";
+    for (let i = 0; i < head.length; i++) {
+      html += `<td>${escapeHtml(r[i] ?? "")}</td>`;
+    }
+    html += "</tr>";
+  }
+  html += "</tbody></table>";
+  html += `<p class="csv-meta">${body.length} row${body.length === 1 ? "" : "s"} · ${head.length} column${head.length === 1 ? "" : "s"}</p>`;
+  return html;
+}
+
+function renderRust(src) {
+  // Order matters: comments + strings first so their contents aren't keyword-matched.
+  //
+  // Strings handle every Rust literal form:
+  //   "..."  b"..."         — escape sequences allowed; `\\[\s\S]` (not `\\.`)
+  //                           lets a `\<NL>` line-continuation match (JS `.` rejects \n).
+  //   r"..."  r#"..."#  r##"..."##  r###"..."###    — raw strings, 0–3 hashes
+  //   br"..." br#"..."# etc.                         — byte raw strings
+  //
+  // Raw strings use a lookahead `"(?!#{n})` so an inner `"` only closes the
+  // literal when followed by EXACTLY the matching hash count. Without this,
+  // the previous `r#?"[^"]*"#?` greedy-matched the first inner `"` and
+  // released the rest of the file into "still inside a string" land.
+  //
+  // Lifetime regex deliberately omits \b on either side: `'` isn't a
+  // word character, so `\b` only matches when the preceding char IS a
+  // word char (e.g. `_'static`) — which would miss the common ` 'static`
+  // case. Alternation order (char literal before lifetime) makes the
+  // distinction unambiguous.
+  const re = new RegExp([
+    String.raw`(\/\/[^\n]*|\/\*[\s\S]*?\*\/)`,
+    String.raw`(br###"(?:[^"]|"(?!###))*"###|br##"(?:[^"]|"(?!##))*"##|br#"(?:[^"]|"(?!#))*"#|br"[^"]*"|r###"(?:[^"]|"(?!###))*"###|r##"(?:[^"]|"(?!##))*"##|r#"(?:[^"]|"(?!#))*"#|r"[^"]*"|b"(?:[^"\\]|\\[\s\S])*"|"(?:[^"\\]|\\[\s\S])*")`,
+    String.raw`('(?:[^'\\]|\\.)')`,
+    String.raw`(#!?\[[^\]\n]*\])`,
+    String.raw`('[a-zA-Z_][a-zA-Z0-9_]*)`,
+    String.raw`\b(0x[0-9a-fA-F_]+|0o[0-7_]+|0b[01_]+|\d[\d_.eE+\-]*(?:_?[uif]\d*)?)\b`,
+    String.raw`\b([a-zA-Z_][a-zA-Z0-9_]*)\b`,
+  ].join("|"), "g");
+  return tokensToHtml(tokenize(src, re, (m) => {
+    if (m[1]) return [{ type: "comment", text: m[1] }];
+    if (m[2]) return [{ type: "string",  text: m[2] }];
+    if (m[3]) return [{ type: "string",  text: m[3] }];
+    if (m[4]) return [{ type: "attr",    text: m[4] }];
+    if (m[5]) return [{ type: "lifetime", text: m[5] }];
+    if (m[6]) return [{ type: "num",     text: m[6] }];
+    if (m[7]) {
+      const w = m[7];
+      if (RUST_KEYWORDS.has(w)) return [{ type: "kw",   text: w }];
+      if (RUST_TYPES.has(w))    return [{ type: "type", text: w }];
+      return [{ type: "plain", text: w }];
+    }
+    return [];
+  }));
 }
 
 // ── Misc ──────────────────────────────────────────────────────────────
@@ -336,7 +729,7 @@ function attachGlobalHandlers() {
     currentEntry = null;
     document.querySelectorAll(".entry.selected").forEach((el) => el.classList.remove("selected"));
     $("entry-detail").classList.add("hidden");
-    $("workspace-placeholder").classList.remove("hidden");
+    $("canvas").classList.remove("hidden");
   });
 }
 
@@ -360,7 +753,6 @@ function cssEscape(s) {
   return s.replace(/[^a-zA-Z0-9_\-]/g, "\\$&");
 }
 
-document.querySelector("#workspace-placeholder")?.classList.remove("hidden");
 document.querySelector("#entry-detail")?.classList.add("hidden");
 
 // ── /r2 WebSocket client + Build pane ─────────────────────────────────
@@ -391,11 +783,7 @@ function setR2Status(state, label) {
   dot.classList.remove("ok", "warn", "err");
   dot.classList.add(state);
   lbl.textContent = label;
-  const compileBtn = $("build-compile");
-  if (compileBtn) {
-    const ready = state === "ok" && $("build-board").value && $("build-ensemble").value;
-    compileBtn.disabled = !ready;
-  }
+  refreshCompileButton();
 }
 
 function connectR2() {
@@ -489,48 +877,143 @@ function sendEvent(name, payload) {
   return true;
 }
 
-// ── Build pane ────────────────────────────────────────────────────────
+// ── Canvas (Phase 1.7c) ───────────────────────────────────────────────
+//
+// The canvas is r2-compiler's structured-prompt builder: drag a board
+// + an ensemble onto it; Compile dispatches the composition over /r2.
+// Phase 1.7d adds the AI-chat pane that reads + mutates `canvas`.
 
-function populateBuildSelects(m) {
-  const bsel = $("build-board");
-  const esel = $("build-ensemble");
-  if (!bsel || !esel) return;
-  bsel.innerHTML = '<option value="">— choose —</option>';
-  for (const b of m.boards) {
-    const opt = document.createElement("option");
-    opt.value = b.slug;
-    opt.textContent = `${b.name}  (${b.target_triple || "?"})`;
-    bsel.appendChild(opt);
-  }
-  esel.innerHTML = '<option value="">— choose —</option>';
-  for (const e of m.ensembles) {
-    const opt = document.createElement("option");
-    opt.value = e.slug;
-    opt.textContent = `${e.name}`;
-    esel.appendChild(opt);
-  }
-  const refresh = () => {
-    const ready = r2Ws && r2Ws.readyState === WebSocket.OPEN && bsel.value && esel.value;
-    $("build-compile").disabled = !ready;
-  };
-  bsel.addEventListener("change", refresh);
-  esel.addEventListener("change", refresh);
+// Distinct MIME types so drop zones can validate during dragover
+// (`dataTransfer.getData` is unreadable during dragover for security;
+// only `.types` is observable, so we encode the kind in the MIME).
+const MIME_BOARD = "application/x-r2-board";
+const MIME_ENSEMBLE = "application/x-r2-ensemble";
 
-  $("build-compile").addEventListener("click", () => {
-    const board = bsel.value;
-    const ensemble = esel.value;
-    if (!board || !ensemble) return;
+const canvasState = { board: null, ensemble: null };
+
+function onEntryDragStart(ev, el, entry, kind) {
+  const mime = kind === "board" ? MIME_BOARD : MIME_ENSEMBLE;
+  ev.dataTransfer.setData(mime, JSON.stringify({ slug: entry.slug }));
+  ev.dataTransfer.effectAllowed = "copy";
+  el.classList.add("dragging");
+}
+
+function attachCanvas() {
+  for (const kind of ["board", "ensemble"]) {
+    const slot = $(`canvas-slot-${kind}`);
+    const mime = kind === "board" ? MIME_BOARD : MIME_ENSEMBLE;
+
+    slot.addEventListener("dragover", (ev) => {
+      if (!ev.dataTransfer.types.includes(mime)) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "copy";
+      slot.classList.add("over");
+    });
+    slot.addEventListener("dragleave", () => slot.classList.remove("over"));
+    slot.addEventListener("drop", (ev) => {
+      slot.classList.remove("over");
+      const raw = ev.dataTransfer.getData(mime);
+      if (!raw) return;
+      ev.preventDefault();
+      try {
+        const data = JSON.parse(raw);
+        canvasState[kind] = data.slug;
+        renderCanvas();
+      } catch (err) {
+        consoleLine("err", `drop parse failed: ${err.message}`);
+      }
+    });
+  }
+
+  $("canvas-clear").addEventListener("click", () => {
+    canvasState.board = null;
+    canvasState.ensemble = null;
+    renderCanvas();
+  });
+
+  $("canvas-compile").addEventListener("click", () => {
+    if (!canvasState.board || !canvasState.ensemble) return;
     setBuildStatus("starting");
     const ok = sendEvent("r2.compiler.build.start", {
-      target: board,
-      score: ensemble,
-      // Phase 1.8 adds the Tera-rendered prompt brief in the payload;
-      // for now the claude-code plugin uses its default command per
+      target: canvasState.board,
+      score: canvasState.ensemble,
+      // Phase 1.8 wraps this in a Tera-rendered prompt brief per
       // SPEC-R2-COMPILER §5.
     });
     if (!ok) setBuildStatus("disconnected");
   });
 
+  renderCanvas();
+}
+
+function renderCanvas() {
+  renderCanvasSlot("board", canvasState.board);
+  renderCanvasSlot("ensemble", canvasState.ensemble);
+  refreshCompileButton();
+}
+
+function renderCanvasSlot(kind, slug) {
+  const slot = $(`canvas-slot-${kind}`);
+  if (!slug) {
+    slot.classList.remove("filled");
+    slot.dataset.kind = kind;
+    slot.innerHTML = `
+      <div class="slot-empty">
+        <span class="slot-kind ${kind}">${kind}</span>
+        <span class="slot-hint">drag a ${kind} here</span>
+      </div>`;
+    return;
+  }
+  const entry = lookupEntry(kind, slug);
+  if (!entry) {
+    slot.innerHTML = `<div class="slot-empty"><span>not in manifest: ${escape(slug)}</span></div>`;
+    return;
+  }
+  slot.classList.add("filled");
+
+  const meta = kind === "board"
+    ? `${escape(entry.target_triple || "?")} · ${escape(entry.chip || "?")} · ${entry.flash_size_mb || "?"} MB${entry.psram ? " · psram" : ""}`
+    : `${entry.plugins.length} plugins · ${entry.sentants.length} sentants · ${escape(entry.compile_target || "?")}`;
+
+  slot.innerHTML = `
+    <div class="canvas-tile">
+      <button class="tile-remove" title="Remove" aria-label="Remove">×</button>
+      <span class="kind-chip ${kind}">${kind}</span>
+      <h3 class="tile-title">${escape(entry.name)}</h3>
+      <p class="tile-desc">${escape(firstSentence(entry.description))}</p>
+      <div class="tile-meta">${meta}</div>
+      ${entry.class ? `<div class="tile-meta">${renderClass(entry.class)}</div>` : ""}
+    </div>`;
+  slot.querySelector(".tile-remove").addEventListener("click", () => {
+    canvasState[kind] = null;
+    renderCanvas();
+  });
+}
+
+function lookupEntry(kind, slug) {
+  if (!manifest) return null;
+  if (kind === "board") return manifest.boards.find((b) => b.slug === slug);
+  return manifest.ensembles.find((e) => e.slug === slug);
+}
+
+function refreshCompileButton() {
+  const btn = $("canvas-compile");
+  const status = $("canvas-status");
+  if (!btn || !status) return;
+  const composed = !!(canvasState.board && canvasState.ensemble);
+  const wsOpen = r2Ws && r2Ws.readyState === WebSocket.OPEN;
+  btn.disabled = !(composed && wsOpen);
+  let state, label;
+  if (!composed) { state = "incomplete"; label = "incomplete"; }
+  else if (!wsOpen) { state = "disconnected"; label = "no /r2 connection"; }
+  else { state = "ready"; label = "ready"; }
+  status.dataset.state = state;
+  status.textContent = label;
+}
+
+// ── Build pane ────────────────────────────────────────────────────────
+
+function attachBuildPane() {
   $("build-clear").addEventListener("click", () => {
     $("build-console").textContent = "";
   });

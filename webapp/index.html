@@ -38,21 +38,27 @@
         <!-- Wrapper for placeholder + entry-detail so the Build pane
              can sit beneath them in the column. -->
         <div class="workspace-top">
-        <div class="workspace-placeholder" id="workspace-placeholder">
-          <h2>Workspace</h2>
-          <p>
-            Drag-and-drop canvas will appear here in Phase 2. For now,
-            click an entry on the left or right to inspect it — the
-            entry's structured artefact, narrative, and source files
-            open in the viewer below.
-          </p>
-          <p class="hint">
-            The Build pane below fires a real <code>r2.compiler.build.start</code>
-            event on the <code>/r2</code> WebSocket — try it. (Today
-            the orchestrator's <code>claude-code</code> plugin actually
-            spawns <code>claude -p</code>; Phase 1.8+ adds a Tera-rendered
-            prompt template per SPEC-R2-COMPILER §5.)
-          </p>
+        <div class="canvas" id="canvas">
+          <div class="canvas-header">
+            <h2>Compose</h2>
+            <p class="canvas-hint">
+              Drag a carrier board from the left, an ensemble from the right.
+              Compile sends the composition over <code>/r2</code> to the
+              <code>claude-code</code> plugin. Phase 1.7d adds the AI chat pane
+              that reads + mutates this canvas.
+            </p>
+          </div>
+
+          <div class="canvas-slots">
+            <div class="canvas-slot" id="canvas-slot-board" data-slot="board"></div>
+            <div class="canvas-slot" id="canvas-slot-ensemble" data-slot="ensemble"></div>
+          </div>
+
+          <div class="canvas-actions">
+            <span class="canvas-status" id="canvas-status" data-state="incomplete">incomplete</span>
+            <button class="btn-secondary" id="canvas-clear">Clear canvas</button>
+            <button class="btn-primary" id="canvas-compile" disabled>Compile →</button>
+          </div>
         </div>
 
         <div class="entry-detail hidden" id="entry-detail">
@@ -76,28 +82,21 @@
               <div class="file-viewer-header">
                 <span id="viewer-path">— select a file —</span>
               </div>
-              <pre class="file-viewer-body" id="viewer-body"></pre>
+              <div class="file-viewer-body" id="viewer-body"></div>
             </div>
           </div>
         </div>
         </div><!-- /.workspace-top -->
 
-        <!-- Build pane — always-visible bottom strip. Phase 1.7b's
-             event flow surfaces here. Phase 2-full's drag-and-drop
-             canvas will replace the placeholder above. -->
+        <!-- Build pane — bottom strip, console only.
+             Phase 1.7c moved compose controls onto the canvas; this
+             pane is now purely the AI-build event stream. -->
         <div class="build-pane" id="build-pane">
           <div class="build-controls">
-            <label>
-              <span class="ctl-label">Board</span>
-              <select id="build-board"></select>
-            </label>
-            <label>
-              <span class="ctl-label">Ensemble</span>
-              <select id="build-ensemble"></select>
-            </label>
-            <button class="btn-primary" id="build-compile" disabled>Compile</button>
-            <button class="btn-secondary" id="build-clear" title="Clear the build console">Clear</button>
-            <span class="build-status" id="build-status">idle</span>
+            <span class="ctl-label">Build</span>
+            <span class="build-status" id="build-status" data-state="idle">idle</span>
+            <span class="build-flex"></span>
+            <button class="btn-secondary" id="build-clear" title="Clear the build console">Clear console</button>
           </div>
           <pre class="build-console" id="build-console" aria-live="polite"></pre>
         </div>
