@@ -7,8 +7,10 @@
 
 pub mod author;
 pub mod builder;
+pub mod deploy;
 pub mod roster;
 
 pub use author::AuthorSentant;
 pub use builder::BuilderSentant;
+pub use deploy::DeploySentant;
 pub use roster::{RosterCtx, RosterSentant};

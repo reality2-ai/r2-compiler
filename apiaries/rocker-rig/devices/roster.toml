@@ -16,3 +16,22 @@ event = "slot.created"
 from = ""
 to = "placeholder"
 detail = "operator declared"
+
+[[devices]]
+slot_id = "e8c5b8af-223a-4409-99f1-d615667e2eb5"
+role = "sensor"
+ensemble = "rocker-sensor"
+host = "esp32-s3-xiao"
+name_alias = "kitchen"
+state = "placeholder"
+provision_state = "unknown"
+cert_status = "unknown"
+enrolled = "2026-06-01T07:34:41Z"
+last_seen = ""
+
+[[devices.history]]
+ts = "2026-06-01T07:34:41Z"
+event = "slot.created"
+from = ""
+to = "placeholder"
+detail = "operator declared"

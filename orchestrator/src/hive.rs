@@ -28,8 +28,8 @@ use tracing::{info, warn};
 
 use std::path::PathBuf;
 
-use crate::plugins::ClaudeCodePlugin;
-use crate::sentants::{AuthorSentant, BuilderSentant, RosterCtx, RosterSentant};
+use crate::plugins::{ClaudeCodePlugin, FlasherPlugin, FlasherSlot};
+use crate::sentants::{AuthorSentant, BuilderSentant, DeploySentant, RosterCtx, RosterSentant};
 
 /// Bridge handle exposed to the axum layer.
 #[derive(Clone)]
@@ -57,7 +57,7 @@ impl EngineHandle {
 /// from `--apiary <name>` at startup. The roster sentant uses it to
 /// read/write `apiaries/<name>/devices/roster.toml`. Runtime apiary
 /// open/close (future) mutates the same Arc<Mutex<>>.
-pub fn spawn(apiary_path: Option<PathBuf>) -> EngineHandle {
+pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
     // Bounded inbound queue — backpressure if the engine falls behind.
     let (inbound_tx, mut inbound_rx) = mpsc::channel::<QueuedEvent>(256);
     // Outbound broadcast — every connected WS client subscribes.
@@ -69,6 +69,12 @@ pub fn spawn(apiary_path: Option<PathBuf>) -> EngineHandle {
     // holds a clone so the WS handler can swap apiaries later.
     let roster_ctx: RosterCtx = Arc::new(Mutex::new(apiary_path));
     let roster_ctx_engine = roster_ctx.clone();
+    let roster_ctx_deploy = roster_ctx.clone();
+
+    // Flasher params slot — Deploy sentant fills it before firing
+    // the flasher's CMD_START.
+    let flasher_slot: FlasherSlot = Arc::new(Mutex::new(None));
+    let flasher_slot_engine = flasher_slot.clone();
 
     std::thread::spawn(move || {
         let mut bus = EventBus::new();
@@ -90,6 +96,12 @@ pub fn spawn(apiary_path: Option<PathBuf>) -> EngineHandle {
         ));
         info!("engine: registered claude-code plugin for author (id={author_pid})");
 
+        // Flasher (F2) — esptool subprocess driver, fed via flasher_slot.
+        let flasher_pid = bus.register_plugin(Box::new(
+            FlasherPlugin::new(0, flasher_slot_engine.clone())
+        ));
+        info!("engine: registered flasher plugin (id={flasher_pid})");
+
         // Register sentants.
         let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));
         info!("engine: registered Builder sentant (id={build_sid})");
@@ -101,6 +113,10 @@ pub fn spawn(apiary_path: Option<PathBuf>) -> EngineHandle {
             RosterSentant::new(roster_ctx_engine)
         ));
         info!("engine: registered Roster sentant (id={roster_sid})");
+        let deploy_sid = bus.register_sentant(Box::new(
+            DeploySentant::new(flasher_pid, flasher_slot_engine, repo_root.clone(), roster_ctx_deploy)
+        ));
+        info!("engine: registered Deploy sentant (id={deploy_sid})");
 
         bus.init_all();
         info!("engine: bus initialised");

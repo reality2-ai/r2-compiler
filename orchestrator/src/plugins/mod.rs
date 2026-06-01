@@ -10,5 +10,7 @@
 //! catalogue, apiary, keyholder per SPEC-R2-COMPOSER §3.3.
 
 pub mod claude_code;
+pub mod flasher;
 
 pub use claude_code::ClaudeCodePlugin;
+pub use flasher::{FlashParams, FlashRegion, FlasherPlugin, FlasherSlot};

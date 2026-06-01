@@ -131,8 +131,9 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Spawn the engine thread with the active apiary path (if any) so
-    // the Roster sentant can read/write devices/roster.toml.
-    let engine = hive::spawn(apiary_path.clone());
+    // the Roster sentant can read/write devices/roster.toml, plus the
+    // repo root so the Deploy sentant can resolve catalogue/boards/.
+    let engine = hive::spawn(apiary_path.clone(), repo_root.clone());
     info!("engine thread spawned");
 
     let state = AppState {
