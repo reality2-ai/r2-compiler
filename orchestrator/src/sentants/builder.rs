@@ -16,7 +16,7 @@ use r2_engine::plugin::PluginId;
 use r2_engine::{Action, ActionBuf, Event, EventSource, Sentant, StateId, Target};
 
 use crate::bridge::registry;
-use crate::plugins::claude_code;
+use crate::composer::claude_code;
 
 /// Idle → Working → Idle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

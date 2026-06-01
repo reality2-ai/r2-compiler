@@ -28,10 +28,8 @@ use tracing::{info, warn};
 
 use std::path::PathBuf;
 
-use crate::plugins::{
-    ClaudeCodePlugin, FlasherPlugin, FlasherSlot, KeyholderPlugin, KeyholderSlot,
-    ProvisionPlugin, ProvisionSlot, UsbSnapshot, UsbWatcherPlugin,
-};
+use crate::composer::{ClaudeCodePlugin, FlasherPlugin, FlasherSlot, UsbSnapshot, UsbWatcherPlugin};
+use crate::substrate::{KeyholderPlugin, KeyholderSlot, ProvisionPlugin, ProvisionSlot};
 use crate::sentants::{
     AuthorSentant, BuilderSentant, DeploySentant, ProvisionSentant, RosterCtx, RosterSentant,
 };
@@ -110,7 +108,7 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         // author / chat flow (emits r2.composer.author.*). Same plugin
         // impl; different event-name configuration at construction time.
         let build_pid = bus.register_plugin(Box::new(ClaudeCodePlugin::new(0)));
-        info!("engine: registered claude-code plugin for build (id={build_pid})");
+        info!("engine: registered composer/claude-code (build) (id={build_pid})");
 
         // Author brief is delivered through a shared slot rather than
         // the bus's PluginCall data (which caps at 256B). Both sides
@@ -119,31 +117,31 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         let author_pid = bus.register_plugin(Box::new(
             ClaudeCodePlugin::new_author(0, author_brief.clone())
         ));
-        info!("engine: registered claude-code plugin for author (id={author_pid})");
+        info!("engine: registered composer/claude-code (author) (id={author_pid})");
 
         // Flasher (F2) — esptool subprocess driver, fed via flasher_slot.
         let flasher_pid = bus.register_plugin(Box::new(
             FlasherPlugin::new(0, flasher_slot_engine.clone())
         ));
-        info!("engine: registered flasher plugin (id={flasher_pid})");
+        info!("engine: registered composer/flasher (id={flasher_pid})");
 
         // USB watcher (F2b) — polls /sys/class/tty/ every 1.5s on Linux.
         let usb_pid = bus.register_plugin(Box::new(
             UsbWatcherPlugin::new(0, catalogue_root.clone(), usb_snapshot_engine)
         ));
-        info!("engine: registered usb-watcher plugin (id={usb_pid})");
+        info!("engine: registered composer/usb-watcher (id={usb_pid})");
 
         // Keyholder (F3) — Ed25519 signer for DeviceCertificate minting.
         let keyholder_pid = bus.register_plugin(Box::new(KeyholderPlugin::new(
             0, roster_ctx_keyholder, keyholder_slot_engine.clone(), config_root.clone(),
         )));
-        info!("engine: registered keyholder plugin (id={keyholder_pid})");
+        info!("engine: registered substrate/keyholder (id={keyholder_pid})");
 
         // Provision (F3) — WiFi credential store + #wifi_offer composer.
         let provision_pid = bus.register_plugin(Box::new(ProvisionPlugin::new(
             0, roster_ctx_provision, provision_slot_engine.clone(), config_root,
         )));
-        info!("engine: registered provision plugin (id={provision_pid})");
+        info!("engine: registered substrate/provision (id={provision_pid})");
 
         // Register sentants.
         let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));

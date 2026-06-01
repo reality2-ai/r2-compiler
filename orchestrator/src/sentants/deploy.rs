@@ -22,7 +22,7 @@ use r2_engine::plugin::PluginId;
 use r2_engine::{Action, ActionBuf, Event, EventSource, Sentant, StateId, Target};
 
 use crate::bridge::registry;
-use crate::plugins::{flasher, FlashParams, FlashRegion, FlasherSlot};
+use crate::composer::{flasher, FlashParams, FlashRegion, FlasherSlot};
 use crate::roster;
 use crate::sentants::RosterCtx;
 

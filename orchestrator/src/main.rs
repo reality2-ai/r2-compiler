@@ -14,10 +14,11 @@
 
 mod apiary;
 mod bridge;
+mod composer;   // r2-composer-specific authoring scaffolding (subprocess wrappers, sysfs watchers)
 mod hive;
-mod plugins;
 mod roster;
 mod sentants;
+mod substrate;  // R2 stack components per R2-HIVE §2.1 (TG-agnostic substrate roles)
 
 use std::net::SocketAddr;
 use std::path::PathBuf;

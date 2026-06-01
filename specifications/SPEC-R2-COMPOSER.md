@@ -92,43 +92,64 @@ Both hives are **members of the operator's trust group**. The webapp obtains its
 | `Builder` | On operator "Compile", emits `r2.composer.build.start{score, target}` and consumes `r2.composer.build.*` progress events. | Yes |
 | `Author` | On operator "+ New Board/Plugin/Sentant", emits `r2.composer.author.start{kind, description}` and surfaces the resulting agent dialog in the UI. | Yes |
 
-**orchestrator-hive** SHALL perform at least the following sentants. These are thin event-routers; **the actual work happens in plugins** (§3.3) — sentants here are FSMs that receive events, dispatch to a plugin, and emit result events. See `[[feedback-sentants-vs-plugins-terminology]]` in memory for the discipline.
+**orchestrator-hive** SHALL perform at least the following sentants. These are thin event-routers; the actual work happens in **substrate** components (§3.3.1) and **composer-specific tooling** (§3.3.2) — sentants here are FSMs that receive events, dispatch to a substrate / tooling component, and emit result events. See `[[feedback-sentants-vs-plugins-terminology]]` in memory for the historical discipline, refined by `[[feedback-substrate-vs-plugin]]` for the current substrate/plugin distinction.
 
 | Sentant | Purpose |
 |---|---|
-| `Catalogue` | Routes `r2.composer.catalogue.*` events; tracks loaded entries. The actual filesystem watching is the `catalogue` plugin (§3.3). |
-| `Builder` | Owns the per-build FSM (`idle → preparing → generating → compiling → done|error`). On `r2.composer.build.start`, dispatches to the `compiler` plugin and emits progress events as the plugin reports them. |
-| `Author` | Owns the catalogue-authoring session FSM. On `r2.composer.author.start`, dispatches to the `claude-code` plugin scoped to the target catalogue directory; routes prompts/replies between the plugin and the UI. |
-| `Deploy` | On `r2.composer.deploy.start`, dispatches to the `flasher` plugin (USB) or the OTA-push variant of the `claude-code` / direct-TCP path. Tracks per-device deploy state per §12. |
-| `Sync` | On `r2.composer.sync.start`, dispatches to the `sync` plugin (which wraps `tools/sync-catalogue.sh`). |
-| `Tg` | Routes `r2.composer.tg.*` events; dispatches to the `keyholder` plugin for issuing/revoking certs per §11. |
+| `Catalogue` | Routes `r2.composer.catalogue.*` events; tracks loaded entries. The actual filesystem watching is the `catalogue` composer-tooling component (§3.3.2). |
+| `Builder` | Owns the per-build FSM (`idle → preparing → generating → compiling → done|error`). On `r2.composer.build.start`, dispatches to the `compiler` composer-tooling component and emits progress events as it reports them. |
+| `Author` | Owns the catalogue-authoring session FSM. On `r2.composer.author.start`, dispatches to the `claude-code` composer-tooling component scoped to the target catalogue directory; routes prompts/replies between it and the UI. |
+| `Deploy` | On `r2.composer.deploy.start`, dispatches to the `flasher` composer-tooling component (USB) or the OTA-push variant. Tracks per-device deploy state per §12. |
+| `Provision` | On `r2.composer.device.identity_observed`, orchestrates the `keyholder` (substrate) → `provision` (substrate) chain to mint a DeviceCertificate + compose a `#wifi_offer`, ending in `r2.composer.device.enrolled`. See SPEC-APIARY-FLASH §5. |
+| `Sync` | On `r2.composer.sync.start`, dispatches to the `sync` composer-tooling component (which wraps `tools/sync-catalogue.sh`). |
+| `Tg` | Routes `r2.composer.tg.*` events; dispatches to the `keyholder` substrate component for issuing/revoking certs per §11. |
 
-### 3.3 Plugins (per hive)
+### 3.3 Substrate + composer-specific tooling
 
-**The plugins do the actual work.** Per R2-PLUGIN §1, plugins are "anything that runs on a hive and provides capabilities" — subprocess management, network I/O, file I/O, hardware drivers. They're invoked by the sentants in §3.2.
+Per the R2 layer model (R2-INTRO §"The Protocol Stack", which defines an 8-layer L0–L7 stack with the L4/L5 trust boundary as load-bearing), the orchestrator hive's non-sentant work splits cleanly in two:
 
-**webapp-hive:**
+- **Substrate** (R2-HIVE §1.4 + §2.1) — the device-scoped, always-running, TG-agnostic core of a hive. Implements R2 protocol roles defined in r2-specifications: identity custody, trust, discovery, transport. Cross-family — any sufficiently-capable R2 hive could have these.
+- **Composer-specific tooling** — host-OS subprocess wrappers, sysfs watchers, AI orchestration. Exists ONLY because r2-composer is an authoring tool. No analogue in a generic R2 hive; no R2-* spec governs them.
 
-| Plugin | Purpose |
+The R2-PLUGIN spec word "plugin" is **reserved for L7 user-domain capability providers in the catalogue** (R2-PLUGIN §1). Neither substrate components nor composer-specific tooling are plugins in that sense — they all happen to implement `r2_engine::Plugin` at the Rust trait level, but that's an implementation detail, not the R2-PLUGIN spec concept.
+
+#### 3.3.1 Substrate components (orchestrator-hive)
+
+These implement R2 stack roles. They would exist in any R2 hive performing the same role.
+
+| Component | R2 layer | Spec | Purpose |
+|---|---|---|---|
+| `keyholder` | L5 — Trust & Identity | R2-TRUST §5.5 | Holds the apiary's TG Ed25519 private key off-tree; signs DeviceCertificates. Used by `Tg` + `Provision` sentants. |
+| `provision` | L5 — Trust & Identity / L1-L2 bootstrap | R2-PROVISION §3, §5; R2-WIFI §3.4 | Owns the apiary's `wifi_networks.toml` off-tree; composes `#wifi_offer` blobs. Used by `Provision` sentant. |
+| `beacon-observer` *(F4 future)* | L2 — Discovery | R2-BEACON §5-7 | Observes R2 beacon frames over BLE; surfaces `r2.composer.device.identity_observed` when a fresh device announces its pubkey. |
+| `ota-push` *(F5 future)* | L6 — Management | R2-UPDATE | TCP push to a device's OTA receiver. Used by `Deploy` sentant for non-first-install updates. |
+
+#### 3.3.2 Composer-specific tooling (orchestrator-hive)
+
+| Component | Purpose |
 |---|---|
-| `webapp-canvas` | DOM + drag-and-drop UX. UI plugin per R2-ENSEMBLE §2.1.1. |
-| `webapp-source-view` | Rust syntax-highlighted read-only viewer. CodeMirror or shiki under the hood. UI plugin. |
-
-**orchestrator-hive:**
-
-| Plugin | Purpose |
-|---|---|
-| `compiler` | Materialises the per-carrier crate from the score, invokes `claude -p` (via the `claude-code` plugin) to fill in generated code, runs `cargo build`, parses output, returns the artefact path. The plugin that the `Builder` sentant calls. |
+| `compiler` | Materialises the per-carrier crate from the score, invokes `claude -p` (via `claude-code`) to fill in generated code, runs `cargo build`, parses output, returns the artefact path. Used by `Builder` sentant. |
 | `claude-code` | Subprocess driver for `claude -p '<brief>' --output-format=stream-json`. Translates between R2 events and JSON-lines on stdin/stdout. Reuses existing local `claude` CLI auth. Used by both `compiler` (for build code-gen) and `Author` sentant (for catalogue authoring). |
 | `cargo-runner` | Shells out to `cargo build --target <triple> --release`. Parses output, surfaces diagnostics. Used by `compiler`. |
-| `flasher` | Runs `esptool` (NEVER `espflash` — see R2-BUILD §5.1) to write firmware to a USB-connected device. Used by `Deploy` sentant. |
-| `ota-push` | TCP push to a device's OTA receiver on port 21043 (R2-DEPLOY). Used by `Deploy` sentant. |
+| `flasher` | Runs `esptool` (NEVER `espflash` — see SPEC-APIARY-FLASH §4.2) to write firmware to a USB-connected device. Used by `Deploy` sentant. |
+| `usb-watcher` | Polls `/sys/class/tty/` for newly-attached serial devices; surfaces `r2.composer.usb.attached`. Used by the canvas footer chip + first-install flow. |
 | `webfetch` | Retrieves datasheets / vendor docs from the web during catalogue authoring. Used by the `Author` sentant via `claude-code`. Maps to Claude Code's existing WebFetch tool. |
-| `git-runner` | Subprocess wrapper around `git`. Used by `sync`. |
+| `git-runner` | Subprocess wrapper around `git`. Used by `sync` + the apiary.create flow. |
 | `sync` | Wraps `tools/sync-catalogue.sh`. Vendors upstream crates and refreshes catalogue templates. Used by `Sync` sentant. |
 | `catalogue` | Watches the `catalogue/` tree on disk and serves entry-listing queries. Used by `Catalogue` sentant. |
-| `keyholder` | Holds the TG private key, issues `DeviceCertificate`s, manages revocation lists. Used by `Tg` sentant per §11. KeyHolder material lives off-tree per §8. |
-| **R2-WEB (hive-shared singleton)** | Serves the webapp bundle + the `/r2` WS endpoint. Same R2-WEB instance as the rest of the hive. |
+
+**webapp-hive** components are all UI plugins per R2-ENSEMBLE §2.1.1 (and live above the trust boundary, so the substrate/composer split doesn't apply):
+
+| Component | Purpose |
+|---|---|
+| `webapp-canvas` | DOM + drag-and-drop UX. UI plugin. |
+| `webapp-source-view` | Rust syntax-highlighted read-only viewer. UI plugin. |
+
+**Hive-shared singleton** (registered with by both hives):
+
+| Component | Purpose |
+|---|---|
+| **R2-WEB** | Serves the webapp bundle + the `/r2` WS endpoint. Same R2-WEB instance as the rest of the hive. |
 
 ### 3.4 Registrations with hive-shared singletons
 
@@ -364,3 +385,4 @@ The meta self-description is dogfood: r2-composer's catalogue browser will be ab
 | 2026-05-31 | 0.1 | Initial draft. Establishes the two-hive ensemble, the `r2.composer.*` event vocabulary, the v0.1 success gate (round-trip the three r2-workshop carriers), and the catalogue authoring obligations. |
 | 2026-05-31 | 0.2 | Added §11 Trust Group management (implicit add/revoke from canvas + explicit `r2.composer.tg.*` events). Added §12 Device lifecycle and deploy paths (USB First-install vs OTA update flows; compulsory plugins; `r2.composer.deploy.*` event set generalising the earlier flash-only events). |
 | 2026-05-31 | 0.3 | Second-pass decisions: §13 acknowledges r2-composer's structural-ensemble nature with deferred `meta/` self-description (Phase 1.6+); §14 companion-spec index added pointing at the new SPEC-APIARY-LAYOUT + SPEC-APIARY-AMENDMENT-PROPOSAL. Apiary terminology adopted throughout. |
+| 2026-06-02 | 0.4 | §3.3 rewritten to distinguish **substrate components** (R2 stack roles per R2-HIVE §2.1 — keyholder, provision, beacon-observer, ota-push) from **composer-specific tooling** (claude-code, flasher, usb-watcher, …). The R2-PLUGIN spec word "plugin" is now reserved for L7 user-domain capability providers in the catalogue; orchestrator-internal components are no longer called "plugins" in spec language. Reflects the 8-layer R2 stack model in R2-INTRO §"The Protocol Stack" and the L4/L5 trust boundary in R2-TRUST §6.1. Orchestrator code mirrors the split: `orchestrator/src/substrate/` + `orchestrator/src/composer/`. |

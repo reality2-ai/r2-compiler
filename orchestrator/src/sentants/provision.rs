@@ -33,8 +33,8 @@ use r2_engine::plugin::PluginId;
 use r2_engine::{Action, ActionBuf, Event, EventSource, Sentant, StateId, Target};
 
 use crate::bridge::registry;
-use crate::plugins::{ComposeOfferRequest, KeyholderSlot, ProvisionSlot, SignCertRequest};
-use crate::plugins::{keyholder, provision};
+use crate::substrate::{ComposeOfferRequest, KeyholderSlot, ProvisionSlot, SignCertRequest};
+use crate::substrate::{keyholder, provision};
 use crate::sentants::RosterCtx;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

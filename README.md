@@ -104,8 +104,9 @@ r2-composer/
 ├── orchestrator/              # workstation-side R2 hive (Rust)
 │   ├── prompts/               # Tera templates — the spec-as-brief authoring system
 │   └── src/
-│       ├── plugins/           # claude-code, flasher, usb-watcher
-│       └── sentants/          # Apiary, Author, Builder, Deploy, Roster
+│       ├── substrate/         # R2 stack roles (R2-HIVE §2.1): keyholder, provision
+│       ├── composer/          # composer-specific: claude-code, flasher, usb-watcher
+│       └── sentants/          # Apiary, Author, Builder, Deploy, Roster, Provision
 ├── webapp/                    # browser-side R2 hive (WASM + JS + HTML)
 │   ├── crate/                 # Rust → wasm-bindgen → r2_composer_webapp
 │   └── ui/                    # vanilla JS + CSS — no framework
