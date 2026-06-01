@@ -16,6 +16,7 @@ mod apiary;
 mod bridge;
 mod hive;
 mod plugins;
+mod roster;
 mod sentants;
 
 use std::net::SocketAddr;
@@ -129,8 +130,9 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
-    // Spawn the engine thread.
-    let engine = hive::spawn();
+    // Spawn the engine thread with the active apiary path (if any) so
+    // the Roster sentant can read/write devices/roster.toml.
+    let engine = hive::spawn(apiary_path.clone());
     info!("engine thread spawned");
 
     let state = AppState {

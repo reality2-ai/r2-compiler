@@ -133,6 +133,40 @@ const KNOWN_EVENTS: &[&str] = &[
     "r2.composer.deploy.done",
     "r2.composer.deploy.error",
 
+    // Device roster (SPEC-APIARY-FLASH §2, §8.1) — F1+
+    "r2.composer.device.slot.create",
+    "r2.composer.device.list",
+    "r2.composer.device.entry",
+    "r2.composer.device.transition",
+    "r2.composer.device.unaccounted",
+    "r2.composer.device.revoke",
+    "r2.composer.device.retire",
+    "r2.composer.device.purge",
+
+    // USB watcher (SPEC-APIARY-FLASH §4.4) — F2+
+    "r2.composer.usb.attached",
+    "r2.composer.usb.detached",
+    "r2.composer.usb.list",
+    "r2.composer.usb.identify",
+
+    // First-install (SPEC-APIARY-FLASH §4) — F2+
+    "r2.composer.deploy.first_install.start",
+    "r2.composer.deploy.first_install.progress",
+    "r2.composer.deploy.first_install.done",
+    "r2.composer.deploy.first_install.error",
+
+    // Provision / WiFi (SPEC-APIARY-FLASH §5) — F3+
+    "r2.composer.provision.network.upsert",
+    "r2.composer.provision.offer.start",
+    "r2.composer.provision.offer.progress",
+
+    // OTA batch (SPEC-APIARY-FLASH §6) — F5+
+    "r2.composer.deploy.batch.start",
+    "r2.composer.deploy.batch.done",
+    "r2.composer.deploy.device.progress",
+    "r2.composer.deploy.device.done",
+    "r2.composer.deploy.device.error",
+
     // Author flow (SPEC-R2-COMPOSER §4.4)
     "r2.composer.author.start",
     "r2.composer.author.prompt",

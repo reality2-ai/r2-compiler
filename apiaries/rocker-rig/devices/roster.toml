@@ -1,0 +1,18 @@
+[[devices]]
+slot_id = "8c1e3aaf-3e41-4200-ba9c-47c00715aed4"
+role = "sensor"
+ensemble = "rocker-sensor"
+host = "esp32-s3-xiao"
+name_alias = "kitchen"
+state = "placeholder"
+provision_state = "unknown"
+cert_status = "unknown"
+enrolled = "2026-06-01T01:37:27Z"
+last_seen = ""
+
+[[devices.history]]
+ts = "2026-06-01T01:37:27Z"
+event = "slot.created"
+from = ""
+to = "placeholder"
+detail = "operator declared"

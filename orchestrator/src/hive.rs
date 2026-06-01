@@ -26,8 +26,10 @@ use r2_engine::queue::QueuedEvent;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{info, warn};
 
+use std::path::PathBuf;
+
 use crate::plugins::ClaudeCodePlugin;
-use crate::sentants::{AuthorSentant, BuilderSentant};
+use crate::sentants::{AuthorSentant, BuilderSentant, RosterCtx, RosterSentant};
 
 /// Bridge handle exposed to the axum layer.
 #[derive(Clone)]
@@ -36,6 +38,10 @@ pub struct EngineHandle {
     pub inbound_tx: mpsc::Sender<QueuedEvent>,
     /// Engine → WS broadcast.
     pub outbound_tx: broadcast::Sender<QueuedEvent>,
+    /// Shared roster context — the active apiary's directory path.
+    /// Mutated by the WS handler (or future apiary-open flow) when the
+    /// orchestrator switches apiaries. None when no apiary is open.
+    pub roster_ctx: RosterCtx,
 }
 
 impl EngineHandle {
@@ -46,12 +52,23 @@ impl EngineHandle {
 }
 
 /// Spawn the engine thread and return a handle for the axum layer.
-pub fn spawn() -> EngineHandle {
+///
+/// `apiary_path` is the active apiary's directory, if any — primed
+/// from `--apiary <name>` at startup. The roster sentant uses it to
+/// read/write `apiaries/<name>/devices/roster.toml`. Runtime apiary
+/// open/close (future) mutates the same Arc<Mutex<>>.
+pub fn spawn(apiary_path: Option<PathBuf>) -> EngineHandle {
     // Bounded inbound queue — backpressure if the engine falls behind.
     let (inbound_tx, mut inbound_rx) = mpsc::channel::<QueuedEvent>(256);
     // Outbound broadcast — every connected WS client subscribes.
     let (outbound_tx, _outbound_rx_unused) = broadcast::channel::<QueuedEvent>(256);
     let outbound_tx_thread = outbound_tx.clone();
+
+    // Roster context — shared between hive.rs (this fn) and the
+    // RosterSentant inside the engine thread. The outer handle also
+    // holds a clone so the WS handler can swap apiaries later.
+    let roster_ctx: RosterCtx = Arc::new(Mutex::new(apiary_path));
+    let roster_ctx_engine = roster_ctx.clone();
 
     std::thread::spawn(move || {
         let mut bus = EventBus::new();
@@ -80,6 +97,10 @@ pub fn spawn() -> EngineHandle {
             AuthorSentant::new(author_pid, author_brief)
         ));
         info!("engine: registered Author sentant (id={author_sid})");
+        let roster_sid = bus.register_sentant(Box::new(
+            RosterSentant::new(roster_ctx_engine)
+        ));
+        info!("engine: registered Roster sentant (id={roster_sid})");
 
         bus.init_all();
         info!("engine: bus initialised");
@@ -114,5 +135,6 @@ pub fn spawn() -> EngineHandle {
     EngineHandle {
         inbound_tx,
         outbound_tx,
+        roster_ctx,
     }
 }

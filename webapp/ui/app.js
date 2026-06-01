@@ -900,6 +900,15 @@ function onEvent(name, payload) {
     onApiaryEntry(payload);
     return;
   }
+  // Device roster events (F1+)
+  if (name === "r2.composer.device.entry") {
+    onDeviceEntry(payload);
+    return;
+  }
+  if (name === "r2.composer.device.transition") {
+    onDeviceTransition(payload);
+    return;
+  }
   // Author flow → chat pane
   if (name.startsWith("r2.composer.author.")) {
     onAuthorEvent(name, payload);
@@ -1520,6 +1529,51 @@ function onApiaryActive(payload) {
   apiaryIsLive = true;
   renderApiaryAll();
   consoleLine("sys", `apiary loaded — ${escape(payload.name)} (${countTargets(payload)} targets)`);
+  // Ask the orchestrator for the current device roster (F1+). Slots
+  // come back as device.entry events that we render into the target
+  // cards.
+  sendEvent("r2.composer.device.list", {});
+}
+
+// ── Device roster (F1) ────────────────────────────────────────────────
+//
+// The Roster sentant emits one `device.entry` per slot when:
+//   • the webapp sends `device.list` (on apiary load)
+//   • a `device.slot.create` lands and the new placeholder row is
+//     broadcast
+// Plus `device.transition` whenever a row's state changes. We keep a
+// browser-side dict keyed by slot_id and re-render the affected target.
+
+const deviceSlots = new Map(); // slot_id → DeviceRow
+
+function onDeviceEntry(payload) {
+  if (!payload || typeof payload !== "object" || !payload.slot_id) return;
+  deviceSlots.set(payload.slot_id, payload);
+  if (apiaryState && apiaryIsLive) renderApiaryRoles(apiaryState);
+}
+
+function onDeviceTransition(payload) {
+  if (!payload || typeof payload !== "object" || !payload.slot_id) return;
+  const row = deviceSlots.get(payload.slot_id);
+  if (row) {
+    row.state = payload.to || row.state;
+    if (apiaryState && apiaryIsLive) renderApiaryRoles(apiaryState);
+  }
+  // Surface in the build console as one calm line — informative without
+  // being noisy. (Per [[feedback-calm-computing]].)
+  consoleLine("sys",
+    `device ${payload.slot_id.slice(0,8)} · ${payload.from || '∅'} → ${payload.to}` +
+    (payload.detail ? ` (${payload.detail})` : ""));
+}
+
+// Slots grouped by `(role, host)` so we can render them inside the
+// matching target row in the apiary canvas.
+function slotsForTarget(role, host) {
+  const out = [];
+  for (const row of deviceSlots.values()) {
+    if (row.role === role && row.host === host) out.push(row);
+  }
+  return out.sort((a, b) => (a.name_alias || a.slot_id).localeCompare(b.name_alias || b.slot_id));
 }
 
 // Called per `r2.composer.apiary.entry` event from the orchestrator at
@@ -1598,9 +1652,20 @@ function renderApiaryRoles(apiary) {
         : (t.note ? `<span class="target-note">${escape(t.note)}</span>`
         : (t.lastBuilt ? `<span class="target-lastbuilt">built ${escape(t.lastBuilt)}</span>` : "")));
 
+      // F1: device slots for this target. Pulled from the
+      // browser-side deviceSlots dict (populated by device.entry
+      // events from the orchestrator's Roster sentant).
+      const slots = slotsForTarget(role.role, t.host);
+      const slotsHtml = slots.length === 0
+        ? ""
+        : `<div class="target-slots">${
+            slots.map(slotRowHtml).join("")
+          }</div>`;
+
       row.innerHTML = `
         <div class="target-row-main">${left}${overrides}</div>
         <div class="target-row-meta">${status}${aux}</div>
+        ${slotsHtml}
       `;
       targets.appendChild(row);
     }
@@ -1608,6 +1673,19 @@ function renderApiaryRoles(apiary) {
 
     root.appendChild(card);
   }
+}
+
+function slotRowHtml(slot) {
+  const alias = slot.name_alias
+    ? `<span class="slot-alias">${escape(slot.name_alias)}</span>`
+    : `<span class="slot-alias slot-alias-anon">(unnamed)</span>`;
+  const slotId8 = `<span class="slot-id" title="${escape(slot.slot_id)}">${escape(slot.slot_id.slice(0, 8))}</span>`;
+  const state = `<span class="slot-state" data-state="${escape(slot.state)}">${escape(slot.state)}</span>`;
+  return `
+    <div class="target-slot" data-slot-id="${escape(slot.slot_id)}">
+      ${alias}${slotId8}${state}
+    </div>
+  `;
 }
 
 function renderApiarySummary(apiary) {

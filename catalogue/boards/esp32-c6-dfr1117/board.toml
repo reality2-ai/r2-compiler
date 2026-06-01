@@ -32,6 +32,19 @@ psram           = false                            # ESP32-C6-FH4 has no PSRAM
 usb_serial_jtag = true                             # CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 uart_cp2102     = false                            # no on-board CP2102; native USB-Serial-JTAG only (USB-C)
 
+[usb]
+# Per SPEC-APIARY-FLASH §4.1 — used by the orchestrator's usb-watcher
+# plugin to detect + identify this carrier on the bus. VID/PID 0x303a/0x1001
+# is shared with ESP32-S3 native USB-Serial-JTAG; `chip_id_probe` is the
+# disambiguator. esptool MUST be used (espflash breaks ESP-IDF v5.3+).
+vid               = 0x303a                         # Espressif native USB-Serial-JTAG
+pid               = 0x1001
+chip_id_probe     = "esp32c6"                      # `esptool chip_id` returns this
+esptool_chip_arg  = "esp32c6"                      # `--chip esp32c6`
+identify_strategy = "vid_pid_then_chip_id"
+reset_strategy    = "usb_serial_jtag"
+flash_offsets     = { bootloader = 0x0, partition_table = 0x8000, ota_0 = 0x20000 }
+
 [compile_target]
 tag = "esp32-c6"                                   # R2-DEF §7.7 — what scores match against
 

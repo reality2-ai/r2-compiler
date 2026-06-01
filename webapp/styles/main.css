@@ -530,6 +530,45 @@ main {
 .target-warn { color: #ffd66b; }
 .target-coloc em { color: var(--fg-dim); font-style: normal; }
 
+/* ── Device slot rows under a target (F1) ───────────────────────────── */
+.target-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+.target-slot {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-dim);
+  padding: 3px 0;
+}
+.slot-alias { color: var(--fg); }
+.slot-alias-anon { color: var(--fg-muted); font-style: italic; }
+.slot-id { color: var(--accent-dim); font-size: 10px; }
+.slot-state {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg);
+}
+.slot-state[data-state="placeholder"]         { color: var(--fg-muted); }
+.slot-state[data-state="built"]               { color: var(--accent); }
+.slot-state[data-state="flashed_pending_pk"]  { color: #ffd66b; }
+.slot-state[data-state="enrolled"]            { color: var(--accent); }
+.slot-state[data-state="reachable"]           { color: var(--ensemble); }
+.slot-state[data-state="unreachable"]         { color: var(--fg-muted); }
+.slot-state[data-state="revoked"]             { color: #ff8a8a; }
+.slot-state[data-state="retired"]             { color: var(--fg-muted); }
+
 .apiary-actions {
   display: flex;
   align-items: center;

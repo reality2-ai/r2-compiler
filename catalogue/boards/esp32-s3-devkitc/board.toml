@@ -33,6 +33,21 @@ psram_speed_mhz = 80
 usb_serial_jtag = true                             # native USB-OTG console
 uart_cp2102     = true                             # second USB port via CP2102
 
+[usb]
+# Per SPEC-APIARY-FLASH §4.1. The DevKitC exposes TWO USB ports: the
+# native USB-Serial-JTAG (vid 0x303a, pid 0x1001) AND an on-board
+# CP2102 UART bridge (vid 0x10c4, pid 0xea60). The usb-watcher plugin
+# MUST prefer the native port for flashing. VID/PID 0x303a/0x1001 is
+# shared with ESP32-C6; `chip_id_probe` is the disambiguator.
+vid               = 0x303a                         # Espressif native USB-Serial-JTAG (primary)
+pid               = 0x1001
+chip_id_probe     = "esp32s3"
+esptool_chip_arg  = "esp32s3"
+identify_strategy = "vid_pid_then_chip_id"
+reset_strategy    = "usb_serial_jtag"
+flash_offsets     = { bootloader = 0x0, partition_table = 0x8000, ota_0 = 0x20000 }
+secondary_uart    = { vid = 0x10c4, pid = 0xea60, role = "cp2102-console" }   # informative
+
 [compile_target]
 tag = "esp32-s3"                                   # R2-DEF §7.7 — shared with esp32-s3-xiao
 
