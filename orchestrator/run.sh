@@ -7,12 +7,12 @@
 # Use:
 #   orchestrator/run.sh                    # release build + run on :21050
 #   orchestrator/run.sh debug              # debug build (faster compile)
-#   R2_COMPILER_PORT=21099 orchestrator/run.sh    # override port
+#   R2_COMPOSER_PORT=21099 orchestrator/run.sh    # override port
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${R2_COMPILER_PORT:-21050}"
+PORT="${R2_COMPOSER_PORT:-${R2_COMPILER_PORT:-21050}}"   # back-compat with old name
 MODE="${1:-release}"
 
 cd "$REPO_ROOT"
