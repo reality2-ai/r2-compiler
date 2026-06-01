@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use r2_engine::action::PayloadBuf;
-use r2_engine::{Action, ActionBuf, Event, Sentant, StateId, Target};
+use r2_engine::{Action, ActionBuf, Event, EventSource, Sentant, StateId, Target};
 
 use crate::bridge::registry;
 use crate::roster::{self, DeviceRow, Roster};
@@ -39,6 +39,7 @@ pub struct RosterSentant {
     list_hash: u32,
     entry_hash: u32,
     transition_hash: u32,
+    first_install_done_hash: u32,
 }
 
 impl RosterSentant {
@@ -51,6 +52,7 @@ impl RosterSentant {
             list_hash:        reg.hash_of("r2.composer.device.list").unwrap(),
             entry_hash:       reg.hash_of("r2.composer.device.entry").unwrap(),
             transition_hash:  reg.hash_of("r2.composer.device.transition").unwrap(),
+            first_install_done_hash: reg.hash_of("r2.composer.deploy.first_install.done").unwrap(),
         }
     }
 
@@ -79,6 +81,16 @@ impl Sentant for RosterSentant {
             self.handle_list(actions);
             return;
         }
+        // deploy.first_install.done from the flasher plugin — drive the
+        // slot through placeholder → built → flashed_pending_pk per
+        // SPEC-APIARY-FLASH §2.2. Only act on Plugin-sourced events to
+        // avoid re-handling Deploy sentant's own re-broadcast.
+        if event.hash == self.first_install_done_hash
+            && matches!(event.source, EventSource::Plugin(_))
+        {
+            self.handle_first_install_done(event.payload, actions);
+            return;
+        }
     }
 
     fn state(&self) -> StateId { self.state as StateId }
@@ -97,6 +109,7 @@ impl Sentant for RosterSentant {
             let subs = vec![
                 reg.hash_of("r2.composer.device.slot.create").unwrap(),
                 reg.hash_of("r2.composer.device.list").unwrap(),
+                reg.hash_of("r2.composer.deploy.first_install.done").unwrap(),
             ];
             Box::leak(subs.into_boxed_slice())
         })
@@ -168,6 +181,109 @@ impl RosterSentant {
                 });
             }
         });
+    }
+
+    /// Drive the slot through `placeholder → built → flashed_pending_pk`
+    /// per SPEC-APIARY-FLASH §2.2. Two transitions in sequence (the
+    /// state table forbids skipping `built`). Emits a `device.transition`
+    /// for each so the webapp's slot-state chip updates.
+    ///
+    /// v0.1: the `built` state is synthetic — we accept the operator's
+    /// `artefact_path` as evidence that an artefact exists. Once the
+    /// compile flow lands (SPEC-APIARY-COMPOSE §6 fan-out), the
+    /// `placeholder → built` transition will fire on `target.build.done`
+    /// instead, and this handler will only do the `built →
+    /// flashed_pending_pk` step.
+    fn handle_first_install_done(&self, payload: &[u8], actions: &mut ActionBuf) {
+        let v: serde_json::Value =
+            serde_json::from_slice(payload).unwrap_or(serde_json::Value::Null);
+        let slot_id = v.get("slot_id").and_then(|x| x.as_str()).unwrap_or("");
+        let port    = v.get("port").and_then(|x| x.as_str()).unwrap_or("");
+        if slot_id.is_empty() {
+            tracing::warn!("roster: first_install.done without slot_id — cannot transition");
+            return;
+        }
+
+        let mut new_state = String::new();
+        let mut transitions: Vec<(String, String, String)> = Vec::new();   // (from, to, detail)
+
+        self.with_apiary(|apiary_dir| {
+            let mut r = roster::load(apiary_dir);
+            let Some(row) = roster::find_mut(&mut r, slot_id) else {
+                tracing::warn!("roster: first_install.done for unknown slot_id {slot_id}");
+                return;
+            };
+            let now = roster::now_iso8601();
+
+            // placeholder → built (synthetic for v0.1)
+            if row.state == "placeholder" {
+                let from = row.state.clone();
+                if let Err(e) = roster::apply_transition(
+                    row, "built", "built",
+                    &format!("operator-supplied artefact via first_install.done (port {port})"),
+                    &now,
+                ) {
+                    tracing::warn!("roster: {e}");
+                    return;
+                }
+                transitions.push((from, "built".to_string(),
+                    "operator-supplied artefact".to_string()));
+            }
+
+            // built → flashed_pending_pk
+            if row.state == "built" {
+                let from = row.state.clone();
+                if let Err(e) = roster::apply_transition(
+                    row, "flashed_pending_pk", "flashed_usb",
+                    &format!("flashed via USB on {port}"),
+                    &now,
+                ) {
+                    tracing::warn!("roster: {e}");
+                    return;
+                }
+                transitions.push((from, "flashed_pending_pk".to_string(),
+                    format!("flashed via USB on {port}")));
+            }
+
+            new_state = row.state.clone();
+            if let Err(e) = roster::save(apiary_dir, &r) {
+                tracing::error!("roster: save failed: {e}");
+            }
+        });
+
+        // Emit one device.transition per applied step. The webapp
+        // updates the slot state chip incrementally — the operator
+        // sees placeholder → built → flashed_pending_pk in sequence.
+        for (from, to, detail) in transitions {
+            let payload = serde_json::to_vec(&serde_json::json!({
+                "slot_id": slot_id,
+                "from": from,
+                "to": to,
+                "detail": detail,
+            })).unwrap_or_default();
+            actions.push(Action::Send {
+                target: Target::Broadcast,
+                event_hash: self.transition_hash,
+                payload: PayloadBuf::from_slice(&payload),
+            });
+        }
+
+        // Also emit a device.entry so the webapp's deviceSlots Map
+        // updates with any other field changes (last_seen, history,
+        // etc.) that came along.
+        if !new_state.is_empty() {
+            self.with_apiary(|apiary_dir| {
+                let r = roster::load(apiary_dir);
+                if let Some(row) = r.devices.iter().find(|d| d.slot_id == slot_id) {
+                    let payload = serde_json::to_vec(row).unwrap_or_default();
+                    actions.push(Action::Send {
+                        target: Target::Broadcast,
+                        event_hash: self.entry_hash,
+                        payload: PayloadBuf::from_slice(&payload),
+                    });
+                }
+            });
+        }
     }
 }
 
@@ -254,5 +370,77 @@ mod tests {
         let payload = br#"{"role":"sensor","ensemble":"rocker-sensor","host":"esp32-s3-xiao"}"#;
         s.handle_event(&ev(s.slot_create_hash, payload), &mut actions);
         assert!(actions.is_empty(), "no-apiary state must not emit");
+    }
+
+    #[test]
+    fn first_install_done_drives_placeholder_to_flashed_pending_pk() {
+        let dir = tempfile::tempdir().unwrap();
+        // Seed a placeholder slot.
+        let mut r = Roster::default();
+        let row = roster::new_placeholder(
+            "sensor", "rocker-sensor", "esp32-s3-xiao", "kitchen", "2026-06-01T00:00:00Z");
+        let slot_id = row.slot_id.clone();
+        r.devices.push(row);
+        roster::save(dir.path(), &r).unwrap();
+
+        let mut s = RosterSentant::new(ctx_for(dir.path()));
+        let mut actions = ActionBuf::new();
+        let payload = format!(
+            r#"{{"slot_id":"{slot_id}","port":"/dev/ttyACM0","exit_code":0}}"#);
+        s.handle_event(
+            &Event {
+                hash: s.first_install_done_hash,
+                payload: payload.as_bytes(),
+                source: EventSource::Plugin(0),
+                msg_id: 0,
+            },
+            &mut actions,
+        );
+
+        // Two transition events + one entry refresh emitted.
+        let collected: Vec<_> = actions.drain().collect();
+        assert!(collected.len() >= 2, "expected ≥2 actions, got {}", collected.len());
+
+        // Roster on disk: state = flashed_pending_pk, history has both transitions.
+        let r = roster::load(dir.path());
+        let row = r.devices.iter().find(|d| d.slot_id == slot_id).expect("row");
+        assert_eq!(row.state, "flashed_pending_pk");
+        // history: initial slot.created + built + flashed_usb = 3 entries.
+        assert!(row.history.len() >= 3, "history should grow on each transition; got {}", row.history.len());
+        let last = row.history.last().unwrap();
+        assert_eq!(last.from, "built");
+        assert_eq!(last.to, "flashed_pending_pk");
+        assert!(last.detail.contains("/dev/ttyACM0"));
+    }
+
+    #[test]
+    fn first_install_done_from_local_source_ignored() {
+        // The Deploy sentant re-broadcasts first_install.done with
+        // EventSource::Sentant. Roster must NOT also handle it
+        // (would double-mutate the row).
+        let dir = tempfile::tempdir().unwrap();
+        let mut r = Roster::default();
+        let row = roster::new_placeholder(
+            "sensor", "rocker-sensor", "esp32-s3-xiao", "kitchen", "2026-06-01T00:00:00Z");
+        let slot_id = row.slot_id.clone();
+        r.devices.push(row);
+        roster::save(dir.path(), &r).unwrap();
+
+        let mut s = RosterSentant::new(ctx_for(dir.path()));
+        let mut actions = ActionBuf::new();
+        let payload = format!(r#"{{"slot_id":"{slot_id}","port":"/dev/x"}}"#);
+        s.handle_event(
+            &Event {
+                hash: s.first_install_done_hash,
+                payload: payload.as_bytes(),
+                source: EventSource::Local(0),  // NOT a Plugin source
+                msg_id: 0,
+            },
+            &mut actions,
+        );
+        assert!(actions.is_empty(), "local-source first_install.done must not trigger Roster");
+        // Row state unchanged.
+        let r = roster::load(dir.path());
+        assert_eq!(r.devices[0].state, "placeholder");
     }
 }

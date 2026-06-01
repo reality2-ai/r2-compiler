@@ -94,10 +94,12 @@ pub const ERR_UNKNOWN_COMMAND: u8 = 0xFE;
 enum WorkerMsg {
     /// One progress event derived from an esptool stdout line.
     Progress { phase: String, line: String },
-    /// Subprocess finished with this exit code.
-    Done { exit_code: i32, port: String },
-    /// Setup or read error.
-    Error { message: String, exit_code: i32, stderr_tail: String },
+    /// Subprocess finished with this exit code. Carries slot_id so the
+    /// Roster sentant can transition the right row on
+    /// first_install.done.
+    Done { exit_code: i32, port: String, slot_id: String },
+    /// Setup or read error. Carries slot_id for the same reason.
+    Error { message: String, exit_code: i32, stderr_tail: String, slot_id: String },
 }
 
 pub struct FlasherPlugin {
@@ -210,9 +212,11 @@ impl FlasherPlugin {
         let (tx, rx) = mpsc::channel();
         let port_for_done = params.port.clone();
         let sha_for_done = params.firmware_sha256.clone();
+        let slot_id_for_done = params.slot_id.clone();
 
         // Reader thread: parse stdout line-by-line into phases.
         let tx_rd = tx.clone();
+        let slot_id_for_reader = slot_id_for_done.clone();
         let reader_handle = thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines() {
@@ -226,6 +230,7 @@ impl FlasherPlugin {
                             message: format!("stdout read failed: {e}"),
                             exit_code: -1,
                             stderr_tail: String::new(),
+                            slot_id: slot_id_for_reader.clone(),
                         });
                         break;
                     }
@@ -263,12 +268,14 @@ impl FlasherPlugin {
                         let _ = tx.send(WorkerMsg::Done {
                             exit_code: 0,
                             port: port_for_done.clone(),
+                            slot_id: slot_id_for_done.clone(),
                         });
                     } else {
                         let _ = tx.send(WorkerMsg::Error {
                             message: format!("esptool exited with code {code}"),
                             exit_code: code,
                             stderr_tail,
+                            slot_id: slot_id_for_done.clone(),
                         });
                     }
                     let _ = sha_for_done; // reserved for done payload upgrade
@@ -278,6 +285,7 @@ impl FlasherPlugin {
                         message: format!("wait failed: {e}"),
                         exit_code: -1,
                         stderr_tail,
+                        slot_id: slot_id_for_done.clone(),
                     });
                 }
             }
@@ -321,20 +329,22 @@ impl Plugin for FlasherPlugin {
                 }));
                 Some((hp, payload))
             }
-            WorkerMsg::Done { exit_code, port } => {
+            WorkerMsg::Done { exit_code, port, slot_id } => {
                 self.rx = None;
                 let payload = self.pack(&serde_json::json!({
                     "exit_code": exit_code,
                     "port": port,
+                    "slot_id": slot_id,
                 }));
                 Some((hd, payload))
             }
-            WorkerMsg::Error { message, exit_code, stderr_tail } => {
+            WorkerMsg::Error { message, exit_code, stderr_tail, slot_id } => {
                 self.rx = None;
                 let payload = self.pack(&serde_json::json!({
                     "exit_code": exit_code,
                     "message": message,
                     "stderr_tail": stderr_tail,
+                    "slot_id": slot_id,
                 }));
                 Some((he, payload))
             }
@@ -477,6 +487,7 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&done_payload.1).unwrap();
         assert_eq!(v["port"], "/dev/ttyACM0");
         assert_eq!(v["exit_code"], 0);
+        assert_eq!(v["slot_id"], "sensor:esp32-s3-xiao:8c1e3aaf");
     }
 
     #[test]
