@@ -40,3 +40,14 @@ logs/
 # Local orchestrator data
 orchestrator/data/
 ~/.config/r2-compiler/
+
+# Apiaries — independent git repos per SPEC-APIARY-LAYOUT §2.1. The
+# r2-composer outer repo MUST NOT track them; each apiary the operator
+# creates lives as its own git repo (and may be pushed to their own
+# GitHub namespace per SPEC-APIARY-CREATE §2.5). The single exception
+# is `apiaries/rocker-rig` — the BUNDLED worked example referenced by
+# SPEC-APIARY-COMPOSE §12 that ships with r2-composer for spec
+# conformance + as the C-1 canvas test fixture.
+apiaries/*
+!apiaries/rocker-rig
+!apiaries/rocker-rig/**
