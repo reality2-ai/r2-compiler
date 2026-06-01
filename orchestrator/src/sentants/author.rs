@@ -167,6 +167,7 @@ fn construct_brief(payload: &[u8]) -> String {
         "ensemble" => "author-ensemble.md.tera",
         "plugin"   => "author-plugin.md.tera",
         "sentant"  => "author-sentant.md.tera",
+        "flash"    => "author-flash.md.tera",
         _          => "author-chat.md.tera",
     };
 
@@ -213,6 +214,7 @@ fn template_engine() -> &'static tera::Tera {
         const T_ENSEMBLE: &str = include_str!("../../prompts/author-ensemble.md.tera");
         const T_PLUGIN:   &str = include_str!("../../prompts/author-plugin.md.tera");
         const T_SENTANT:  &str = include_str!("../../prompts/author-sentant.md.tera");
+        const T_FLASH:    &str = include_str!("../../prompts/author-flash.md.tera");
 
         let mut tera = tera::Tera::default();
         tera.add_raw_templates(vec![
@@ -223,6 +225,7 @@ fn template_engine() -> &'static tera::Tera {
             ("author-ensemble.md.tera", T_ENSEMBLE),
             ("author-plugin.md.tera",   T_PLUGIN),
             ("author-sentant.md.tera",  T_SENTANT),
+            ("author-flash.md.tera",    T_FLASH),
         ])
         .expect("Tera template parse failed — fix the .tera files");
         tera
@@ -348,6 +351,17 @@ mod tests {
         let payload = br#"{"kind":"future-thing","message":"hi","canvas":{},"history":[]}"#;
         let brief = construct_brief(payload);
         assert!(brief.contains("open chat"));
+    }
+
+    #[test]
+    fn kind_dispatch_flash() {
+        let payload = br#"{"kind":"flash","message":"flash esp32-s3-xiao on /dev/ttyACM0 as the kitchen sensor","canvas":{},"history":[]}"#;
+        let brief = construct_brief(payload);
+        assert!(brief.contains("FLASH a board"));
+        assert!(brief.contains("SPEC-APIARY-FLASH.md"));
+        assert!(brief.contains("device.slot.create"));
+        assert!(brief.contains("deploy.first_install.start"));
+        assert!(brief.contains("flash esp32-s3-xiao on /dev/ttyACM0"));
     }
 
     #[test]

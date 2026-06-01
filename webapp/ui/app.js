@@ -1664,6 +1664,9 @@ function onUsbChipClick(p) {
   input.value = `flash ${carrier} on ${p.port} as `;
   input.focus();
   input.selectionStart = input.selectionEnd = input.value.length;
+  // Signal the authoring intent — the next author.prompt will carry
+  // kind:"flash" so the AuthorSentant picks author-flash.md.tera per #25.
+  setAuthoringKind("flash");
   refreshChatSendButton();
 }
 
