@@ -40,6 +40,7 @@ pub struct RosterSentant {
     entry_hash: u32,
     transition_hash: u32,
     first_install_done_hash: u32,
+    device_enrolled_hash: u32,
 }
 
 impl RosterSentant {
@@ -53,6 +54,7 @@ impl RosterSentant {
             entry_hash:       reg.hash_of("r2.composer.device.entry").unwrap(),
             transition_hash:  reg.hash_of("r2.composer.device.transition").unwrap(),
             first_install_done_hash: reg.hash_of("r2.composer.deploy.first_install.done").unwrap(),
+            device_enrolled_hash:    reg.hash_of("r2.composer.device.enrolled").unwrap(),
         }
     }
 
@@ -91,6 +93,13 @@ impl Sentant for RosterSentant {
             self.handle_first_install_done(event.payload, actions);
             return;
         }
+        // device.enrolled from ProvisionSentant — transition slot to
+        // enrolled and stamp device_pk + cert_status. Sentant-sourced
+        // (the Provision sentant synthesised it), so accept any source.
+        if event.hash == self.device_enrolled_hash {
+            self.handle_device_enrolled(event.payload, actions);
+            return;
+        }
     }
 
     fn state(&self) -> StateId { self.state as StateId }
@@ -110,6 +119,7 @@ impl Sentant for RosterSentant {
                 reg.hash_of("r2.composer.device.slot.create").unwrap(),
                 reg.hash_of("r2.composer.device.list").unwrap(),
                 reg.hash_of("r2.composer.deploy.first_install.done").unwrap(),
+                reg.hash_of("r2.composer.device.enrolled").unwrap(),
             ];
             Box::leak(subs.into_boxed_slice())
         })
@@ -285,6 +295,80 @@ impl RosterSentant {
             });
         }
     }
+
+    /// Transition slot `flashed_pending_pk → enrolled` on device.enrolled
+    /// from the Provision sentant. Stamps `device_pk` + `cert_status` +
+    /// `provision_state` per SPEC-APIARY-FLASH §2.2.
+    fn handle_device_enrolled(&self, payload: &[u8], actions: &mut ActionBuf) {
+        let v: serde_json::Value =
+            serde_json::from_slice(payload).unwrap_or(serde_json::Value::Null);
+        let slot_id   = v.get("slot_id").and_then(|x| x.as_str()).unwrap_or("");
+        let device_pk = v.get("device_pk").and_then(|x| x.as_str()).unwrap_or("");
+        if slot_id.is_empty() || device_pk.is_empty() {
+            tracing::warn!("roster: device.enrolled missing slot_id or device_pk");
+            return;
+        }
+
+        let mut applied_transition: Option<(String, String, String)> = None;
+        self.with_apiary(|apiary_dir| {
+            let mut r = roster::load(apiary_dir);
+            let Some(row) = roster::find_mut(&mut r, slot_id) else {
+                tracing::warn!("roster: device.enrolled for unknown slot_id {slot_id}");
+                return;
+            };
+            if row.state != "flashed_pending_pk" {
+                tracing::warn!(
+                    "roster: device.enrolled for slot in state {:?} — expected flashed_pending_pk; ignoring",
+                    row.state
+                );
+                return;
+            }
+            let now = roster::now_iso8601();
+            let from = row.state.clone();
+            if let Err(e) = roster::apply_transition(
+                row, "enrolled", "enrolled_via_ble",
+                &format!("cert issued for {device_pk}"),
+                &now,
+            ) {
+                tracing::warn!("roster: enrolled transition failed: {e}");
+                return;
+            }
+            row.device_pk = Some(device_pk.to_string());
+            row.cert_status = "valid".to_string();
+            row.provision_state = "valid".to_string();
+            applied_transition = Some((from, "enrolled".to_string(),
+                format!("cert issued for {device_pk}")));
+            if let Err(e) = roster::save(apiary_dir, &r) {
+                tracing::error!("roster: save failed: {e}");
+            }
+        });
+
+        if let Some((from, to, detail)) = applied_transition {
+            let payload = serde_json::to_vec(&serde_json::json!({
+                "slot_id": slot_id,
+                "from": from,
+                "to": to,
+                "detail": detail,
+            })).unwrap_or_default();
+            actions.push(Action::Send {
+                target: Target::Broadcast,
+                event_hash: self.transition_hash,
+                payload: PayloadBuf::from_slice(&payload),
+            });
+
+            self.with_apiary(|apiary_dir| {
+                let r = roster::load(apiary_dir);
+                if let Some(row) = r.devices.iter().find(|d| d.slot_id == slot_id) {
+                    let payload = serde_json::to_vec(row).unwrap_or_default();
+                    actions.push(Action::Send {
+                        target: Target::Broadcast,
+                        event_hash: self.entry_hash,
+                        payload: PayloadBuf::from_slice(&payload),
+                    });
+                }
+            });
+        }
+    }
 }
 
 #[cfg(test)]
@@ -411,6 +495,84 @@ mod tests {
         assert_eq!(last.from, "built");
         assert_eq!(last.to, "flashed_pending_pk");
         assert!(last.detail.contains("/dev/ttyACM0"));
+    }
+
+    #[test]
+    fn device_enrolled_drives_flashed_pending_to_enrolled() {
+        // Seed roster with a slot in flashed_pending_pk.
+        let dir = tempfile::tempdir().unwrap();
+        let mut r = Roster::default();
+        let mut row = roster::new_placeholder(
+            "sensor", "rocker-sensor", "esp32-s3-xiao", "kitchen", "2026-06-01T00:00:00Z");
+        row.state = "flashed_pending_pk".to_string();
+        let slot_id = row.slot_id.clone();
+        r.devices.push(row);
+        roster::save(dir.path(), &r).unwrap();
+
+        let mut s = RosterSentant::new(ctx_for(dir.path()));
+        let mut actions = ActionBuf::new();
+        let device_pk = "ab".repeat(32);
+        let payload = format!(
+            r#"{{"slot_id":"{slot_id}","device_pk":"{device_pk}","cert_hex":"{}","network":"lab","ssid":"Lab","offer_hex":""}}"#,
+            "11".repeat(144),
+        );
+        s.handle_event(
+            &Event {
+                hash: s.device_enrolled_hash,
+                payload: payload.as_bytes(),
+                source: EventSource::Local(0),
+                msg_id: 0,
+            },
+            &mut actions,
+        );
+
+        // Row mutated.
+        let r = roster::load(dir.path());
+        let row = r.devices.iter().find(|d| d.slot_id == slot_id).expect("row");
+        assert_eq!(row.state, "enrolled");
+        assert_eq!(row.device_pk.as_deref(), Some(device_pk.as_str()));
+        assert_eq!(row.cert_status, "valid");
+        assert_eq!(row.provision_state, "valid");
+
+        // device.transition + device.entry emitted.
+        let collected: Vec<_> = actions.drain().collect();
+        let has_transition = collected.iter().any(|a| matches!(a,
+            Action::Send { event_hash, .. } if *event_hash == s.transition_hash));
+        let has_entry = collected.iter().any(|a| matches!(a,
+            Action::Send { event_hash, .. } if *event_hash == s.entry_hash));
+        assert!(has_transition, "expected device.transition");
+        assert!(has_entry, "expected device.entry");
+    }
+
+    #[test]
+    fn device_enrolled_for_wrong_state_sluffs() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut r = Roster::default();
+        let row = roster::new_placeholder(
+            "sensor", "rocker-sensor", "esp32-s3-xiao", "k", "2026-06-01T00:00:00Z");
+        let slot_id = row.slot_id.clone();
+        // Stays in `placeholder`, not flashed_pending_pk.
+        r.devices.push(row);
+        roster::save(dir.path(), &r).unwrap();
+
+        let mut s = RosterSentant::new(ctx_for(dir.path()));
+        let mut actions = ActionBuf::new();
+        let payload = format!(
+            r#"{{"slot_id":"{slot_id}","device_pk":"{}","cert_hex":""}}"#,
+            "ab".repeat(32),
+        );
+        s.handle_event(
+            &Event {
+                hash: s.device_enrolled_hash,
+                payload: payload.as_bytes(),
+                source: EventSource::Local(0),
+                msg_id: 0,
+            },
+            &mut actions,
+        );
+        assert!(actions.is_empty(), "must not transition from placeholder");
+        let r = roster::load(dir.path());
+        assert_eq!(r.devices[0].state, "placeholder");
     }
 
     #[test]

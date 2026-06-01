@@ -168,6 +168,7 @@ fn construct_brief(payload: &[u8]) -> String {
         "plugin"   => "author-plugin.md.tera",
         "sentant"  => "author-sentant.md.tera",
         "flash"    => "author-flash.md.tera",
+        "provision" => "author-provision.md.tera",
         _          => "author-chat.md.tera",
     };
 
@@ -215,17 +216,19 @@ fn template_engine() -> &'static tera::Tera {
         const T_PLUGIN:   &str = include_str!("../../prompts/author-plugin.md.tera");
         const T_SENTANT:  &str = include_str!("../../prompts/author-sentant.md.tera");
         const T_FLASH:    &str = include_str!("../../prompts/author-flash.md.tera");
+        const T_PROVISION: &str = include_str!("../../prompts/author-provision.md.tera");
 
         let mut tera = tera::Tera::default();
         tera.add_raw_templates(vec![
-            ("_base.md.tera",           T_BASE),
-            ("author-chat.md.tera",     T_CHAT),
-            ("author-apiary.md.tera",   T_APIARY),
-            ("author-board.md.tera",    T_BOARD),
-            ("author-ensemble.md.tera", T_ENSEMBLE),
-            ("author-plugin.md.tera",   T_PLUGIN),
-            ("author-sentant.md.tera",  T_SENTANT),
-            ("author-flash.md.tera",    T_FLASH),
+            ("_base.md.tera",            T_BASE),
+            ("author-chat.md.tera",      T_CHAT),
+            ("author-apiary.md.tera",    T_APIARY),
+            ("author-board.md.tera",     T_BOARD),
+            ("author-ensemble.md.tera",  T_ENSEMBLE),
+            ("author-plugin.md.tera",    T_PLUGIN),
+            ("author-sentant.md.tera",   T_SENTANT),
+            ("author-flash.md.tera",     T_FLASH),
+            ("author-provision.md.tera", T_PROVISION),
         ])
         .expect("Tera template parse failed — fix the .tera files");
         tera

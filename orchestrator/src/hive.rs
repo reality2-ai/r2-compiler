@@ -29,9 +29,12 @@ use tracing::{info, warn};
 use std::path::PathBuf;
 
 use crate::plugins::{
-    ClaudeCodePlugin, FlasherPlugin, FlasherSlot, UsbSnapshot, UsbWatcherPlugin,
+    ClaudeCodePlugin, FlasherPlugin, FlasherSlot, KeyholderPlugin, KeyholderSlot,
+    ProvisionPlugin, ProvisionSlot, UsbSnapshot, UsbWatcherPlugin,
 };
-use crate::sentants::{AuthorSentant, BuilderSentant, DeploySentant, RosterCtx, RosterSentant};
+use crate::sentants::{
+    AuthorSentant, BuilderSentant, DeploySentant, ProvisionSentant, RosterCtx, RosterSentant,
+};
 
 /// Bridge handle exposed to the axum layer.
 #[derive(Clone)]
@@ -76,11 +79,22 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
     let roster_ctx: RosterCtx = Arc::new(Mutex::new(apiary_path));
     let roster_ctx_engine = roster_ctx.clone();
     let roster_ctx_deploy = roster_ctx.clone();
+    let roster_ctx_keyholder = roster_ctx.clone();
+    let roster_ctx_provision = roster_ctx.clone();
+    let roster_ctx_provision_sentant = roster_ctx.clone();
 
     // Flasher params slot — Deploy sentant fills it before firing
     // the flasher's CMD_START.
     let flasher_slot: FlasherSlot = Arc::new(Mutex::new(None));
     let flasher_slot_engine = flasher_slot.clone();
+
+    // F3 side-slots for keyholder + provision plugins. Filled by the
+    // ProvisionSentant before each PluginCall.
+    let keyholder_slot: KeyholderSlot = Arc::new(Mutex::new(None));
+    let keyholder_slot_engine = keyholder_slot.clone();
+    let provision_slot: ProvisionSlot = Arc::new(Mutex::new(None));
+    let provision_slot_engine = provision_slot.clone();
+    let config_root = KeyholderPlugin::default_config_root();
 
     // USB snapshot — usb-watcher updates; WS handler reads for replay.
     let usb_snapshot: UsbSnapshot = Arc::new(Mutex::new(Vec::new()));
@@ -119,6 +133,18 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         ));
         info!("engine: registered usb-watcher plugin (id={usb_pid})");
 
+        // Keyholder (F3) — Ed25519 signer for DeviceCertificate minting.
+        let keyholder_pid = bus.register_plugin(Box::new(KeyholderPlugin::new(
+            0, roster_ctx_keyholder, keyholder_slot_engine.clone(), config_root.clone(),
+        )));
+        info!("engine: registered keyholder plugin (id={keyholder_pid})");
+
+        // Provision (F3) — WiFi credential store + #wifi_offer composer.
+        let provision_pid = bus.register_plugin(Box::new(ProvisionPlugin::new(
+            0, roster_ctx_provision, provision_slot_engine.clone(), config_root,
+        )));
+        info!("engine: registered provision plugin (id={provision_pid})");
+
         // Register sentants.
         let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));
         info!("engine: registered Builder sentant (id={build_sid})");
@@ -134,6 +160,16 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
             DeploySentant::new(flasher_pid, flasher_slot_engine, repo_root.clone(), roster_ctx_deploy)
         ));
         info!("engine: registered Deploy sentant (id={deploy_sid})");
+
+        // Provision sentant — orchestrates the keyholder→provision chain
+        // on device.identity_observed. F3 v0.1: operator triggers it via
+        // chat; F4's beacon-observer will emit it from real BLE traffic.
+        let provision_sid = bus.register_sentant(Box::new(ProvisionSentant::new(
+            keyholder_pid, keyholder_slot_engine,
+            provision_pid, provision_slot_engine,
+            roster_ctx_provision_sentant,
+        )));
+        info!("engine: registered Provision sentant (id={provision_sid})");
 
         bus.init_all();
         info!("engine: bus initialised");

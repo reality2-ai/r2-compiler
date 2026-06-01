@@ -157,8 +157,17 @@ const KNOWN_EVENTS: &[&str] = &[
 
     // Provision / WiFi (SPEC-APIARY-FLASH §5) — F3+
     "r2.composer.provision.network.upsert",
+    "r2.composer.provision.network.upserted",
+    "r2.composer.provision.networks.list",
+    "r2.composer.provision.networks.listed",
     "r2.composer.provision.offer.start",
     "r2.composer.provision.offer.progress",
+    "r2.composer.provision.offer.composed",
+    "r2.composer.provision.cert_issued",
+    "r2.composer.provision.cert_error",
+    "r2.composer.provision.error",
+    "r2.composer.device.identity_observed",
+    "r2.composer.device.enrolled",
 
     // OTA batch (SPEC-APIARY-FLASH §6) — F5+
     "r2.composer.deploy.batch.start",

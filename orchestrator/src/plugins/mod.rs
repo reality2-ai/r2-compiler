@@ -11,8 +11,12 @@
 
 pub mod claude_code;
 pub mod flasher;
+pub mod keyholder;
+pub mod provision;
 pub mod usb_watcher;
 
 pub use claude_code::ClaudeCodePlugin;
 pub use flasher::{FlashParams, FlashRegion, FlasherPlugin, FlasherSlot};
+pub use keyholder::{KeyholderPlugin, KeyholderSlot, SignCertRequest};
+pub use provision::{ComposeOfferRequest, ProvisionPlugin, ProvisionSlot};
 pub use usb_watcher::{UsbPort, UsbSnapshot, UsbWatcherPlugin};
