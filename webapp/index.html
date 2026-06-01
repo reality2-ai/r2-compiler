@@ -46,6 +46,7 @@
              the destination and the default. -->
         <div class="canvas-mode-strip">
           <button class="mode-tab active" data-mode="apiary" id="mode-apiary">Apiary</button>
+          <button class="mode-tab" data-mode="stack" id="mode-stack" title="R2 protocol stack view (R2-INTRO §The Protocol Stack)">Stack</button>
           <button class="mode-tab" data-mode="quick" id="mode-quick">Quick build</button>
           <span class="mode-flex"></span>
           <span class="mode-hint" id="mode-hint">v0.1 mock — open an apiary later via <code>r2.composer.apiary.open</code></span>
@@ -88,6 +89,29 @@
             <ul class="empty-apiary-list" id="empty-apiary-list">
               <li class="empty-apiary-pending">scanning <code>apiaries/</code>…</li>
             </ul>
+          </div>
+        </div>
+
+        <!-- Stack view — R2 protocol stack as 8 layers (L0-L7) per
+             R2-INTRO §"The Protocol Stack". Shows the active apiary's
+             composition rendered against the layer model, with the
+             L4/L5 trust boundary as the load-bearing horizontal. The
+             "view as" selector picks which hive's stack we're looking
+             at (orchestrator / device-firmware / webapp). Read-only in
+             v0.1; future chunks make layers click-to-edit. -->
+        <div class="canvas-stack hidden" id="canvas-stack">
+          <div class="stack-header">
+            <h2>R2 protocol stack</h2>
+            <div class="stack-view-as">
+              <label for="stack-view-select">View as</label>
+              <select id="stack-view-select" class="stack-select"></select>
+            </div>
+            <span class="stack-flex"></span>
+            <span class="stack-citation" title="R2-INTRO §The Protocol Stack">R2-INTRO §The Protocol Stack</span>
+          </div>
+          <div class="stack-layers" id="stack-layers"></div>
+          <div class="stack-empty hidden" id="stack-empty">
+            <p>Open an apiary to see its stack.</p>
           </div>
         </div>
 

@@ -67,6 +67,7 @@ let wasmReady = false;
   // C-1: apiary canvas frame + mode switcher between Apiary and
   // Quick build. Mocked state for v0.1; C-2 wires to apiary.toml.
   attachApiaryCanvas();
+  attachStackView();
   attachCanvasModeSwitcher();
 
   // Phase 1.7b: connect to the orchestrator's /r2 WebSocket and wire
@@ -1461,17 +1462,25 @@ function attachApiaryCanvas() {
 function renderApiaryAll() {
   const emptyPane = $("canvas-apiary-empty");
   const livePane  = $("canvas-apiary");
+  // Only swap apiary/empty panes if Apiary mode is the active one;
+  // Stack/Quick modes manage their own visibility.
+  const activeMode = document.querySelector(".mode-tab.active")?.dataset.mode || "apiary";
   if (apiaryState) {
-    emptyPane.classList.add("hidden");
-    livePane.classList.remove("hidden");
+    if (activeMode === "apiary") {
+      emptyPane.classList.add("hidden");
+      livePane.classList.remove("hidden");
+    }
     renderApiaryHeader(apiaryState);
     renderApiaryRoles(apiaryState);
     renderApiarySummary(apiaryState);
-  } else {
+  } else if (activeMode === "apiary") {
     livePane.classList.add("hidden");
     emptyPane.classList.remove("hidden");
     renderKnownApiaries();
   }
+  // Stack view depends on apiaryState + deviceSlots — refresh when
+  // either changes, even if Stack isn't the active mode (cheap re-render).
+  if (activeMode === "stack") renderStackAll();
   // Header pill + mode hint reflect live status.
   const pillName = $("apiary-pill-name");
   if (pillName) {
@@ -1559,6 +1568,7 @@ function onDeviceEntry(payload) {
   if (!payload || typeof payload !== "object" || !payload.slot_id) return;
   deviceSlots.set(payload.slot_id, payload);
   if (apiaryState && apiaryIsLive) renderApiaryRoles(apiaryState);
+  if (currentMode() === "stack") renderStackAll();
 }
 
 function onDeviceTransition(payload) {
@@ -1567,6 +1577,7 @@ function onDeviceTransition(payload) {
   if (row) {
     row.state = payload.to || row.state;
     if (apiaryState && apiaryIsLive) renderApiaryRoles(apiaryState);
+    if (currentMode() === "stack") renderStackAll();
   }
   // Surface in the build console as one calm line — informative without
   // being noisy. (Per [[feedback-calm-computing]].)
@@ -1811,5 +1822,294 @@ function switchCanvasMode(mode) {
     t.classList.toggle("active", t.dataset.mode === mode);
   });
   $("canvas-apiary").classList.toggle("hidden", mode !== "apiary");
+  $("canvas-stack").classList.toggle("hidden", mode !== "stack");
   $("canvas").classList.toggle("hidden", mode !== "quick");
+  // Empty-canvas pane is for apiary mode only.
+  const empty = $("canvas-apiary-empty");
+  if (empty) {
+    if (mode !== "apiary") empty.classList.add("hidden");
+    else if (!apiaryState) empty.classList.remove("hidden");
+  }
+  if (mode === "stack") renderStackAll();
+}
+
+// ── Stack view (R2-INTRO §The Protocol Stack) ────────────────────────
+//
+// Renders the active apiary's composition against R2's 8-layer model.
+// "View as" lets the operator switch the perspective (which hive in
+// the apiary are we looking at — orchestrator, device firmware, webapp).
+// Lower-layer descriptions are derived from the carrier slug for v0.1
+// (we don't yet have board.toml [transports] tables in webapp state);
+// L5 + L7 are populated from apiaryState + deviceSlots.
+
+const STACK_LAYERS = [
+  { num: 7, label: "Application",  high: true,  populate: populateL7 },
+  { num: 6, label: "Management",   high: true,  populate: populateL6 },
+  { num: 5, label: "Trust",        high: true,  populate: populateL5 },
+  // trust boundary divider injected between L5 and L4
+  { num: 4, label: "Wire",         high: false, populate: populateL4 },
+  { num: 3, label: "Routing",      high: false, populate: populateL3 },
+  { num: 2, label: "Discovery",    high: false, populate: populateL2 },
+  { num: 1, label: "Transport",    high: false, populate: populateL1 },
+  { num: 0, label: "Hardware",     high: false, populate: populateL0 },
+];
+
+// Hive options the "View as" selector enumerates for a given apiary.
+function stackHiveOptions(apiary) {
+  const opts = [{ value: "orchestrator", label: "orchestrator hive (this workstation)" }];
+  if (apiary && Array.isArray(apiary.roles)) {
+    for (const role of apiary.roles) {
+      for (const t of (role.targets || [])) {
+        // MOCK uses `type`; real serialised ApiaryState uses `target_type`.
+        const tkind = t.type || t.target_type;
+        const kind = tkind === "mcu-fw" ? "device firmware"
+                   : tkind === "beam"   ? "webapp / native"
+                   : tkind === "native" ? "native"
+                   : tkind || "?";
+        opts.push({
+          value: `target:${t.id}`,
+          label: `${kind} · ${role.role} on ${t.host}`,
+          target: { ...t, _type: tkind },
+          role,
+        });
+      }
+    }
+  }
+  return opts;
+}
+
+let stackCurrentView = "orchestrator";
+
+function renderStackAll() {
+  const layers = $("stack-layers");
+  const empty  = $("stack-empty");
+  const sel    = $("stack-view-select");
+  if (!layers || !sel) return;
+
+  if (!apiaryState) {
+    layers.innerHTML = "";
+    empty.classList.remove("hidden");
+    sel.innerHTML = "";
+    return;
+  }
+  empty.classList.add("hidden");
+
+  // Populate the "view as" selector.
+  const opts = stackHiveOptions(apiaryState);
+  sel.innerHTML = "";
+  for (const o of opts) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.label;
+    sel.appendChild(opt);
+  }
+  // Preserve previous selection if still valid; otherwise default to
+  // first non-orchestrator (more interesting view) when one exists.
+  if (!opts.some((o) => o.value === stackCurrentView)) {
+    stackCurrentView = opts.length > 1 ? opts[1].value : "orchestrator";
+  }
+  sel.value = stackCurrentView;
+
+  const ctx = stackContextFor(stackCurrentView, apiaryState);
+
+  // Render the 8 layers + the trust boundary between L5 and L4.
+  layers.innerHTML = "";
+  for (const layer of STACK_LAYERS) {
+    if (layer.num === 4) {
+      const div = document.createElement("div");
+      div.className = "stack-trust-boundary";
+      div.innerHTML = `<span>trust boundary (L4/L5) · R2-TRUST §6.1</span>`;
+      layers.appendChild(div);
+    }
+    const row = document.createElement("div");
+    row.className = `stack-layer ${layer.high ? "high" : ""}`;
+    const num = document.createElement("div");
+    num.className = "stack-layer-num";
+    num.textContent = `L${layer.num}`;
+    const lbl = document.createElement("div");
+    lbl.className = "stack-layer-label";
+    lbl.textContent = layer.label;
+    const content = document.createElement("div");
+    content.className = "stack-layer-content";
+    layer.populate(content, ctx);
+    row.appendChild(num);
+    row.appendChild(lbl);
+    row.appendChild(content);
+    layers.appendChild(row);
+  }
+}
+
+// Build a per-view context object for the layer populators. `view` is
+// either "orchestrator" or "target:<id>". The context exposes the kind
+// of hive, the carrier (if any), and a reference back to the apiary.
+function stackContextFor(view, apiary) {
+  if (view === "orchestrator") {
+    return {
+      hive: "orchestrator",
+      carrier: "workstation",
+      apiary,
+      role: null,
+      target: null,
+    };
+  }
+  const opts = stackHiveOptions(apiary);
+  const hit = opts.find((o) => o.value === view);
+  return {
+    hive: hit?.target?._type === "mcu-fw" ? "device" : "native",
+    carrier: hit?.target?.host || "unknown",
+    apiary,
+    role: hit?.role || null,
+    target: hit?.target || null,
+  };
+}
+
+// ── Layer populators ─────────────────────────────────────────────────
+
+function populateL0(el, ctx) {
+  // Hardware row.
+  if (ctx.hive === "orchestrator") {
+    el.innerHTML = `<span class="mono">workstation</span> <span class="muted">(linux-x86_64 / your dev machine)</span>`;
+    return;
+  }
+  if (ctx.carrier.startsWith("esp32-s3")) {
+    el.innerHTML = `<span class="stack-chip kind-transport">${escape(ctx.carrier)}</span><span class="mono">ESP32-S3 · 240 MHz dual-core · 8 MB Flash · 512 KB SRAM</span>`;
+  } else if (ctx.carrier.startsWith("esp32-c6")) {
+    el.innerHTML = `<span class="stack-chip kind-transport">${escape(ctx.carrier)}</span><span class="mono">ESP32-C6 · 160 MHz RISC-V · 4 MB Flash · 512 KB SRAM</span>`;
+  } else if (ctx.carrier.startsWith("linux")) {
+    el.innerHTML = `<span class="mono">${escape(ctx.carrier)}</span>`;
+  } else {
+    el.innerHTML = `<span class="mono">${escape(ctx.carrier)}</span>`;
+  }
+}
+
+function populateL1(el, ctx) {
+  // Transport row. Hardcoded from carrier slug for v0.1 — future
+  // chunks read board.toml [transports] from the orchestrator.
+  if (ctx.hive === "orchestrator") {
+    el.innerHTML = `
+      <span class="stack-chip kind-transport">WebSocket /r2</span>
+      <span class="stack-chip kind-transport">USB-host (esptool)</span>
+      <span class="stack-chip kind-transport">BLE (BlueZ — F4)</span>
+    `;
+    return;
+  }
+  const transports = [];
+  if (ctx.carrier.startsWith("esp32-s3")) {
+    transports.push("BLE 5.0", "WiFi 2.4 GHz", "USB-CDC", "UART");
+  } else if (ctx.carrier.startsWith("esp32-c6")) {
+    transports.push("BLE 5.0", "WiFi 6 (2.4 GHz)", "IEEE 802.15.4", "USB-CDC", "UART");
+  } else {
+    transports.push("TCP", "BLE");
+  }
+  el.innerHTML = transports.map((t) =>
+    `<span class="stack-chip kind-transport">${escape(t)}</span>`
+  ).join("");
+}
+
+function populateL2(el, ctx) {
+  el.innerHTML = `
+    <span class="stack-chip kind-substrate">R2-BEACON</span>
+    <span class="muted">capability Bloom · class hash · presence advertising</span>
+  `;
+}
+
+function populateL3(el, ctx) {
+  el.innerHTML = `
+    <span class="mono">R2-ROUTE</span>
+    <span class="muted">observed-path · spray-and-wait</span>
+  `;
+}
+
+function populateL4(el, ctx) {
+  el.innerHTML = `
+    <span class="mono">r2-engine · r2-fnv · r2-cbor · HMAC</span>
+    <span class="muted">R2-WIRE</span>
+  `;
+}
+
+function populateL5(el, ctx) {
+  // Trust row — apiary-specific.
+  const ap = ctx.apiary;
+  const fp = ap?.tg?.keyholderFingerprint || ap?.tg?.keyholder_fp || "—";
+  const chips = [];
+  if (ctx.hive === "orchestrator") {
+    // Orchestrator HOLDS the TG private key (substrate/keyholder).
+    chips.push(`<span class="stack-chip kind-substrate">substrate/keyholder</span>`);
+    chips.push(`<span class="stack-chip kind-substrate">substrate/provision</span>`);
+    chips.push(`<span class="mono">TG fp ${escape(String(fp).slice(0, 16))}…</span>`);
+  } else {
+    // Devices hold a DeviceCertificate, not the TG private key.
+    const enrolled = countEnrolledFor(ctx);
+    const total    = countSlotsFor(ctx);
+    chips.push(`<span class="stack-chip kind-substrate">DeviceCertificate</span>`);
+    chips.push(`<span class="mono">${enrolled}/${total} enrolled · TG fp ${escape(String(fp).slice(0, 16))}…</span>`);
+  }
+  el.innerHTML = chips.join(" ");
+}
+
+function populateL6(el, ctx) {
+  if (ctx.hive === "orchestrator") {
+    el.innerHTML = `<span class="mono">r2.mgmt.*</span> <span class="muted">local control plane · /r2 WebSocket</span>`;
+  } else {
+    el.innerHTML = `<span class="muted">— minimal management surface on constrained hives</span>`;
+  }
+}
+
+function populateL7(el, ctx) {
+  // Application row — sentants + plugins.
+  if (ctx.hive === "orchestrator") {
+    const sentants = ["Apiary", "Author", "Builder", "Deploy", "Roster", "Provision"];
+    const composer = ["composer/claude-code", "composer/flasher", "composer/usb-watcher"];
+    el.innerHTML =
+      sentants.map((s) => `<span class="stack-chip kind-sentant">${escape(s)}</span>`).join(" ") +
+      " " +
+      composer.map((c) => `<span class="stack-chip kind-plugin">${escape(c)}</span>`).join(" ");
+    return;
+  }
+  if (ctx.role) {
+    // Show the ensemble + a sentant-count hint. Future: resolve the
+    // ensemble.toml from catalogue/ to list the actual sentants+plugins.
+    const ensemble = ctx.role.ensemble;
+    const count = ctx.role.sentantCount;
+    el.innerHTML = `
+      <span class="stack-chip kind-sentant">${escape(ensemble)}</span>
+      <span class="muted">${count ? count + " sentants" : "ensemble"} · resolve from <code class="mono">catalogue/ensembles/${escape(ensemble)}/</code></span>
+    `;
+    return;
+  }
+  el.innerHTML = `<span class="muted">no target selected</span>`;
+}
+
+// Count enrolled / total slots that match a target. Matches by role
+// + host: the slot's host is the carrier slug, and the slot's role is
+// the role slug — both visible in deviceSlots entries.
+function countSlotsFor(ctx) {
+  if (!ctx.role || !ctx.target) return 0;
+  let n = 0;
+  for (const row of deviceSlots.values()) {
+    if (row.role === ctx.role.role && row.host === ctx.target.host) n++;
+  }
+  return n;
+}
+function countEnrolledFor(ctx) {
+  if (!ctx.role || !ctx.target) return 0;
+  let n = 0;
+  for (const row of deviceSlots.values()) {
+    if (row.role === ctx.role.role && row.host === ctx.target.host && row.state === "enrolled") n++;
+  }
+  return n;
+}
+
+function currentMode() {
+  return document.querySelector(".mode-tab.active")?.dataset.mode || "apiary";
+}
+
+function attachStackView() {
+  const sel = $("stack-view-select");
+  if (sel) {
+    sel.addEventListener("change", () => {
+      stackCurrentView = sel.value;
+      renderStackAll();
+    });
+  }
 }

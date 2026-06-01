@@ -1484,3 +1484,182 @@ footer a:hover { color: var(--accent); text-decoration: underline; }
   .canvas-status { margin-right: 0; }
   .chat-input-row { padding: 8px 10px; }
 }
+
+/* ── Stack view (R2-INTRO §The Protocol Stack) ────────────────────────
+ * 8-layer R2 protocol stack rendered top-down (L7 highest, L0 lowest).
+ * The trust boundary at L4/L5 is drawn as a horizontal divider — it's
+ * the load-bearing architectural feature per R2-TRUST §6.1.
+ * Calm-computing posture: subtle borders, no decoration, content
+ * should be legible at the edge of awareness.
+ */
+
+.canvas-stack {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+}
+.canvas-stack.hidden { display: none; }
+.stack-empty.hidden { display: none; }
+
+.stack-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.stack-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+.stack-view-as {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stack-view-as label {
+  font-size: 11px;
+  color: var(--fg-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.stack-select {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.stack-select:hover { background: var(--bg-hover); }
+.stack-flex { flex: 1; }
+.stack-citation {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.stack-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;            /* rows touch; subtle separation */
+  background: var(--border);  /* shows through as 1px borders */
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stack-layer {
+  display: grid;
+  grid-template-columns: 56px 140px 1fr;
+  background: var(--bg-panel);
+  align-items: center;
+  min-height: 38px;
+}
+.stack-layer.high {
+  /* L5-L7 — above the trust boundary, slight authenticated tint */
+  background: var(--bg-elevated);
+}
+.stack-layer-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  text-align: center;
+  border-right: 1px solid var(--border);
+  padding: 8px 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stack-layer-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-dim);
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+.stack-layer-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--fg);
+}
+.stack-layer-content .muted {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+.stack-layer-content .mono {
+  font-family: var(--font-mono);
+  color: var(--fg-dim);
+}
+
+/* Layer content chips — sentants, plugins, transports. */
+.stack-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg);
+}
+.stack-chip.kind-sentant   { border-color: rgba(107, 220, 255, 0.4); color: var(--sentant); }
+.stack-chip.kind-plugin    { border-color: rgba(197, 150, 240, 0.4); color: var(--plugin); }
+.stack-chip.kind-transport { border-color: rgba(255, 184, 107, 0.4); color: var(--board); }
+.stack-chip.kind-substrate { border-color: rgba(167, 232, 122, 0.4); color: var(--ensemble); }
+
+/* The L4/L5 trust boundary divider. */
+.stack-trust-boundary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  background: var(--bg);
+  color: var(--accent-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-top: 1px solid var(--accent-dim);
+  border-bottom: 1px solid var(--accent-dim);
+}
+.stack-trust-boundary::before,
+.stack-trust-boundary::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--accent-dim);
+  opacity: 0.4;
+}
+
+.stack-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .stack-layer { grid-template-columns: 40px 100px 1fr; }
+  .stack-layer-label { font-size: 11px; padding: 6px 8px; }
+  .stack-layer-content { padding: 6px 8px; }
+}
