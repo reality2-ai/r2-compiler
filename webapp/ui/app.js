@@ -1965,26 +1965,40 @@ function stackContextFor(view, apiary) {
 
 // ── Layer populators ─────────────────────────────────────────────────
 
+// Look up a board entry from the loaded catalogue manifest by slug.
+// Returns null if the manifest hasn't loaded yet or no slug matches.
+function manifestBoard(slug) {
+  if (!manifest || !slug) return null;
+  return (manifest.boards || []).find((b) => b.slug === slug) || null;
+}
+
+// Look up an ensemble entry from the manifest by slug.
+function manifestEnsemble(slug) {
+  if (!manifest || !slug) return null;
+  return (manifest.ensembles || []).find((e) => e.slug === slug) || null;
+}
+
 function populateL0(el, ctx) {
-  // Hardware row.
   if (ctx.hive === "orchestrator") {
     el.innerHTML = `<span class="mono">workstation</span> <span class="muted">(linux-x86_64 / your dev machine)</span>`;
     return;
   }
-  if (ctx.carrier.startsWith("esp32-s3")) {
-    el.innerHTML = `<span class="stack-chip kind-transport">${escape(ctx.carrier)}</span><span class="mono">ESP32-S3 · 240 MHz dual-core · 8 MB Flash · 512 KB SRAM</span>`;
-  } else if (ctx.carrier.startsWith("esp32-c6")) {
-    el.innerHTML = `<span class="stack-chip kind-transport">${escape(ctx.carrier)}</span><span class="mono">ESP32-C6 · 160 MHz RISC-V · 4 MB Flash · 512 KB SRAM</span>`;
-  } else if (ctx.carrier.startsWith("linux")) {
-    el.innerHTML = `<span class="mono">${escape(ctx.carrier)}</span>`;
-  } else {
-    el.innerHTML = `<span class="mono">${escape(ctx.carrier)}</span>`;
+  const board = manifestBoard(ctx.carrier);
+  if (board) {
+    // Catalogue-derived hardware blurb (chip · flash · PSRAM).
+    el.innerHTML = `
+      <span class="stack-chip kind-transport">${escape(board.slug)}</span>
+      <span class="mono">${escape(board.hw_blurb || board.chip || "")}</span>
+      <span class="muted">${escape(board.arch || "")}</span>
+    `;
+    return;
   }
+  el.innerHTML = `<span class="mono">${escape(ctx.carrier)}</span> <span class="muted">(not in catalogue)</span>`;
 }
 
 function populateL1(el, ctx) {
-  // Transport row. Hardcoded from carrier slug for v0.1 — future
-  // chunks read board.toml [transports] from the orchestrator.
+  // Transport row — from board.toml [capabilities].provides + [usb]
+  // (distilled by tools/build-catalogue-index.py at build time).
   if (ctx.hive === "orchestrator") {
     el.innerHTML = `
       <span class="stack-chip kind-transport">WebSocket /r2</span>
@@ -1993,13 +2007,11 @@ function populateL1(el, ctx) {
     `;
     return;
   }
-  const transports = [];
-  if (ctx.carrier.startsWith("esp32-s3")) {
-    transports.push("BLE 5.0", "WiFi 2.4 GHz", "USB-CDC", "UART");
-  } else if (ctx.carrier.startsWith("esp32-c6")) {
-    transports.push("BLE 5.0", "WiFi 6 (2.4 GHz)", "IEEE 802.15.4", "USB-CDC", "UART");
-  } else {
-    transports.push("TCP", "BLE");
+  const board = manifestBoard(ctx.carrier);
+  const transports = board?.transports || [];
+  if (transports.length === 0) {
+    el.innerHTML = `<span class="muted">no transports declared in catalogue — fill in <code>[capabilities]</code> + <code>[usb]</code> in <code>board.toml</code></span>`;
+    return;
   }
   el.innerHTML = transports.map((t) =>
     `<span class="stack-chip kind-transport">${escape(t)}</span>`
@@ -2056,7 +2068,7 @@ function populateL6(el, ctx) {
 }
 
 function populateL7(el, ctx) {
-  // Application row — sentants + plugins.
+  // Application row — sentants + plugins resolved from the manifest.
   if (ctx.hive === "orchestrator") {
     const sentants = ["Apiary", "Author", "Builder", "Deploy", "Roster", "Provision"];
     const composer = ["composer/claude-code", "composer/flasher", "composer/usb-watcher"];
@@ -2066,18 +2078,40 @@ function populateL7(el, ctx) {
       composer.map((c) => `<span class="stack-chip kind-plugin">${escape(c)}</span>`).join(" ");
     return;
   }
-  if (ctx.role) {
-    // Show the ensemble + a sentant-count hint. Future: resolve the
-    // ensemble.toml from catalogue/ to list the actual sentants+plugins.
-    const ensemble = ctx.role.ensemble;
-    const count = ctx.role.sentantCount;
+  if (!ctx.role) {
+    el.innerHTML = `<span class="muted">no target selected</span>`;
+    return;
+  }
+  // Look up the ensemble in the manifest. Render each sentant + plugin
+  // as its own chip — what the operator actually composed.
+  const ens = manifestEnsemble(ctx.role.ensemble);
+  if (!ens) {
     el.innerHTML = `
-      <span class="stack-chip kind-sentant">${escape(ensemble)}</span>
-      <span class="muted">${count ? count + " sentants" : "ensemble"} · resolve from <code class="mono">catalogue/ensembles/${escape(ensemble)}/</code></span>
+      <span class="stack-chip kind-sentant">${escape(ctx.role.ensemble)}</span>
+      <span class="muted">ensemble not in catalogue manifest (run <code>tools/build-catalogue-index.py</code>?)</span>
     `;
     return;
   }
-  el.innerHTML = `<span class="muted">no target selected</span>`;
+  const sentantChips = (ens.sentants || []).map((s) =>
+    `<span class="stack-chip kind-sentant" title="${escape(s.description || s.class || '')}">${escape(s.name || s.slug)}</span>`
+  ).join(" ");
+  // Group plugins by category for a calmer read at the layer level.
+  const byCat = new Map();
+  for (const p of (ens.plugins || [])) {
+    const c = p.category || "?";
+    if (!byCat.has(c)) byCat.set(c, []);
+    byCat.get(c).push(p);
+  }
+  const pluginChips = Array.from(byCat.entries())
+    .map(([cat, plugs]) => plugs.map((p) =>
+      `<span class="stack-chip kind-plugin" title="${escape(p.description || '')}">${escape(cat)}/${escape(p.slug)}</span>`
+    ).join(" "))
+    .join(" ");
+  el.innerHTML = `
+    <span class="stack-chip kind-substrate" title="role-ensemble">${escape(ens.slug)}</span>
+    ${sentantChips}
+    ${pluginChips}
+  `;
 }
 
 // Count enrolled / total slots that match a target. Matches by role

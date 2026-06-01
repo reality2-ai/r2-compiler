@@ -21,6 +21,25 @@
       "compulsory_capabilities": [
         "ai.reality2.deploy.ota"
       ],
+      "capabilities": [
+        "r2.hw.spi",
+        "r2.hw.i2c",
+        "r2.hw.gpio",
+        "r2.hw.adc",
+        "r2.hw.uart",
+        "r2.hw.ble",
+        "r2.hw.wifi",
+        "r2.hw.flash",
+        "r2.hw.sdspi",
+        "r2.hw.usb-serial-jtag"
+      ],
+      "transports": [
+        "UART",
+        "BLE 5.0",
+        "WiFi 2.4 GHz",
+        "USB-CDC"
+      ],
+      "hw_blurb": "ESP32C6 \u00b7 4 MB Flash",
       "files": [
         {
           "path": "catalogue/boards/esp32-c6-dfr1117/AI-CONTEXT.md",
@@ -97,6 +116,29 @@
       "compulsory_capabilities": [
         "ai.reality2.deploy.ota"
       ],
+      "capabilities": [
+        "r2.hw.spi",
+        "r2.hw.i2c",
+        "r2.hw.gpio",
+        "r2.hw.adc",
+        "r2.hw.uart",
+        "r2.hw.ble",
+        "r2.hw.wifi",
+        "r2.hw.flash",
+        "r2.hw.psram",
+        "r2.hw.sdspi",
+        "r2.hw.ws2812",
+        "r2.hw.rmt",
+        "r2.hw.usb-serial-jtag",
+        "r2.hw.usb-uart"
+      ],
+      "transports": [
+        "UART",
+        "BLE 5.0",
+        "WiFi 2.4 GHz",
+        "USB-CDC"
+      ],
+      "hw_blurb": "ESP32S3 \u00b7 8 MB Flash \u00b7 PSRAM",
       "files": [
         {
           "path": "catalogue/boards/esp32-s3-devkitc/AI-CONTEXT.md",
@@ -173,6 +215,29 @@
       "compulsory_capabilities": [
         "ai.reality2.deploy.ota"
       ],
+      "capabilities": [
+        "r2.hw.spi",
+        "r2.hw.i2c",
+        "r2.hw.gpio",
+        "r2.hw.adc",
+        "r2.hw.uart",
+        "r2.hw.ble",
+        "r2.hw.wifi",
+        "r2.hw.flash",
+        "r2.hw.psram",
+        "r2.hw.sdspi",
+        "r2.hw.ledc",
+        "r2.hw.usb-serial-jtag",
+        "r2.hw.lipo-charger",
+        "r2.hw.lipo-buck"
+      ],
+      "transports": [
+        "UART",
+        "BLE 5.0",
+        "WiFi 2.4 GHz",
+        "USB-CDC"
+      ],
+      "hw_blurb": "ESP32S3 \u00b7 8 MB Flash \u00b7 PSRAM",
       "files": [
         {
           "path": "catalogue/boards/esp32-s3-xiao/AI-CONTEXT.md",

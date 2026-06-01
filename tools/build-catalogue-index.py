@@ -123,6 +123,8 @@ def scan_board(dir: Path) -> dict[str, Any] | None:
         data = tomllib.load(f)
     board = data.get("board", {})
     compulsory = data.get("compulsory_plugins", {})
+    capabilities = data.get("capabilities", {}).get("provides", [])
+    usb_table = data.get("usb", {})
     return {
         "kind": "board",
         "slug": dir.name,
@@ -140,8 +142,54 @@ def scan_board(dir: Path) -> dict[str, Any] | None:
         "flash_size_mb": data.get("build", {}).get("flash_size_mb", 0),
         "psram": data.get("build", {}).get("psram", False),
         "compulsory_capabilities": compulsory.get("capabilities", []),
+        "capabilities": capabilities,
+        # Pre-derived transport set for the Stack view L1 row — distilled
+        # from the capabilities list + the USB table. Catalogue-builder
+        # owns this so the webapp doesn't repeat the heuristic.
+        "transports": derive_transports(capabilities, usb_table),
+        # Pre-formatted hardware blurb for the L0 row.
+        "hw_blurb": derive_hw_blurb(board, data.get("build", {})),
         "files": list_files(dir),
     }
+
+
+# Map an r2.hw.* capability to a human transport label. Only includes
+# transports that show up at L1 (BLE, WiFi, 802.15.4, UART). Wired-only
+# capabilities like SPI/I2C/GPIO live at L0 in the stack model.
+HW_TRANSPORT_LABELS: dict[str, str] = {
+    "r2.hw.ble":      "BLE 5.0",
+    "r2.hw.ble.5":    "BLE 5.0",
+    "r2.hw.ble.4":    "BLE 4.2",
+    "r2.hw.wifi":     "WiFi 2.4 GHz",
+    "r2.hw.wifi.6":   "WiFi 6 (2.4 GHz)",
+    "r2.hw.802.15.4": "IEEE 802.15.4",
+    "r2.hw.uart":     "UART",
+}
+
+
+def derive_transports(capabilities: list[str], usb: dict[str, Any]) -> list[str]:
+    seen: list[str] = []
+    for cap in capabilities:
+        label = HW_TRANSPORT_LABELS.get(cap)
+        if label and label not in seen:
+            seen.append(label)
+    # USB-CDC inferred from the presence of a [usb] table — every board
+    # we ship with one is flashable + serial-attached.
+    if usb:
+        seen.append("USB-CDC")
+    return seen
+
+
+def derive_hw_blurb(board: dict[str, Any], build: dict[str, Any]) -> str:
+    parts: list[str] = []
+    chip = board.get("chip", "").upper()
+    if chip:
+        parts.append(chip)
+    if build.get("flash_size_mb"):
+        parts.append(f"{build['flash_size_mb']} MB Flash")
+    if build.get("psram"):
+        parts.append("PSRAM")
+    return " · ".join(parts)
 
 
 def scan_plugin(dir: Path) -> dict[str, Any] | None:
