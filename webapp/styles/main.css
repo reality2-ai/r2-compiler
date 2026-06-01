@@ -1067,6 +1067,62 @@ table.csv-table tbody tr:hover { background: var(--bg-hover); }
 .csv-meta { margin-top: 8px; font-size: 11px; color: var(--fg-muted); font-family: var(--font-mono); }
 .csv-empty { color: var(--fg-muted); font-style: italic; }
 
+/* ── USB footer strip (F2b) ─────────────────────────────────────────── */
+.usb-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.usb-footer.hidden { display: none; }
+.usb-footer-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.usb-footer-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.usb-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--fg-dim);
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+}
+.usb-chip:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+  border-color: var(--accent-dim);
+}
+.usb-chip-carrier { color: var(--board); }
+.usb-chip-port    { color: var(--fg-muted); font-size: 10px; }
+
+/* Confidence-based borders — calm-loud only when ambiguous/unknown */
+.usb-chip-vid-pid    { /* normal — single carrier match */ }
+.usb-chip-ambiguous  { border-color: rgba(255,214,107,0.4); }
+.usb-chip-unknown    { border-color: var(--border); opacity: 0.7; }
+.usb-chip-ambiguous .usb-chip-carrier { color: #ffd66b; }
+.usb-chip-unknown   .usb-chip-carrier { color: var(--fg-muted); }
+
 /* Bottom panel — tabbed [Chat][Build]. Replaces the older
  * single-purpose build-pane; the build console is now one of the
  * tab panes here. */

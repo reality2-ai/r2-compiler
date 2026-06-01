@@ -145,6 +145,15 @@
         </div>
         </div><!-- /.workspace-top -->
 
+        <!-- Calm USB footer strip (F2b) — peripheral row of currently-
+             attached serial devices the orchestrator's usb-watcher has
+             observed. Clicking a chip seeds the chat with a flash
+             utterance. Hidden when no devices are attached. -->
+        <div class="usb-footer hidden" id="usb-footer">
+          <span class="usb-footer-label">USB</span>
+          <div class="usb-footer-list" id="usb-footer-list"></div>
+        </div>
+
         <!-- Bottom panel — tabbed [Chat][Build]. Chat is the AI dialog
              that mutates the canvas above; Build is the compile-event
              stream from `r2.composer.build.*`. -->

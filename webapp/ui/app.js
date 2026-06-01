@@ -909,6 +909,15 @@ function onEvent(name, payload) {
     onDeviceTransition(payload);
     return;
   }
+  // USB watcher events (F2b)
+  if (name === "r2.composer.usb.attached") {
+    onUsbAttached(payload);
+    return;
+  }
+  if (name === "r2.composer.usb.detached") {
+    onUsbDetached(payload);
+    return;
+  }
   // Author flow → chat pane
   if (name.startsWith("r2.composer.author.")) {
     onAuthorEvent(name, payload);
@@ -1574,6 +1583,88 @@ function slotsForTarget(role, host) {
     if (row.role === role && row.host === host) out.push(row);
   }
   return out.sort((a, b) => (a.name_alias || a.slot_id).localeCompare(b.name_alias || b.slot_id));
+}
+
+// ── USB watcher (F2b) ─────────────────────────────────────────────────
+//
+// Calm peripheral footer chip per SPEC-APIARY-FLASH §9.1: a board
+// appearing on the bus is AMBIENT, not modal. The footer strip is
+// hidden when nothing is attached.
+//
+// Clicking a chip seeds the chat with a flash utterance so the AI can
+// pick up the port + carrier_guess as selection context (per
+// [[feedback-ai-chat-primary]]).
+
+const attachedUsb = new Map();   // port → UsbPort
+
+function onUsbAttached(payload) {
+  if (!payload || typeof payload !== "object" || !payload.port) return;
+  attachedUsb.set(payload.port, payload);
+  renderUsbFooter();
+}
+
+function onUsbDetached(payload) {
+  if (!payload || typeof payload !== "object" || !payload.port) return;
+  attachedUsb.delete(payload.port);
+  renderUsbFooter();
+}
+
+function renderUsbFooter() {
+  const footer = $("usb-footer");
+  const list = $("usb-footer-list");
+  if (!footer || !list) return;
+  if (attachedUsb.size === 0) {
+    footer.classList.add("hidden");
+    return;
+  }
+  footer.classList.remove("hidden");
+  list.innerHTML = "";
+  // Sort by port so the strip is stable across re-renders.
+  const ports = Array.from(attachedUsb.values())
+    .sort((a, b) => a.port.localeCompare(b.port));
+  for (const p of ports) {
+    const chip = document.createElement("button");
+    chip.className = `usb-chip usb-chip-${p.guess_confidence}`;
+    chip.dataset.port = p.port;
+    const label = p.carrier_guess
+      ? escape(p.carrier_guess)
+      : (p.candidates && p.candidates.length
+          ? `${escape(p.candidates[0])} …`
+          : `${p.vid.toString(16).padStart(4,'0')}:${p.pid.toString(16).padStart(4,'0')}`);
+    const portShort = p.port.replace(/^\/dev\//, "");
+    chip.innerHTML = `
+      <span class="usb-chip-carrier">${label}</span>
+      <span class="usb-chip-port">${escape(portShort)}</span>
+    `;
+    chip.title = describeUsbPort(p);
+    chip.addEventListener("click", () => onUsbChipClick(p));
+    list.appendChild(chip);
+  }
+}
+
+function describeUsbPort(p) {
+  const vidpid = `vid=${p.vid.toString(16).padStart(4,'0')} pid=${p.pid.toString(16).padStart(4,'0')}`;
+  let line = `${p.port} · ${vidpid}`;
+  if (p.serial) line += ` · ${p.serial}`;
+  if (p.guess_confidence === "ambiguous" && p.candidates?.length) {
+    line += `\nCandidates: ${p.candidates.join(", ")}`;
+  } else if (p.guess_confidence === "vid-pid" && p.carrier_guess) {
+    line += `\nMatched: ${p.carrier_guess}`;
+  } else {
+    line += "\nUnknown vid/pid — not in catalogue";
+  }
+  return line;
+}
+
+function onUsbChipClick(p) {
+  const input = $("chat-input");
+  if (!input) return;
+  const carrier = p.carrier_guess
+    || (p.candidates?.length ? `(one of ${p.candidates.join(" / ")})` : "this device");
+  input.value = `flash ${carrier} on ${p.port} as `;
+  input.focus();
+  input.selectionStart = input.selectionEnd = input.value.length;
+  refreshChatSendButton();
 }
 
 // Called per `r2.composer.apiary.entry` event from the orchestrator at

@@ -205,6 +205,12 @@ async fn handle_socket(
     apiary_state: Option<Arc<ApiaryState>>,
     repo_root: PathBuf,
 ) {
+    // Capture the USB snapshot for replay — done before any state-
+    // sensitive ops so the WS client gets the current attached set
+    // right after hello.
+    let usb_snapshot_replay: Vec<_> = engine.usb_snapshot.lock().ok()
+        .map(|s| s.clone())
+        .unwrap_or_default();
     info!("/r2 client connected");
 
     let mut outbound_rx = engine.subscribe_outbound();
@@ -250,6 +256,21 @@ async fn handle_socket(
         let env = WireEnvelope::Event {
             name: "r2.composer.apiary.active".into(),
             payload: serde_json::to_value(ap.as_ref()).unwrap_or(serde_json::Value::Null),
+        };
+        let text = serde_json::to_string(&env).unwrap_or_else(|_| "{}".into());
+        if socket.send(Message::Text(text.into())).await.is_err() {
+            return;
+        }
+    }
+
+    // Replay currently-attached USB devices so the canvas footer chip
+    // populates immediately for late-connecting clients. (Live attach/
+    // detach events thereafter flow through the usb-watcher plugin via
+    // the bus.)
+    for port in &usb_snapshot_replay {
+        let env = WireEnvelope::Event {
+            name: "r2.composer.usb.attached".into(),
+            payload: serde_json::to_value(port).unwrap_or(serde_json::Value::Null),
         };
         let text = serde_json::to_string(&env).unwrap_or_else(|_| "{}".into());
         if socket.send(Message::Text(text.into())).await.is_err() {

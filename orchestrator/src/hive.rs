@@ -28,7 +28,9 @@ use tracing::{info, warn};
 
 use std::path::PathBuf;
 
-use crate::plugins::{ClaudeCodePlugin, FlasherPlugin, FlasherSlot};
+use crate::plugins::{
+    ClaudeCodePlugin, FlasherPlugin, FlasherSlot, UsbSnapshot, UsbWatcherPlugin,
+};
 use crate::sentants::{AuthorSentant, BuilderSentant, DeploySentant, RosterCtx, RosterSentant};
 
 /// Bridge handle exposed to the axum layer.
@@ -42,6 +44,10 @@ pub struct EngineHandle {
     /// Mutated by the WS handler (or future apiary-open flow) when the
     /// orchestrator switches apiaries. None when no apiary is open.
     pub roster_ctx: RosterCtx,
+    /// Shared snapshot of currently-attached USB serial devices —
+    /// updated by the usb-watcher plugin's background thread, read by
+    /// the WS handler so late-connecting clients see current state.
+    pub usb_snapshot: UsbSnapshot,
 }
 
 impl EngineHandle {
@@ -76,6 +82,11 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
     let flasher_slot: FlasherSlot = Arc::new(Mutex::new(None));
     let flasher_slot_engine = flasher_slot.clone();
 
+    // USB snapshot — usb-watcher updates; WS handler reads for replay.
+    let usb_snapshot: UsbSnapshot = Arc::new(Mutex::new(Vec::new()));
+    let usb_snapshot_engine = usb_snapshot.clone();
+    let catalogue_root = repo_root.join("catalogue");
+
     std::thread::spawn(move || {
         let mut bus = EventBus::new();
 
@@ -101,6 +112,12 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
             FlasherPlugin::new(0, flasher_slot_engine.clone())
         ));
         info!("engine: registered flasher plugin (id={flasher_pid})");
+
+        // USB watcher (F2b) — polls /sys/class/tty/ every 1.5s on Linux.
+        let usb_pid = bus.register_plugin(Box::new(
+            UsbWatcherPlugin::new(0, catalogue_root.clone(), usb_snapshot_engine)
+        ));
+        info!("engine: registered usb-watcher plugin (id={usb_pid})");
 
         // Register sentants.
         let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));
@@ -152,5 +169,6 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         inbound_tx,
         outbound_tx,
         roster_ctx,
+        usb_snapshot,
     }
 }

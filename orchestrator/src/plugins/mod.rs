@@ -11,6 +11,8 @@
 
 pub mod claude_code;
 pub mod flasher;
+pub mod usb_watcher;
 
 pub use claude_code::ClaudeCodePlugin;
 pub use flasher::{FlashParams, FlashRegion, FlasherPlugin, FlasherSlot};
+pub use usb_watcher::{UsbPort, UsbSnapshot, UsbWatcherPlugin};
