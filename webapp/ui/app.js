@@ -58,6 +58,12 @@ let wasmReady = false;
   renderBoards(manifest.boards);
   renderEnsembles(manifest.ensembles);
   attachGlobalHandlers();
+  // Stack view depends on the manifest (board.transports, hw_blurb,
+  // ensemble.plugins/sentants). If it's the active mode at the moment
+  // the manifest lands, refresh so L0/L1/L7 populate.
+  if (typeof renderStackAll === "function" && currentMode?.() === "stack") {
+    renderStackAll();
+  }
 
   // Phase 1.7c: canvas + drag-and-drop. The catalogue panels become
   // the drag SOURCES; the canvas in the centre is the drop TARGET;
@@ -1855,8 +1861,15 @@ const STACK_LAYERS = [
 ];
 
 // Hive options the "View as" selector enumerates for a given apiary.
+// Three layers of perspective per SPEC-R2-COMPOSER §3.2:
+//   1. webapp hive — this browser (always available; you're in it)
+//   2. orchestrator hive — the workstation localhost server
+//   3. one row per (role × target) — device firmware / native / beam etc.
 function stackHiveOptions(apiary) {
-  const opts = [{ value: "orchestrator", label: "orchestrator hive (this workstation)" }];
+  const opts = [
+    { value: "webapp",       label: "webapp hive (this browser)" },
+    { value: "orchestrator", label: "orchestrator hive (this workstation)" },
+  ];
   if (apiary && Array.isArray(apiary.roles)) {
     for (const role of apiary.roles) {
       for (const t of (role.targets || [])) {
@@ -1904,9 +1917,11 @@ function renderStackAll() {
     sel.appendChild(opt);
   }
   // Preserve previous selection if still valid; otherwise default to
-  // first non-orchestrator (more interesting view) when one exists.
+  // the most interesting view available: first device target if any,
+  // else orchestrator (always present), else webapp.
   if (!opts.some((o) => o.value === stackCurrentView)) {
-    stackCurrentView = opts.length > 1 ? opts[1].value : "orchestrator";
+    const firstTarget = opts.find((o) => o.value.startsWith("target:"));
+    stackCurrentView = firstTarget ? firstTarget.value : "orchestrator";
   }
   sel.value = stackCurrentView;
 
@@ -1943,6 +1958,15 @@ function renderStackAll() {
 // either "orchestrator" or "target:<id>". The context exposes the kind
 // of hive, the carrier (if any), and a reference back to the apiary.
 function stackContextFor(view, apiary) {
+  if (view === "webapp") {
+    return {
+      hive: "webapp",
+      carrier: "browser",
+      apiary,
+      role: null,
+      target: null,
+    };
+  }
   if (view === "orchestrator") {
     return {
       hive: "orchestrator",
@@ -1979,6 +2003,22 @@ function manifestEnsemble(slug) {
 }
 
 function populateL0(el, ctx) {
+  if (ctx.hive === "webapp") {
+    // Browser + WASM runtime. Best-effort UA sniff for the visible
+    // identity; the calm chip is the constant "browser" label.
+    const ua = navigator.userAgent || "";
+    const browser =
+      /Firefox\/(\d+)/.exec(ua)?.[0] ||
+      /Chrome\/(\d+)/.exec(ua)?.[0] ||
+      /Safari\/(\d+)/.exec(ua)?.[0] ||
+      "browser";
+    el.innerHTML = `
+      <span class="stack-chip kind-transport">browser</span>
+      <span class="mono">${escape(browser)}</span>
+      <span class="muted">wasm32-unknown-unknown · DOM · canvas</span>
+    `;
+    return;
+  }
   if (ctx.hive === "orchestrator") {
     el.innerHTML = `<span class="mono">workstation</span> <span class="muted">(linux-x86_64 / your dev machine)</span>`;
     return;
@@ -1999,6 +2039,17 @@ function populateL0(el, ctx) {
 function populateL1(el, ctx) {
   // Transport row — from board.toml [capabilities].provides + [usb]
   // (distilled by tools/build-catalogue-index.py at build time).
+  if (ctx.hive === "webapp") {
+    // The browser hive has exactly one R2 transport: the WebSocket up
+    // to the orchestrator. Read the live r2-status indicator's class
+    // (set by setR2Status — ok = open, warn = connecting, err = closed).
+    const wsDot = document.getElementById("r2-dot");
+    const labelText = wsDot?.classList.contains("ok")  ? "WebSocket /r2 · open"
+                    : wsDot?.classList.contains("err") ? "WebSocket /r2 · closed"
+                    : "WebSocket /r2 · connecting";
+    el.innerHTML = `<span class="stack-chip kind-transport">${escape(labelText)}</span>`;
+    return;
+  }
   if (ctx.hive === "orchestrator") {
     el.innerHTML = `
       <span class="stack-chip kind-transport">WebSocket /r2</span>
@@ -2044,7 +2095,14 @@ function populateL5(el, ctx) {
   const ap = ctx.apiary;
   const fp = ap?.tg?.keyholderFingerprint || ap?.tg?.keyholder_fp || "—";
   const chips = [];
-  if (ctx.hive === "orchestrator") {
+  if (ctx.hive === "webapp") {
+    // The webapp does NOT hold the TG private key (per R2-TRUST: only
+    // the orchestrator's keyholder does). It inherits TG context over
+    // /r2; the active apiary's class hash + keyholder fp are visible
+    // to it but it cannot sign.
+    chips.push(`<span class="stack-chip kind-substrate">TG context (read-only)</span>`);
+    chips.push(`<span class="mono">inherits apiary TG via /r2 · fp ${escape(String(fp).slice(0, 16))}…</span>`);
+  } else if (ctx.hive === "orchestrator") {
     // Orchestrator HOLDS the TG private key (substrate/keyholder).
     chips.push(`<span class="stack-chip kind-substrate">substrate/keyholder</span>`);
     chips.push(`<span class="stack-chip kind-substrate">substrate/provision</span>`);
@@ -2060,15 +2118,30 @@ function populateL5(el, ctx) {
 }
 
 function populateL6(el, ctx) {
+  if (ctx.hive === "webapp") {
+    // Webapp consumes the orchestrator's mgmt surface; doesn't run one.
+    el.innerHTML = `<span class="muted">consumes <code class="mono">r2.composer.*</code> events over /r2 · no local control plane</span>`;
+    return;
+  }
   if (ctx.hive === "orchestrator") {
     el.innerHTML = `<span class="mono">r2.mgmt.*</span> <span class="muted">local control plane · /r2 WebSocket</span>`;
-  } else {
-    el.innerHTML = `<span class="muted">— minimal management surface on constrained hives</span>`;
+    return;
   }
+  el.innerHTML = `<span class="muted">— minimal management surface on constrained hives</span>`;
 }
 
 function populateL7(el, ctx) {
   // Application row — sentants + plugins resolved from the manifest.
+  if (ctx.hive === "webapp") {
+    // Per SPEC-R2-COMPOSER §3.2 webapp-hive sentants + §3.3 UI plugins.
+    const sentants = ["Catalogue", "Composition", "SourceViewer", "Builder", "Author"];
+    const plugins  = ["webapp-canvas", "webapp-source-view", "stack-view"];
+    el.innerHTML =
+      sentants.map((s) => `<span class="stack-chip kind-sentant">${escape(s)}</span>`).join(" ") +
+      " " +
+      plugins.map((p) => `<span class="stack-chip kind-plugin">${escape(p)}</span>`).join(" ");
+    return;
+  }
   if (ctx.hive === "orchestrator") {
     const sentants = ["Apiary", "Author", "Builder", "Deploy", "Roster", "Provision"];
     const composer = ["composer/claude-code", "composer/flasher", "composer/usb-watcher"];
