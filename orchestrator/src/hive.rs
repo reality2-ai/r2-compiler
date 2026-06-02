@@ -31,7 +31,7 @@ use std::path::PathBuf;
 use crate::composer::{ClaudeCodePlugin, FlasherPlugin, FlasherSlot, UsbSnapshot, UsbWatcherPlugin};
 use crate::substrate::{
     BeaconObserverPlugin, BeaconSnapshot, KeyholderPlugin, KeyholderSlot,
-    ProvisionPlugin, ProvisionSlot,
+    ProvisionHandshakePlugin, ProvisionHandshakeSlot, ProvisionPlugin, ProvisionSlot,
 };
 use crate::sentants::{
     AuthorSentant, BuilderSentant, DeploySentant, ProvisionSentant, RosterCtx, RosterSentant,
@@ -88,6 +88,7 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
     let roster_ctx_keyholder = roster_ctx.clone();
     let roster_ctx_provision = roster_ctx.clone();
     let roster_ctx_provision_sentant = roster_ctx.clone();
+    let roster_ctx_handshake = roster_ctx.clone();
 
     // Flasher params slot — Deploy sentant fills it before firing
     // the flasher's CMD_START.
@@ -100,6 +101,10 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
     let keyholder_slot_engine = keyholder_slot.clone();
     let provision_slot: ProvisionSlot = Arc::new(Mutex::new(None));
     let provision_slot_engine = provision_slot.clone();
+    // F4b side-slot for the provision-handshake substrate. Sentant
+    // fills it before dispatching CMD_START.
+    let handshake_slot: ProvisionHandshakeSlot = Arc::new(Mutex::new(None));
+    let handshake_slot_engine = handshake_slot.clone();
     let config_root = KeyholderPlugin::default_config_root();
 
     // USB snapshot — usb-watcher updates; WS handler reads for replay.
@@ -163,6 +168,15 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         ));
         info!("engine: registered substrate/beacon-observer (id={beacon_pid})");
 
+        // Provision handshake (F4b) — L2CAP CoC + R2-PROVISION join
+        // exchange. Linux-only (bluer). Mints real R2-TRUST
+        // DeviceCertificates via TrustGroup::process_join_request.
+        let handshake_pid = bus.register_plugin(Box::new(ProvisionHandshakePlugin::new(
+            0, roster_ctx_handshake, handshake_slot_engine.clone(),
+            ProvisionHandshakePlugin::default_config_root(),
+        )));
+        info!("engine: registered substrate/provision-handshake (id={handshake_pid})");
+
         // Register sentants.
         let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));
         info!("engine: registered Builder sentant (id={build_sid})");
@@ -179,12 +193,15 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         ));
         info!("engine: registered Deploy sentant (id={deploy_sid})");
 
-        // Provision sentant — orchestrates the keyholder→provision chain
-        // on device.identity_observed. F3 v0.1: operator triggers it via
-        // chat; F4's beacon-observer will emit it from real BLE traffic.
+        // Provision sentant (F4b) — orchestrates the
+        // beacon_observed → handshake → identity_observed → enrolled
+        // chain. The pre-F4b signature (keyholder+provision side-slots)
+        // is gone; the L2CAP handshake substrate mints + delivers the
+        // R2-TRUST DeviceCertificate end-to-end.
+        let _ = (keyholder_pid, keyholder_slot_engine,
+                 provision_pid, provision_slot_engine); // F4c will revive for WiFi offer
         let provision_sid = bus.register_sentant(Box::new(ProvisionSentant::new(
-            keyholder_pid, keyholder_slot_engine,
-            provision_pid, provision_slot_engine,
+            handshake_pid, handshake_slot_engine,
             roster_ctx_provision_sentant,
         )));
         info!("engine: registered Provision sentant (id={provision_sid})");

@@ -55,20 +55,30 @@ uuid       = { version = "1", features = ["v4"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 sha2       = "0.10"
 hex        = "0.4"
+rand       = "0.8"
+rand_chacha = "0.3"
 
 # F4: BLE beacon scanning. btleplug is cross-platform (Linux/macOS/Win
 # via bluez/CoreBluetooth/WinRT) and exposes manufacturer-data AD
-# payloads which is what R2-BEACON §7.7.3 needs. Used by the
-# beacon-observer substrate component to observe nearby R2 devices in
-# provisioning mode.
+# payloads which is what R2-BEACON §7.7.3 needs.
 btleplug   = "0.12"
 
 # Error handling.
 anyhow     = "1"
 
-# Vendored R2 protocol crates (Phase 1.7a+ — engine + naming).
+# Vendored R2 protocol crates (Phase 1.7a+ — engine + naming + trust + wire).
 r2-engine = { workspace = true, features = ["alloc", "std", "large-payloads"] }
 r2-fnv    = { workspace = true, features = ["std"] }
+r2-wire   = { workspace = true }
+r2-trust  = { workspace = true }
+
+# F4b: L2CAP CoC handshake on PSM 0x00D2 (R2-BLE §6.2). bluer is
+# Linux-only (bluez via D-Bus); macOS / Windows L2CAP CoC paths differ
+# enough we'd need separate impls there. tokio-stream pairs with
+# bluer's adapter event stream.
+[target.'cfg(target_os = "linux")'.dependencies]
+bluer        = { version = "0.17", features = ["bluetoothd", "l2cap"] }
+tokio-stream = "0.1"
 
 [dev-dependencies]
 tempfile = "3"

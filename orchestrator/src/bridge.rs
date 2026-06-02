@@ -170,6 +170,8 @@ const KNOWN_EVENTS: &[&str] = &[
     "r2.composer.device.enrolled",
     "r2.composer.device.beacon_observed",
     "r2.composer.device.beacon_lost",
+    "r2.composer.provision.handshake.start",
+    "r2.composer.provision.handshake.error",
 
     // OTA batch (SPEC-APIARY-FLASH §6) — F5+
     "r2.composer.deploy.batch.start",

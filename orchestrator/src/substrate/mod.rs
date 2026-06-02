@@ -22,7 +22,11 @@ pub mod beacon_observer;
 pub mod beacon_parser;
 pub mod keyholder;
 pub mod provision;
+pub mod provision_handshake;
 
 pub use beacon_observer::{BeaconObservation, BeaconObserverPlugin, BeaconSnapshot};
 pub use keyholder::{KeyholderPlugin, KeyholderSlot, SignCertRequest};
 pub use provision::{ComposeOfferRequest, ProvisionPlugin, ProvisionSlot};
+pub use provision_handshake::{
+    HandshakeRequest, ProvisionHandshakePlugin, ProvisionHandshakeSlot,
+};
