@@ -29,7 +29,10 @@ use tracing::{info, warn};
 use std::path::PathBuf;
 
 use crate::composer::{ClaudeCodePlugin, FlasherPlugin, FlasherSlot, UsbSnapshot, UsbWatcherPlugin};
-use crate::substrate::{KeyholderPlugin, KeyholderSlot, ProvisionPlugin, ProvisionSlot};
+use crate::substrate::{
+    BeaconObserverPlugin, BeaconSnapshot, KeyholderPlugin, KeyholderSlot,
+    ProvisionPlugin, ProvisionSlot,
+};
 use crate::sentants::{
     AuthorSentant, BuilderSentant, DeploySentant, ProvisionSentant, RosterCtx, RosterSentant,
 };
@@ -49,6 +52,11 @@ pub struct EngineHandle {
     /// updated by the usb-watcher plugin's background thread, read by
     /// the WS handler so late-connecting clients see current state.
     pub usb_snapshot: UsbSnapshot,
+    /// Shared snapshot of currently-observed R2-BEACONs — updated by
+    /// the beacon-observer substrate. WS replay uses this so a late-
+    /// connecting client sees the current set without waiting for the
+    /// next scan window.
+    pub beacon_snapshot: BeaconSnapshot,
 }
 
 impl EngineHandle {
@@ -97,6 +105,9 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
     // USB snapshot — usb-watcher updates; WS handler reads for replay.
     let usb_snapshot: UsbSnapshot = Arc::new(Mutex::new(Vec::new()));
     let usb_snapshot_engine = usb_snapshot.clone();
+    // Beacon snapshot — beacon-observer updates; same WS replay role.
+    let beacon_snapshot: BeaconSnapshot = Arc::new(Mutex::new(Vec::new()));
+    let beacon_snapshot_engine = beacon_snapshot.clone();
     let catalogue_root = repo_root.join("catalogue");
 
     std::thread::spawn(move || {
@@ -142,6 +153,15 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
             0, roster_ctx_provision, provision_slot_engine.clone(), config_root,
         )));
         info!("engine: registered substrate/provision (id={provision_pid})");
+
+        // Beacon observer (F4) — BLE scan + R2-BEACON parser. Linux-
+        // primary; macOS works for development. If no BLE adapter is
+        // available the plugin logs a warning and stays inert — the
+        // hive does NOT fail to boot.
+        let beacon_pid = bus.register_plugin(Box::new(
+            BeaconObserverPlugin::new(0, beacon_snapshot_engine)
+        ));
+        info!("engine: registered substrate/beacon-observer (id={beacon_pid})");
 
         // Register sentants.
         let build_sid = bus.register_sentant(Box::new(BuilderSentant::new(build_pid)));
@@ -204,5 +224,6 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         outbound_tx,
         roster_ctx,
         usb_snapshot,
+        beacon_snapshot,
     }
 }

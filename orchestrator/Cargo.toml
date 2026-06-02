@@ -56,6 +56,13 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 sha2       = "0.10"
 hex        = "0.4"
 
+# F4: BLE beacon scanning. btleplug is cross-platform (Linux/macOS/Win
+# via bluez/CoreBluetooth/WinRT) and exposes manufacturer-data AD
+# payloads which is what R2-BEACON §7.7.3 needs. Used by the
+# beacon-observer substrate component to observe nearby R2 devices in
+# provisioning mode.
+btleplug   = "0.12"
+
 # Error handling.
 anyhow     = "1"
 

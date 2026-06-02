@@ -212,6 +212,9 @@ async fn handle_socket(
     let usb_snapshot_replay: Vec<_> = engine.usb_snapshot.lock().ok()
         .map(|s| s.clone())
         .unwrap_or_default();
+    let beacon_snapshot_replay: Vec<_> = engine.beacon_snapshot.lock().ok()
+        .map(|s| s.clone())
+        .unwrap_or_default();
     info!("/r2 client connected");
 
     let mut outbound_rx = engine.subscribe_outbound();
@@ -272,6 +275,18 @@ async fn handle_socket(
         let env = WireEnvelope::Event {
             name: "r2.composer.usb.attached".into(),
             payload: serde_json::to_value(port).unwrap_or(serde_json::Value::Null),
+        };
+        let text = serde_json::to_string(&env).unwrap_or_else(|_| "{}".into());
+        if socket.send(Message::Text(text.into())).await.is_err() {
+            return;
+        }
+    }
+    // Same replay for the BLE-beacon snapshot (F4). One
+    // beacon_observed event per currently-observed nearby device.
+    for obs in &beacon_snapshot_replay {
+        let env = WireEnvelope::Event {
+            name: "r2.composer.device.beacon_observed".into(),
+            payload: serde_json::to_value(obs).unwrap_or(serde_json::Value::Null),
         };
         let text = serde_json::to_string(&env).unwrap_or_else(|_| "{}".into());
         if socket.send(Message::Text(text.into())).await.is_err() {

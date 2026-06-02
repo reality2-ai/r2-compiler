@@ -18,8 +18,11 @@
 //! - `beacon_observer` (F4) — L2 Discovery (R2-BEACON §5-7)
 //! - `ota_push`        (F5) — L6 Management (R2-UPDATE)
 
+pub mod beacon_observer;
+pub mod beacon_parser;
 pub mod keyholder;
 pub mod provision;
 
+pub use beacon_observer::{BeaconObservation, BeaconObserverPlugin, BeaconSnapshot};
 pub use keyholder::{KeyholderPlugin, KeyholderSlot, SignCertRequest};
 pub use provision::{ComposeOfferRequest, ProvisionPlugin, ProvisionSlot};
