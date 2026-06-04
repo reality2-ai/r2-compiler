@@ -23,6 +23,7 @@ pub mod beacon_parser;
 pub mod keyholder;
 pub mod provision;
 pub mod provision_handshake;
+pub mod tg_state;
 
 pub use beacon_observer::{BeaconObservation, BeaconObserverPlugin, BeaconSnapshot};
 pub use keyholder::{KeyholderPlugin, KeyholderSlot, SignCertRequest};

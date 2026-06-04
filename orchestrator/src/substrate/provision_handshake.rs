@@ -233,6 +233,8 @@ mod linux {
     use r2_trust::types::JOIN_INVITE_LEN;
     use r2_wire::compact::{decode_compact, encode_compact};
     use r2_wire::types::{CompactHeader, CompactMessage, Flags, MsgType};
+    use crate::substrate::tg_state;
+    use std::path::Path;
     use std::str::FromStr;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -276,6 +278,17 @@ mod linux {
                 "slot_id_hint": req.slot_id_hint.clone(),
             }));
 
+            // Resolve the in-tree apiary dir — the TG state file lives
+            // under it. (load_tg_sk re-resolves it for the off-tree key.)
+            let apiary_dir = match apiary_ctx.lock().unwrap().clone() {
+                Some(d) => d,
+                None => {
+                    emit_error(&pending, hash_handshake_error,
+                        ERR_NO_APIARY, "no apiary open", &req);
+                    continue;
+                }
+            };
+
             // Resolve the apiary signing key from off-tree.
             let sk = match load_tg_sk(&apiary_ctx, &config_root) {
                 Ok(sk) => sk,
@@ -286,7 +299,7 @@ mod linux {
                 }
             };
 
-            match run_handshake(&req, sk).await {
+            match run_handshake(&req, sk, &apiary_dir).await {
                 Ok(result) => {
                     let payload = serde_json::json!({
                         "ble_addr":     result.ble_addr,
@@ -323,7 +336,7 @@ mod linux {
         message: String,
     }
 
-    async fn run_handshake(req: &HandshakeRequest, sk: SigningKey) -> std::result::Result<HandshakeOk, HandshakeErr> {
+    async fn run_handshake(req: &HandshakeRequest, sk: SigningKey, apiary_dir: &Path) -> std::result::Result<HandshakeOk, HandshakeErr> {
         let target = Address::from_str(&req.ble_addr)
             .map_err(|e| HandshakeErr {
                 code: ERR_BLE_CONNECT,
@@ -331,11 +344,21 @@ mod linux {
             })?;
         let now = unix_now();
 
-        // Build the TG, mint a join code, sign an invite.
-        let mut tg = TrustGroup::from_signing_key(sk.clone(), now).map_err(|e| HandshakeErr {
-            code: ERR_TG_LOAD,
-            message: format!("TrustGroup::from_signing_key: {e:?}"),
-        })?;
+        // Restore the apiary TG from persisted state so prior enrolments
+        // and the GROUP_MGMT sequence counter survive restarts — R2-TRUST
+        // §5.6. First run (no state file) starts fresh from the key. A
+        // corrupt state file is a hard failure, not a silent rebuild.
+        let mut tg = match tg_state::load(apiary_dir, sk.clone()) {
+            Ok(Some(tg)) => tg,
+            Ok(None) => TrustGroup::from_signing_key(sk.clone(), now).map_err(|e| HandshakeErr {
+                code: ERR_TG_LOAD,
+                message: format!("TrustGroup::from_signing_key: {e:?}"),
+            })?,
+            Err(e) => return Err(HandshakeErr {
+                code: ERR_TG_LOAD,
+                message: format!("load TG state {}: {e}", tg_state::state_path(apiary_dir).display()),
+            }),
+        };
         let mut rng = rand::rngs::OsRng;
         let invite_code = *tg.generate_join_code(&mut rng, now, INVITE_TTL_SECS).value();
         let trust_group_id = tg.trust_group_id();
@@ -439,6 +462,24 @@ mod linux {
             code: ERR_HANDSHAKE_PROTO,
             message: format!("process_join_request: {e:?}"),
         })?;
+
+        // Persist the TG (new member + bumped sequence) BEFORE the device
+        // sees the JoinResponse. The device commits to this sequence on
+        // receipt, so the orchestrator must have it on disk first — a
+        // restart that reused the sequence would collide with the device's
+        // replay protection (R2-TRUST §5.6). A save failure aborts here,
+        // before the device is enrolled, so the in-memory TG is simply
+        // dropped and the next attempt starts clean.
+        //
+        // Known v0.1 limitation: if the JoinResponse write below fails
+        // *after* this save, the member is persisted while the device never
+        // completed — that device_pk is then blocked (DuplicateMember)
+        // until revoked. We accept this over the sequence-collision risk.
+        tg_state::save(apiary_dir, &tg).map_err(|e| HandshakeErr {
+            code: ERR_TG_LOAD,
+            message: format!("persist TG state: {e}"),
+        })?;
+
         let mut response_payload = Vec::with_capacity(
             encrypted.nonce.len() + encrypted.ciphertext.len());
         response_payload.extend_from_slice(&encrypted.nonce);
