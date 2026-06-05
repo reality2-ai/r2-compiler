@@ -41,6 +41,7 @@ pub struct RosterSentant {
     transition_hash: u32,
     first_install_done_hash: u32,
     device_enrolled_hash: u32,
+    device_done_hash: u32,
 }
 
 impl RosterSentant {
@@ -55,6 +56,7 @@ impl RosterSentant {
             transition_hash:  reg.hash_of("r2.composer.device.transition").unwrap(),
             first_install_done_hash: reg.hash_of("r2.composer.deploy.first_install.done").unwrap(),
             device_enrolled_hash:    reg.hash_of("r2.composer.device.enrolled").unwrap(),
+            device_done_hash:        reg.hash_of("r2.composer.deploy.device.done").unwrap(),
         }
     }
 
@@ -100,6 +102,19 @@ impl Sentant for RosterSentant {
             self.handle_device_enrolled(event.payload, actions);
             return;
         }
+        // deploy.device.done from the ota_push plugin (F5b) — the device
+        // verified SHA-256 before swapping partitions and acked OK, so
+        // the push SHA is now the row's firmware_sha. Plugin-sourced only
+        // (don't re-handle Deploy's re-broadcast). State stays unchanged
+        // (it was `reachable` to pass the §6.1 gate); we update the SHA
+        // in place per the ack-as-confirmation model (SPEC-APIARY-FLASH
+        // §6.2 — beacon-confirm is not observable on wire-v1 devices).
+        if event.hash == self.device_done_hash
+            && matches!(event.source, EventSource::Plugin(_))
+        {
+            self.handle_ota_done(event.payload, actions);
+            return;
+        }
     }
 
     fn state(&self) -> StateId { self.state as StateId }
@@ -120,6 +135,7 @@ impl Sentant for RosterSentant {
                 reg.hash_of("r2.composer.device.list").unwrap(),
                 reg.hash_of("r2.composer.deploy.first_install.done").unwrap(),
                 reg.hash_of("r2.composer.device.enrolled").unwrap(),
+                reg.hash_of("r2.composer.deploy.device.done").unwrap(),
             ];
             Box::leak(subs.into_boxed_slice())
         })
@@ -369,6 +385,70 @@ impl RosterSentant {
             });
         }
     }
+
+    /// Handle `deploy.device.done` (F5b). The device verified the pushed
+    /// firmware's SHA-256 before swapping its OTA partition and returned
+    /// `STATUS_OK`, so we record `firmware_sha` = the pushed sha and log
+    /// a `flashed_ota` history entry. The row's `state` is left unchanged
+    /// (it was `reachable` to clear the §6.1 gate). We do NOT wait for a
+    /// post-reboot beacon: R2-BEACON carries no firmware identity and
+    /// wire-v1 devices emit no `r2.update.applied`, so the ack is the
+    /// only — and a cryptographically sound — confirmation available.
+    fn handle_ota_done(&self, payload: &[u8], actions: &mut ActionBuf) {
+        let v: serde_json::Value =
+            serde_json::from_slice(payload).unwrap_or(serde_json::Value::Null);
+        let slot_id = v.get("slot_id").and_then(|x| x.as_str()).unwrap_or("");
+        let sha     = v.get("artefact_sha256").and_then(|x| x.as_str()).unwrap_or("");
+        if slot_id.is_empty() || sha.is_empty() {
+            tracing::warn!("roster: deploy.device.done missing slot_id or artefact_sha256");
+            return;
+        }
+
+        let mut updated = false;
+        self.with_apiary(|apiary_dir| {
+            let mut r = roster::load(apiary_dir);
+            let Some(row) = roster::find_mut(&mut r, slot_id) else {
+                tracing::warn!("roster: deploy.device.done for unknown slot_id {slot_id}");
+                return;
+            };
+            let now = roster::now_iso8601();
+            let from = row.state.clone();
+            row.firmware_sha = Some(sha.to_string());
+            row.history.push(roster::HistoryEntry {
+                ts: now,
+                event: "flashed_ota".to_string(),
+                from: from.clone(),
+                to: from, // OTA update is in-place; state is unchanged
+                detail: format!("OTA push verified (sha {})", short_sha(sha)),
+            });
+            if let Err(e) = roster::save(apiary_dir, &r) {
+                tracing::error!("roster: save failed: {e}");
+            }
+            updated = true;
+        });
+
+        // Surface the updated row so the webapp's slot card reflects the
+        // new firmware_sha (no state change → device.entry, not a
+        // transition).
+        if updated {
+            self.with_apiary(|apiary_dir| {
+                let r = roster::load(apiary_dir);
+                if let Some(row) = r.devices.iter().find(|d| d.slot_id == slot_id) {
+                    let payload = serde_json::to_vec(row).unwrap_or_default();
+                    actions.push(Action::Send {
+                        target: Target::Broadcast,
+                        event_hash: self.entry_hash,
+                        payload: PayloadBuf::from_slice(&payload),
+                    });
+                }
+            });
+        }
+    }
+}
+
+/// First 12 hex chars of a SHA for compact history/log detail.
+fn short_sha(sha: &str) -> &str {
+    &sha[..sha.len().min(12)]
 }
 
 #[cfg(test)]
@@ -604,5 +684,67 @@ mod tests {
         // Row state unchanged.
         let r = roster::load(dir.path());
         assert_eq!(r.devices[0].state, "placeholder");
+    }
+
+    // ── F5b: OTA ack → firmware_sha ────────────────────────────────
+
+    fn plugin_ev(hash: u32, payload: &[u8]) -> Event<'_> {
+        Event { hash, payload, source: EventSource::Plugin(0), msg_id: 0 }
+    }
+
+    #[test]
+    fn ota_done_records_firmware_sha_and_keeps_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut r = Roster::default();
+        let mut row = roster::new_placeholder(
+            "sensor", "rocker-sensor", "esp32-s3-xiao", "kitchen", "2026-06-01T00:00:00Z");
+        row.state = "reachable".to_string(); // passed the §6.1 gate
+        let slot_id = row.slot_id.clone();
+        r.devices.push(row);
+        roster::save(dir.path(), &r).unwrap();
+
+        let mut s = RosterSentant::new(ctx_for(dir.path()));
+        let mut actions = ActionBuf::new();
+        let sha = "ab".repeat(32); // 64-hex
+        let payload = format!(r#"{{"batch_id":"b1","slot_id":"{slot_id}","artefact_sha256":"{sha}","duration_ms":42}}"#);
+        s.handle_event(&plugin_ev(s.device_done_hash, payload.as_bytes()), &mut actions);
+
+        // One device.entry emitted (no transition — state unchanged).
+        let collected: Vec<_> = actions.drain().collect();
+        assert_eq!(collected.len(), 1);
+        match &collected[0] {
+            Action::Send { event_hash, .. } => assert_eq!(*event_hash, s.entry_hash),
+            _ => panic!("expected device.entry Send"),
+        }
+
+        // firmware_sha recorded, state unchanged, history appended.
+        let r = roster::load(dir.path());
+        let row = &r.devices[0];
+        assert_eq!(row.firmware_sha.as_deref(), Some(sha.as_str()));
+        assert_eq!(row.state, "reachable", "OTA update is in-place; state must not change");
+        assert!(row.history.iter().any(|h| h.event == "flashed_ota"),
+            "expected a flashed_ota history entry");
+    }
+
+    #[test]
+    fn ota_done_from_local_source_ignored() {
+        // Deploy re-broadcasts deploy.device.done (Local/Sentant source);
+        // Roster must act only on the Plugin-sourced original.
+        let dir = tempfile::tempdir().unwrap();
+        let mut r = Roster::default();
+        let mut row = roster::new_placeholder(
+            "sensor", "rocker-sensor", "esp32-s3-xiao", "kitchen", "2026-06-01T00:00:00Z");
+        row.state = "reachable".to_string();
+        let slot_id = row.slot_id.clone();
+        r.devices.push(row);
+        roster::save(dir.path(), &r).unwrap();
+
+        let mut s = RosterSentant::new(ctx_for(dir.path()));
+        let mut actions = ActionBuf::new();
+        let payload = format!(r#"{{"slot_id":"{slot_id}","artefact_sha256":"{}"}}"#, "cd".repeat(32));
+        s.handle_event(&ev(s.device_done_hash, payload.as_bytes()), &mut actions); // Local source
+        assert!(actions.is_empty(), "local-source device.done must not trigger Roster");
+        let r = roster::load(dir.path());
+        assert!(r.devices[0].firmware_sha.is_none(), "firmware_sha must stay unset");
     }
 }

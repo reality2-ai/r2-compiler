@@ -851,8 +851,11 @@ flash_offsets = { bootloader = 0x0, partition_table = 0x8000, ota_0 = 0x20000 }
         let mut bus = EventBus::new();
         let ota_pid = bus.register_plugin(Box::new(ota_push::OtaPushPlugin::new(0, ota_slot.clone())));
         bus.register_sentant(Box::new(DeploySentant::new(
-            0, flasher_slot, ota_pid, ota_slot, repo.path().to_path_buf(), apiary_ctx,
+            0, flasher_slot, ota_pid, ota_slot, repo.path().to_path_buf(), apiary_ctx.clone(),
         )));
+        // Register the Roster sentant too (F5b) — it consumes the
+        // plugin's deploy.device.done and persists firmware_sha.
+        bus.register_sentant(Box::new(crate::sentants::RosterSentant::new(apiary_ctx)));
         bus.init_all();
 
         // 4. Inject deploy.batch.start (source 0xFF — exactly how the WS
@@ -906,5 +909,13 @@ flash_offsets = { bootloader = 0x0, partition_table = 0x8000, ota_0 = 0x20000 }
         let v: serde_json::Value = serde_json::from_slice(bd).unwrap();
         assert_eq!(v["ok_count"], 1);
         assert_eq!(v["error_count"], 0);
+
+        // 6d. F5b: the Roster sentant persisted firmware_sha = pushed sha,
+        //     state stayed reachable, and a flashed_ota history landed.
+        let r = roster::load(apiary.path());
+        let row = r.devices.iter().find(|d| d.slot_id == slot_id).expect("row");
+        assert_eq!(row.firmware_sha.as_deref(), Some(expected_sha.as_str()));
+        assert_eq!(row.state, "reachable");
+        assert!(row.history.iter().any(|h| h.event == "flashed_ota"));
     }
 }
