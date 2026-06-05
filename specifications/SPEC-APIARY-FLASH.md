@@ -297,12 +297,14 @@ Only devices in `state: "reachable"` are **OTA-pushable**. The orchestrator **MU
 For each device the operator wants to push to:
 
 1. Orchestrator opens TCP to `<device-ip>:21043` (the `ota-tcp` plugin's port, per r2-workshop).
-2. Sends a length-prefixed frame: `[u32 BE length][bytes]`, where the bytes are the `firmware.bin` from `out/<role>-<host>-<slot8>-<ts>/`.
-3. Awaits the device's response: `OK <sha256>` or `ERR <reason>`.
-4. On `OK`: device verifies SHA-256, swaps active OTA partition, sends one final `REBOOTING` line, closes.
+2. Sends the wire-v1 request frame (§6.4 — **binary**, not text): a 1-byte command `CMD_START` (`0x01`), a 36-byte preamble (`size: u32 LE` + `sha256: 32 raw bytes`), then the raw `firmware.bin` bytes from `out/<role>-<host>-<slot8>-<ts>/` streamed to the socket. The orchestrator then **half-closes the write side** (TCP `FIN`) to signal end-of-firmware; the device reads the body until EOF.
+3. Awaits the device's single binary response frame: `status: u8` + `msg_len: u16 LE` + `msg: utf-8`. `status == 0x00` is success (`msg` is literally `"OK"`); `status == 0x01` is failure (`msg` is a plain reason such as `"SHA-256 mismatch"` — no `ERR` prefix). The success SHA is **not** echoed back.
+4. On success: the device verifies SHA-256, swaps the active OTA partition, logs locally, and `esp_restart()`s after ~2 s — there is **no** `REBOOTING` frame; the TCP connection simply drops as the device reboots.
 5. Orchestrator waits up to 90 s for the device to come back and emit a beacon with the NEW firmware's `firmware_sha`.
 6. On confirmation: roster row's `firmware_sha` + `firmware_ver` are updated; `state` stays `reachable`.
 7. On timeout: orchestrator marks `provision_state: "stale"` (last-known-good beacon was the pre-push firmware) and surfaces the partial state to chat. The device may have rolled back — the next beacon from it will clarify.
+
+> **Wire correction (2026-06-06).** This section originally described a text-line shape (`[u32 BE length]` frame, `OK <sha256>` / `ERR <reason>` / `REBOOTING` lines). That was an incorrect assumption — confirmed against R2-UPDATE §3.1.2.2 and r2-workshop's device source `crates/r2-esp/src/ota_tcp.rs` (which agree byte-for-byte): the real wire is binary-framed, the size is **little-endian**, the SHA-256 travels as **32 raw bytes** (not hex) in the request preamble, and EOF is signalled by a half-close, not a length prefix. The F5 `ota_push` substrate (`orchestrator/src/substrate/ota_push.rs`) implements the corrected wire above. Steps 5–7 (beacon-confirm of the new SHA) are deferred to F5b; F5 emits up to the `rebooting` progress phase.
 
 ### 6.3 Batching + sequencing
 
@@ -315,7 +317,22 @@ The `deploy.batch.*` events carry the batch identity; the `deploy.device.*` even
 
 ### 6.4 Wire-v1 vs wire-v2
 
-v0.1 of this spec uses r2-workshop's **wire-v1** OTA shape: unsigned length-prefixed frame, the device trusts whoever connects to port 21043 (with the implicit assumption of WiFi-network trust). This **MUST** match r2-workshop bytes-for-bytes so unmodified r2-workshop sensors keep working.
+v0.1 of this spec uses r2-workshop's **wire-v1** OTA shape: an unsigned binary frame; the device trusts whoever connects to port 21043 (with the implicit assumption of WiFi-network trust). This **MUST** match r2-workshop bytes-for-bytes so unmodified r2-workshop sensors keep working.
+
+Wire-v1 framing (R2-UPDATE §3.1.2.2 / r2-workshop `crates/r2-esp/src/ota_tcp.rs`):
+
+```text
+Request  (client → device):
+  [0x01 CMD_START][size: u32 LE][sha256: 32 raw bytes][firmware bytes…]
+  then half-close the write side (TCP FIN); the device reads the body until EOF.
+
+Response (device → client):
+  [status: u8][msg_len: u16 LE][msg: utf-8]
+  status 0x00 = OK    (msg == "OK"; the SHA is not echoed)
+  status 0x01 = error (msg is a plain reason, e.g. "SHA-256 mismatch")
+```
+
+The pusher does **not** send a `CMD_QUERY` (`0x02`) version probe before the push — it opens the socket and sends `CMD_START` directly. (`CMD_QUERY` exists on the device as a separate one-byte probe returning a JSON build-info frame, used by other tooling, not the push path.)
 
 **Wire-v2** (OPTIONAL, capability-gated) wraps the v1 frame in a TG-signed envelope (`OtaPushAuthorization{artefact_sha256, target_device_pk, ttl}`) so an attacker on the WiFi network can't push arbitrary firmware. v2 is deferred to a future spec amendment; v0.1 ships v1-compatible and the device's `ota-tcp` plugin advertises its supported version via a CMD_QUERY probe.
 

@@ -31,7 +31,8 @@ use std::path::PathBuf;
 use crate::composer::{ClaudeCodePlugin, FlasherPlugin, FlasherSlot, UsbSnapshot, UsbWatcherPlugin};
 use crate::substrate::{
     BeaconObserverPlugin, BeaconSnapshot, KeyholderPlugin, KeyholderSlot,
-    ProvisionHandshakePlugin, ProvisionHandshakeSlot, ProvisionPlugin, ProvisionSlot,
+    OtaPushPlugin, OtaPushSlot, ProvisionHandshakePlugin, ProvisionHandshakeSlot,
+    ProvisionPlugin, ProvisionSlot,
 };
 use crate::sentants::{
     AuthorSentant, BuilderSentant, DeploySentant, ProvisionSentant, RosterCtx, RosterSentant,
@@ -95,6 +96,11 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
     let flasher_slot: FlasherSlot = Arc::new(Mutex::new(None));
     let flasher_slot_engine = flasher_slot.clone();
 
+    // OTA push params slot (F5) — Deploy sentant fills it before firing
+    // the ota_push substrate's CMD_START, once per device in a batch.
+    let ota_push_slot: OtaPushSlot = Arc::new(Mutex::new(None));
+    let ota_push_slot_engine = ota_push_slot.clone();
+
     // F3 side-slots for keyholder + provision plugins. Filled by the
     // ProvisionSentant before each PluginCall.
     let keyholder_slot: KeyholderSlot = Arc::new(Mutex::new(None));
@@ -147,6 +153,12 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         ));
         info!("engine: registered composer/usb-watcher (id={usb_pid})");
 
+        // OTA push (F5) — wire-v1 TCP firmware push, fed via ota_push_slot.
+        let ota_push_pid = bus.register_plugin(Box::new(
+            OtaPushPlugin::new(0, ota_push_slot_engine.clone())
+        ));
+        info!("engine: registered substrate/ota-push (id={ota_push_pid})");
+
         // Keyholder (F3) — Ed25519 signer for DeviceCertificate minting.
         let keyholder_pid = bus.register_plugin(Box::new(KeyholderPlugin::new(
             0, roster_ctx_keyholder, keyholder_slot_engine.clone(), config_root.clone(),
@@ -189,7 +201,11 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
         ));
         info!("engine: registered Roster sentant (id={roster_sid})");
         let deploy_sid = bus.register_sentant(Box::new(
-            DeploySentant::new(flasher_pid, flasher_slot_engine, repo_root.clone(), roster_ctx_deploy)
+            DeploySentant::new(
+                flasher_pid, flasher_slot_engine,
+                ota_push_pid, ota_push_slot_engine,
+                repo_root.clone(), roster_ctx_deploy,
+            )
         ));
         info!("engine: registered Deploy sentant (id={deploy_sid})");
 

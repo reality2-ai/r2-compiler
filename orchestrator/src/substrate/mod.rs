@@ -16,17 +16,19 @@
 //! - `keyholder`    — L5 Trust & Identity (R2-TRUST §5.5)
 //! - `provision`    — L5 Trust & Identity / L1-L2 BLE bootstrap (R2-PROVISION §3, §5; R2-WIFI §3.4)
 //! - `beacon_observer` (F4) — L2 Discovery (R2-BEACON §5-7)
-//! - `ota_push`        (F5) — L6 Management (R2-UPDATE)
+//! - `ota_push`        (F5) — L6 Management (R2-UPDATE §3.1.2.2)
 
 pub mod beacon_observer;
 pub mod beacon_parser;
 pub mod keyholder;
+pub mod ota_push;
 pub mod provision;
 pub mod provision_handshake;
 pub mod tg_state;
 
 pub use beacon_observer::{BeaconObservation, BeaconObserverPlugin, BeaconSnapshot};
 pub use keyholder::{KeyholderPlugin, KeyholderSlot, SignCertRequest};
+pub use ota_push::{OtaPushParams, OtaPushPlugin, OtaPushSlot};
 pub use provision::{ComposeOfferRequest, ProvisionPlugin, ProvisionSlot};
 pub use provision_handshake::{
     HandshakeRequest, ProvisionHandshakePlugin, ProvisionHandshakeSlot,
