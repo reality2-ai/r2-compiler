@@ -1,0 +1,40 @@
+# r2-plugin-sensor-adxl355 — R2 plugin wrapping the Analog Devices
+# ADXL355 precision triaxial accelerometer over SPI. R2-PLUGIN §12
+# dual-mode (AOT + future NIF).
+#
+# Hardware abstraction is via `embedded-hal` 1.0 SPI traits — the plugin
+# itself is bus-agnostic. The firmware-rendering step (compiler plugin)
+# wraps esp-idf-svc::hal::spi::SpiDeviceDriver to satisfy the trait at
+# link time. Capability-paired with sensor/lis2dh (I²C, 10-bit): same
+# `ai.reality2.cap.accel.triaxial`, higher precision (20-bit).
+
+[package]
+name        = "r2-plugin-sensor-adxl355"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: Analog Devices ADXL355 precision triaxial accelerometer over SPI."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+# Mutually-exclusive build modes per R2-PLUGIN §12.5. `default = []` —
+# neither mode builds by default. The Compiler-plugin enables `aot` for
+# firmware builds; NIF support is deferred (false in plugin.toml today).
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine    = { workspace = true }
+embedded-hal = { workspace = true }
+
+[dev-dependencies]
+# A mock SPI device for unit-testing the decode + command-dispatch logic
+# without real hardware. embedded-hal-mock implements the eh1 traits.
+embedded-hal-mock = { version = "0.11", default-features = false, features = ["eh1"] }
+
+[lib]
+# `rlib` for AOT static linking; `cdylib` covers a future NIF build.
+crate-type = ["rlib"]
