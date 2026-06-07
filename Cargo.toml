@@ -32,6 +32,7 @@ members = [
   # Ensemble-owned plugin crates inside the catalogue. Added per Phase 1.4-source.
   "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh",
   "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355",
+  "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc",
   # Workstation orchestrator binary (Phase 1.6+).
   "orchestrator",
 ]

@@ -1,0 +1,32 @@
+# r2-plugin-sensor-battery-adc — R2 plugin reading a single-cell LiPo
+# voltage through a resistive divider on an ADC pin. R2-PLUGIN §12
+# dual-mode (AOT + future NIF).
+#
+# embedded-hal 1.0 has no stable ADC trait (the `adc` module was dropped
+# in the 1.0 release), so — like r2-plugin-storage-nvs (KvStore) and
+# r2-plugin-time-clock (Clock) — this crate defines its own minimal
+# `AdcChannel` trait. The firmware-rendering step wraps esp-idf-svc's
+# `AdcChannelDriver` (whose `read()` returns calibrated millivolts) to
+# satisfy it at link time.
+
+[package]
+name        = "r2-plugin-sensor-battery-adc"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: single-cell LiPo voltage via a divider on an ADC pin."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+# Mutually-exclusive build modes per R2-PLUGIN §12.5.
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
