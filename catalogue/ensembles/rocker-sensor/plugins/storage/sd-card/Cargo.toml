@@ -1,0 +1,31 @@
+# r2-plugin-storage-sd-card — R2 plugin for a FATFS-mounted microSD card:
+# the 20-byte fixed-record acceleration ring (r2-workshop CAPTURE §6) plus
+# capture-file management. R2-PLUGIN §12 dual-mode (AOT + future NIF).
+#
+# Unlike the other ensemble plugins this one needs `alloc` (file lists are
+# Vec<String>, file contents are variable-length) — it is `no_std + alloc`,
+# which on-target uses esp-idf's global allocator. All filesystem IO is
+# behind the minimal `SdFs` trait; the firmware-render step supplies the
+# esp-idf FATFS-over-SD-SPI impl, tests supply an in-memory one.
+
+[package]
+name        = "r2-plugin-storage-sd-card"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: microSD acceleration ring + capture-file storage over a generic SdFs backend."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+# Mutually-exclusive build modes per R2-PLUGIN §12.5.
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
