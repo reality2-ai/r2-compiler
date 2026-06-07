@@ -1,0 +1,30 @@
+# r2-plugin-indicator-led — R2 plugin driving a status LED from an
+# FSM-state → colour map. R2-PLUGIN §12 dual-mode (AOT + future NIF).
+#
+# The plugin is bus-agnostic: it computes the colour for a state and
+# writes it through the minimal `LedSink` trait. The firmware-render step
+# supplies the sink — a WS2812 RMT driver (RGB carriers) or a mono LEDC
+# PWM channel (single-colour carriers) — so this crate stays no_std and
+# free of any platform LED dependency.
+
+[package]
+name        = "r2-plugin-indicator-led"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: status LED driver mapping FSM state → colour over a generic sink."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+# Mutually-exclusive build modes per R2-PLUGIN §12.5.
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]

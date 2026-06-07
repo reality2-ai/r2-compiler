@@ -5,7 +5,12 @@ version     = "0.1.0"
 description = "Status LED driver — abstracts over WS2812 (RMT-driven RGB on devkitc) and mono LEDC PWM (xiao GPIO21 + dfr1117 GPIO15). The plugin exposes a small FSM-state-to-colour-or-blink mapping; the consuming Status sentant calls set_state(<state>) and the plugin handles the per-carrier rendering."
 
 [modes]
-aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }
+# no_std corrected false→true during Phase 1.4-source: the extracted
+# plugin is a pure state→colour map behind the `LedSink` trait (no std,
+# no threads, no platform LED dep — those live in the firmware-render
+# sink). The reference firmware's std-only animator thread is out of the
+# plugin's scope (see src/lib.rs module docs).
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
 nif = false
 web = false
 
