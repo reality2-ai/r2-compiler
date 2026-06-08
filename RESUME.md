@@ -41,7 +41,17 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
    (retire the toy `webapp/crate` wasm), **TCP-only transport** via a WS↔TCP
    bridge to `r2-transport/tcp.rs`; pluggable. AUTH = **Ed25519, not HMAC**
    (R2-WEB v0.3 §4.2; `device_id` = DEV_PK). Serverless WASM-hive = §8.4.
-3. **D4 b/c/d + D5** — see MCU placement note; align with hive first.
+3. **D4 b/c/d are NOT composer's** (hive placement confirmed 2026-06-09):
+   button(IO18)+LCD(ST7735) = hive's no_std firmware test instrumentation;
+   LoRa = core's no_std SX1262 sync transport (D3b). composer's remaining
+   Part-D = **(a)** the **D5 test ensemble + semantics** (what to inject / what
+   "delivered" looks like) on the FULL hives, DFR1195s as routing endpoints
+   (inject via button-frame, show via LCD); **(b)** feed a SYNC embedded-hal
+   SX1262 trait proposal INTO core D3b (not a parallel composer trait); **(c)**
+   ✅ OTA reply-status contract delivered — `specifications/OTA-REPLY-STATUS-CONTRACT.md`
+   (status 0x00 OK / 0x01 ERR + CODE-in-msg vocabulary; DFR1195 = 4 MB → TOO_BIG
+   bound; folds into SPEC-APIARY-FLASH §6 at merge). Also: peer-ask workshop for
+   reusable no_std ST7735 code to point hive at.
 4. **Part C (iii/iv)** — `TestCoordinator` sentant + `test-ux` ensemble (two
    views) → coverage grid reading specs' published
    `testing/test-vectors/r2-transient-networking-conjectures.json` (fields:
