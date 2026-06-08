@@ -1,0 +1,30 @@
+# r2-plugin-sensor-simulated — R2 plugin: deterministic synthetic
+# triaxial-acceleration source for the transient-networking hardware test
+# tier (Phase 3 Part D4a). R2-PLUGIN §12 dual-mode (AOT + future NIF).
+#
+# NO hardware dependency — it generates a deterministic synthetic waveform
+# so the test ensemble has a data source before real sensors are wired.
+# Drop-in for `ai.reality2.cap.accel.triaxial`: same 12-byte read output
+# (256_000-LSB/g convention) as sensor/adxl355 + sensor/lis2dh, so the
+# Accelerometer sentant consumes it unchanged. no_std, host-testable.
+
+[package]
+name        = "r2-plugin-sensor-simulated"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: deterministic synthetic triaxial-accel source for transient-network testing."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
