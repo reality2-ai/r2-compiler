@@ -1,0 +1,28 @@
+# r2-plugin-comms-reset-tcp — R2 plugin: remote-reset TCP listener.
+# R2-PLUGIN §12 dual-mode (AOT + future NIF).
+#
+# The plugin is the protocol core (recognise CMD_RESET) + a `Resetter`
+# platform hook; the firmware-render step supplies the TCP accept loop +
+# an esp_restart()-backed Resetter. no_std (the std networking lives in
+# the firmware listener, not this crate).
+
+[package]
+name        = "r2-plugin-comms-reset-tcp"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: remote-reset TCP listener (single CMD_RESET byte -> device reset)."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]

@@ -4,8 +4,11 @@ category    = "comms"
 version     = "0.1.0"
 description = "TCP fan-out of the device's log::info!/warn!/error! stream on port 21046. Multiple dashboard clients can `nc <ip> 21046` to tail the live log (SPEC-R2-WORKSHOP-SENSOR-LIVE-LOGS). Read-only; ignores any data sent by the client."
 
+# no_std corrected false→true during Phase 1.4-source: the extracted
+# plugin is the fan-out core + a `LogSink` trait — no std, no sockets
+# (the TCP client set lives in the firmware listener).
 [modes]
-aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
 nif = false
 web = false
 

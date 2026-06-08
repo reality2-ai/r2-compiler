@@ -1,0 +1,28 @@
+# r2-plugin-comms-data-tcp — R2 plugin: capture-file TCP server.
+# R2-PLUGIN §12 dual-mode (AOT + future NIF).
+#
+# The plugin is the LIST/GET/DEL/DEL_ALL protocol core over a
+# `CaptureStore` (the SD captures directory, provided on-device by
+# storage/sd-card); the firmware-render step supplies the TCP accept loop
+# + the store. no_std + alloc (request parsing + file lists).
+
+[package]
+name        = "r2-plugin-comms-data-tcp"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: capture-file TCP server (LIST/GET/DEL/DEL_ALL) over a CaptureStore."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]

@@ -4,8 +4,12 @@ category    = "comms"
 version     = "0.1.0"
 description = "TCP server on port 21047 implementing LIST / GET / DEL / DEL_ALL over the captures directory on the SD card. Used by the dashboard to download named capture files and to free SD space remotely (SPEC-R2-WORKSHOP-CAPTURE §6)."
 
+# no_std corrected false→true during Phase 1.4-source: the extracted
+# plugin is the LIST/GET/DEL/DEL_ALL protocol core + a `CaptureStore`
+# trait — no_std + alloc (request parsing + file lists); the SD captures
+# dir + TCP accept loop live in the firmware.
 [modes]
-aot = { targets = ["esp32-s3"], no_std = false }   # depends on sd-card
+aot = { targets = ["esp32-s3"], no_std = true }   # protocol core; store via storage/sd-card
 nif = false
 web = false
 

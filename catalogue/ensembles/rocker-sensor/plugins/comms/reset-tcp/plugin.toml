@@ -4,8 +4,11 @@ category    = "comms"
 version     = "0.1.0"
 description = "TCP listener on port 21044 accepting a single CMD_RESET byte (0x52). On receipt, calls esp_restart(). Implements SPEC-R2-WORKSHOP-SENSOR-REMOTE-RESET; used by the dashboard's `r2.dash.cmd.reset` flow."
 
+# no_std corrected false→true during Phase 1.4-source: the extracted
+# plugin is the protocol core (CMD_RESET recognition) + a `Resetter`
+# trait — no std, no sockets (those live in the firmware listener).
 [modes]
-aot = { targets = ["esp32-s3", "esp32-c6"], no_std = false }
+aot = { targets = ["esp32-s3", "esp32-c6"], no_std = true }
 nif = false
 web = false
 

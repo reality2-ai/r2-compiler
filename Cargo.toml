@@ -35,6 +35,9 @@ members = [
   "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc",
   "catalogue/ensembles/rocker-sensor/plugins/indicator/led",
   "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card",
+  "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp",
+  "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp",
+  "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp",
   # Workstation orchestrator binary (Phase 1.6+).
   "orchestrator",
 ]

@@ -1,0 +1,27 @@
+# r2-plugin-comms-log-tcp — R2 plugin: live-log TCP fan-out.
+# R2-PLUGIN §12 dual-mode (AOT + future NIF).
+#
+# The plugin forwards each log line to a `LogSink` (the set of connected
+# clients); the firmware-render step supplies the TCP accept loop + the
+# multi-client sink. no_std (the std networking lives in the firmware).
+
+[package]
+name        = "r2-plugin-comms-log-tcp"
+version     = "0.1.0"
+edition.workspace      = true
+license.workspace      = true
+description = "R2 AOT plugin: read-only fan-out of the device log stream to TCP clients."
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+aot     = []
+nif     = ["std"]
+std     = []
+
+[dependencies]
+r2-engine = { workspace = true }
+
+[lib]
+crate-type = ["rlib"]
