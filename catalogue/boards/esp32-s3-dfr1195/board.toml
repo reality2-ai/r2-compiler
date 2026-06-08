@@ -1,0 +1,228 @@
+# board.toml — DFRobot LoRaWAN ESP32-S3 (DFR1195).
+#
+# Schema: SPEC-CATALOGUE-LAYOUT §3.2.
+# Source of truth for all r2-composer decisions about this carrier.
+#
+# Authored 2026-06-09 for the Phase 3 transient-networking hardware test
+# tier (PHASE3-TESTING-SUBSTRATE-PLAN.md Part D1) by reading the DFRobot
+# wiki (https://wiki.dfrobot.com/dfr1195/). The board adds a LoRa
+# (SX1262) radio + an on-board colour TFT + two buttons to the ESP32-S3
+# family already represented by esp32-s3-devkitc / esp32-s3-xiao.
+
+[board]
+name        = "esp32-s3-dfr1195"
+arch        = "esp32"                              # R2-COMPILE §4 platform tag
+chip        = "esp32s3"                            # ESP-IDF chip-family slug
+carrier     = "dfr1195"                            # DFRobot SKU
+version     = "0.1.0"
+description = """\
+DFRobot LoRaWAN ESP32-S3 Dev Board (DFR1195) — ESP32-S3-WROOM-1-N4 \
+(Xtensa LX7 dual-core @ 240 MHz, WiFi 4 + BLE 5) plus a Semtech SX1262 \
+LoRa radio (direct LoRa P2P / one-to-many / LoRaWAN / Meshtastic), a \
+0.96\" 160×80 colour TFT (ST7735-family, SPI), two user buttons (Key1 on \
+GPIO18, Key2 on the GPIO0 boot strap), an on-board LED (GPIO21) and a \
+battery-sense ADC (GPIO1). USB-C with the ESP32-S3 native USB-Serial-JTAG. \
+The first tri-radio (WiFi + BLE + LoRa) carrier in the catalogue — the \
+Phase-3 transient-networking hardware test node.\
+"""
+
+[build]
+target_triple   = "xtensa-esp32s3-espidf"          # R2-BUILD §2 — Xtensa family (shared with devkitc/xiao)
+toolchain       = "esp"                            # via `espup install`
+esp_idf_version = "v5.2.5"
+flash_size_mb   = 4                                # ESP32-S3-WROOM-1-N4 (4 MB flash, no PSRAM)
+psram           = false                            # N4 module — no PSRAM
+usb_serial_jtag = true                             # native USB-OTG console on the USB-C port
+uart_cp2102     = false                            # no separate UART bridge documented
+
+[usb]
+# Per SPEC-APIARY-FLASH §4.1. The DFR1195 exposes the ESP32-S3 native
+# USB-Serial-JTAG over its USB-C port (vid 0x303a, pid 0x1001 — shared
+# across the ESP32-S3/C6 family; `chip_id_probe` is the disambiguator).
+# No on-board CP2102/CH340 bridge is documented.
+vid               = 0x303a                         # Espressif native USB-Serial-JTAG
+pid               = 0x1001
+chip_id_probe     = "esp32s3"
+esptool_chip_arg  = "esp32s3"
+identify_strategy = "vid_pid_then_chip_id"
+reset_strategy    = "usb_serial_jtag"
+# Standard ESP32-S3 layout. NOTE: 4 MB flash (vs 8 MB on the devkitc)
+# constrains the two OTA slots — the firmware's partitions.csv must size
+# ota_0/ota_1 to fit two app images + NVS + phy_init in 4 MB (≈1.5 MB
+# each at most). ota_1 is derived from partitions.csv.
+flash_offsets     = { bootloader = 0x0, partition_table = 0x8000, ota_0 = 0x20000 }
+
+[compile_target]
+tag = "esp32-s3"                                   # R2-DEF §7.7 — shared with esp32-s3-devkitc / esp32-s3-xiao
+
+[capabilities]
+# Hive-shared singletons this carrier exposes.
+provides = [
+    "r2.hw.wifi",         # WiFi 4 (2.4 GHz), ESP32-S3
+    "r2.hw.ble",          # BLE 5, NimBLE host stack
+    "r2.hw.lora",         # Semtech SX1262 (SPI) — direct LoRa P2P / LoRaWAN / Meshtastic
+    "r2.hw.spi",          # two SPI buses in use: SX1262 (GPIO5/6/7) + TFT (GPIO11/12)
+    "r2.hw.gpio",
+    "r2.hw.adc",          # ADC1 — battery sense on GPIO1
+    "r2.hw.uart",
+    "r2.hw.flash",        # 4 MB internal
+    "r2.hw.display",      # 0.96" 160×80 colour TFT (ST7735-family, SPI)
+    "r2.hw.button",       # Key1 (GPIO18) + Key2 (GPIO0 boot strap)
+    "r2.hw.led",          # on-board LED (GPIO21)
+    "r2.hw.usb-serial-jtag",
+]
+absent = [
+    "r2.hw.psram",        # N4 module has no PSRAM
+    "r2.hw.sdspi",        # no on-board microSD slot documented
+]
+
+[pinout]
+
+# ── SX1262 LoRa radio (SPI bus A) ──────────────────────────────────────
+# Silk labels MI/MO: MI = Master-In (MISO) = GPIO5; MO = Master-Out
+# (MOSI) = GPIO6. CONFIRM against a physical board before first bring-up —
+# the wiki's prose annotated MI/MO inconsistently; this records the
+# Master-In/Master-Out reading.
+[pinout.gpio.GPIO5]
+description = "SX1262 SPI MI (MISO); silk 'LoRa MI'"
+silk        = "5"
+functions   = ["digital", "spi"]
+role_hint   = "lora-miso"
+
+[pinout.gpio.GPIO6]
+description = "SX1262 SPI MO (MOSI); silk 'LoRa MO'"
+silk        = "6"
+functions   = ["digital", "spi"]
+role_hint   = "lora-mosi"
+
+[pinout.gpio.GPIO7]
+description = "SX1262 SPI SCK"
+silk        = "7"
+functions   = ["digital", "spi"]
+role_hint   = "lora-sck"
+
+[pinout.gpio.GPIO10]
+description = "SX1262 chip-select (NSS)"
+silk        = "10"
+functions   = ["digital", "spi-cs"]
+role_hint   = "lora-cs"
+
+[pinout.gpio.GPIO4]
+description = "SX1262 DIO1 (IRQ line)"
+silk        = "4"
+functions   = ["digital"]
+role_hint   = "lora-dio1"
+
+[pinout.gpio.GPIO40]
+description = "SX1262 BUSY (transceiver-busy input)"
+silk        = "40"
+functions   = ["digital"]
+role_hint   = "lora-busy"
+
+[pinout.gpio.GPIO41]
+description = "SX1262 reset"
+silk        = "41"
+functions   = ["digital"]
+role_hint   = "lora-rst"
+
+[pinout.gpio.GPIO42]
+description = "SX1262 RXEN (RF switch / RX-enable)"
+silk        = "42"
+functions   = ["digital"]
+role_hint   = "lora-rxen"
+
+# ── 0.96\" 160×80 colour TFT (ST7735-family, SPI bus B) ────────────────
+[pinout.gpio.GPIO11]
+description = "TFT SPI MOSI (silk 'LCD MO')"
+silk        = "11"
+functions   = ["digital", "spi"]
+role_hint   = "lcd-mosi"
+
+[pinout.gpio.GPIO12]
+description = "TFT SPI SCK"
+silk        = "12"
+functions   = ["digital", "spi"]
+role_hint   = "lcd-sck"
+
+[pinout.gpio.GPIO17]
+description = "TFT chip-select"
+silk        = "17"
+functions   = ["digital", "spi-cs"]
+role_hint   = "lcd-cs"
+
+[pinout.gpio.GPIO15]
+description = "TFT reset"
+silk        = "15"
+functions   = ["digital"]
+role_hint   = "lcd-rst"
+
+[pinout.gpio.GPIO14]
+description = "TFT D/C (data-command select)"
+silk        = "14"
+functions   = ["digital"]
+role_hint   = "lcd-dc"
+
+[pinout.gpio.GPIO16]
+description = "TFT backlight enable"
+silk        = "16"
+functions   = ["digital"]
+role_hint   = "lcd-backlight"
+
+[pinout.gpio.GPIO48]
+description = "TFT power enable (non-standard I/O — gates LCD VDD)"
+silk        = "48"
+functions   = ["digital"]
+role_hint   = "lcd-power"
+
+# ── Buttons / LED / battery ────────────────────────────────────────────
+[pinout.gpio.GPIO18]
+description = "User button Key1 — the Phase-3 test trigger (inject a test event)"
+silk        = "18"
+functions   = ["digital"]
+role_hint   = "button-key1"
+
+[pinout.gpio.GPIO21]
+description = "On-board LED"
+silk        = "21"
+functions   = ["digital"]
+role_hint   = "status-led"
+
+[pinout.gpio.GPIO1]
+description = "Battery voltage sense — ADC1_CH0"
+silk        = "1"
+functions   = ["digital", "adc", "rtc"]
+role_hint   = "battery-sense"
+
+# Pins not safe to wire (strapping / USB / boot):
+[pinout.reserved]
+"GPIO0"  = "Strapping pin (boot mode) + user button Key2 — held at boot selects download mode"
+"GPIO3"  = "Strapping pin (JTAG signal source select)"
+"GPIO19" = "USB-D− (native USB-Serial-JTAG)"
+"GPIO20" = "USB-D+ (native USB-Serial-JTAG)"
+"GPIO45" = "Strapping (VDD_SPI voltage)"
+"GPIO46" = "Strapping (ROM print)"
+"GPIO48" = "Drives LCD VDD via a load switch — not a general-purpose pin"
+
+[references]
+vendor_url      = "https://www.dfrobot.com/product-2933.html"
+wiki_url        = "https://wiki.dfrobot.com/dfr1195/"
+chip_vendor_url = "https://www.espressif.com/en/products/socs/esp32-s3"
+lora_chip_url   = "https://www.semtech.com/products/wireless-rf/lora-connect/sx1262"
+
+[compulsory_plugins]
+# Per SPEC-R2-COMPOSER §12.1 + [[project-compulsory-plugins-and-virgin-boards]].
+capabilities = ["ai.reality2.deploy.ota"]
+prefer       = ["ota-tcp"]                         # esp_ota_*-based, over WiFi STA (Path B: a no_std embassy-net receiver in firmware)
+
+[notes]
+gotchas = [
+    "Tri-radio carrier: WiFi + BLE share the ESP32-S3 radio; LoRa is a separate SX1262 on SPI. Concurrent WiFi+LoRa is fine (different radios), but ADC2 is unusable while WiFi is active — battery sense uses ADC1 (GPIO1).",
+    "Two SEPARATE SPI buses: SX1262 on GPIO5/6/7 (+CS GPIO10) and the TFT on GPIO11/12 (+CS GPIO17). Do not collapse them onto one bus — they have independent CS/RST/IRQ lines.",
+    "SX1262 silk MI/MO: this board.toml reads MI=MISO=GPIO5, MO=MOSI=GPIO6. The DFRobot wiki prose was inconsistent on which is which — CONFIRM on a physical board before first SPI bring-up (a swapped MOSI/MISO silently yields no SX1262 response).",
+    "0.96\" display is 160×80 COLOUR (ST7735-family TFT over SPI), NOT a 128×64 SSD1306 OLED — the on-device LCD plugin (Phase 3 D4c) must target ST7735, not SSD1306. Controller chip not named on the wiki; treat as ST7735S until a physical board confirms.",
+    "GPIO48 gates LCD VDD through a load switch — the LCD plugin must raise GPIO48 before driving the panel. (On the devkitc GPIO48 is the v1.0 WS2812 pin — different role here; do not copy devkitc LED assumptions.)",
+    "Key2 is the GPIO0 boot strap — usable as a button at runtime but held-low at reset enters download mode. Key1 (GPIO18) is the clean user button; use it for the Phase-3 test trigger.",
+    "4 MB flash (N4 module) — half the devkitc's 8 MB. The OTA partition table must fit two app slots + NVS + phy_init in 4 MB; app images are budget-constrained accordingly (R2-COMPILE AOT-size discipline matters more here).",
+    "Path B firmware (pure no_std esp-hal/embassy, hive-owned): the device-side OTA receiver is a no_std embassy-net listener, not the std ota_tcp.rs reference. composer's OTA PUSH wire (F5) is unchanged.",
+    "Use esptool (Python, ESP-IDF-bundled) for first-install flashing, NOT espflash, per R2-BUILD §5.1.",
+]

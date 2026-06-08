@@ -199,6 +199,63 @@
     },
     {
       "kind": "board",
+      "slug": "esp32-s3-dfr1195",
+      "path": "catalogue/boards/esp32-s3-dfr1195",
+      "display_name": "DFRobot LoRaWAN ESP32-S3 Dev Board (DFR1195) \u2014 ESP32-S3-WROOM-1-N4 (Xtensa LX7 dual-core @ 240 MHz, WiFi 4 + BLE 5) plus a Semtech SX1262 LoRa radio (direct LoRa P2P / one-to-many / LoRaWAN / Meshtastic), a 0",
+      "name": "esp32-s3-dfr1195",
+      "version": "0.1.0",
+      "description": "DFRobot LoRaWAN ESP32-S3 Dev Board (DFR1195) \u2014 ESP32-S3-WROOM-1-N4 (Xtensa LX7 dual-core @ 240 MHz, WiFi 4 + BLE 5) plus a Semtech SX1262 LoRa radio (direct LoRa P2P / one-to-many / LoRaWAN / Meshtastic), a 0.96\" 160\u00d780 colour TFT (ST7735-family, SPI), two user buttons (Key1 on GPIO18, Key2 on the GPIO0 boot strap), an on-board LED (GPIO21) and a battery-sense ADC (GPIO1). USB-C with the ESP32-S3 native USB-Serial-JTAG. The first tri-radio (WiFi + BLE + LoRa) carrier in the catalogue \u2014 the Phase-3 transient-networking hardware test node.",
+      "arch": "esp32",
+      "chip": "esp32s3",
+      "carrier": "dfr1195",
+      "target_triple": "xtensa-esp32s3-espidf",
+      "compile_target_tag": "esp32-s3",
+      "flash_size_mb": 4,
+      "psram": false,
+      "compulsory_capabilities": [
+        "ai.reality2.deploy.ota"
+      ],
+      "capabilities": [
+        "r2.hw.wifi",
+        "r2.hw.ble",
+        "r2.hw.lora",
+        "r2.hw.spi",
+        "r2.hw.gpio",
+        "r2.hw.adc",
+        "r2.hw.uart",
+        "r2.hw.flash",
+        "r2.hw.display",
+        "r2.hw.button",
+        "r2.hw.led",
+        "r2.hw.usb-serial-jtag"
+      ],
+      "transports": [
+        "WiFi 2.4 GHz",
+        "BLE 5.0",
+        "UART",
+        "USB-CDC"
+      ],
+      "hw_blurb": "ESP32S3 \u00b7 4 MB Flash",
+      "files": [
+        {
+          "path": "catalogue/boards/esp32-s3-dfr1195/AI-CONTEXT.md",
+          "name": "AI-CONTEXT.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-dfr1195/BOARD.md",
+          "name": "BOARD.md",
+          "kind": "md"
+        },
+        {
+          "path": "catalogue/boards/esp32-s3-dfr1195/board.toml",
+          "name": "board.toml",
+          "kind": "toml"
+        }
+      ]
+    },
+    {
+      "kind": "board",
       "slug": "esp32-s3-xiao",
       "path": "catalogue/boards/esp32-s3-xiao",
       "display_name": "Seeed Studio XIAO ESP32-S3 (Pre-Soldered SKU) \u2014 coin-sized 21 \u00d7 17",
@@ -338,6 +395,11 @@
               "kind": "md"
             },
             {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
               "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/PLUGIN.md",
               "name": "PLUGIN.md",
               "kind": "md"
@@ -346,6 +408,11 @@
               "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/plugin.toml",
               "name": "plugin.toml",
               "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
             }
           ]
         },
@@ -378,6 +445,11 @@
               "kind": "md"
             },
             {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
               "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/PLUGIN.md",
               "name": "PLUGIN.md",
               "kind": "md"
@@ -386,6 +458,11 @@
               "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/plugin.toml",
               "name": "plugin.toml",
               "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
             }
           ]
         },
@@ -419,6 +496,11 @@
               "kind": "md"
             },
             {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
               "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/PLUGIN.md",
               "name": "PLUGIN.md",
               "kind": "md"
@@ -427,6 +509,11 @@
               "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/plugin.toml",
               "name": "plugin.toml",
               "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
             }
           ]
         },
@@ -1120,6 +1207,11 @@
           "kind": "md"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/PLUGIN.md",
           "name": "PLUGIN.md",
           "kind": "md"
@@ -1130,9 +1222,19 @@
           "kind": "toml"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/AI-CONTEXT.md",
           "name": "AI-CONTEXT.md",
           "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/PLUGIN.md",
@@ -1145,9 +1247,19 @@
           "kind": "toml"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/AI-CONTEXT.md",
           "name": "AI-CONTEXT.md",
           "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/PLUGIN.md",
@@ -1158,6 +1270,11 @@
           "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/plugin.toml",
           "name": "plugin.toml",
           "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/AI-CONTEXT.md",
@@ -1518,7 +1635,7 @@
     }
   ],
   "stats": {
-    "boards": 3,
+    "boards": 4,
     "ensembles": 1,
     "plugins": 8,
     "sentants": 15
