@@ -462,6 +462,11 @@
               "kind": "md"
             },
             {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
               "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/PLUGIN.md",
               "name": "PLUGIN.md",
               "kind": "md"
@@ -470,6 +475,11 @@
               "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/plugin.toml",
               "name": "plugin.toml",
               "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
             }
           ]
         },
@@ -509,6 +519,11 @@
               "kind": "md"
             },
             {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
               "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/PLUGIN.md",
               "name": "PLUGIN.md",
               "kind": "md"
@@ -517,6 +532,11 @@
               "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/plugin.toml",
               "name": "plugin.toml",
               "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
             }
           ]
         },
@@ -552,6 +572,11 @@
               "kind": "md"
             },
             {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
               "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/PLUGIN.md",
               "name": "PLUGIN.md",
               "kind": "md"
@@ -560,6 +585,11 @@
               "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/plugin.toml",
               "name": "plugin.toml",
               "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
             }
           ]
         },
@@ -664,6 +694,11 @@
               "kind": "md"
             },
             {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/Cargo.toml",
+              "name": "Cargo.toml",
+              "kind": "toml"
+            },
+            {
               "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/PLUGIN.md",
               "name": "PLUGIN.md",
               "kind": "md"
@@ -672,6 +707,11 @@
               "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/plugin.toml",
               "name": "plugin.toml",
               "kind": "toml"
+            },
+            {
+              "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/src/lib.rs",
+              "name": "lib.rs",
+              "kind": "rs"
             }
           ]
         }
@@ -1125,6 +1165,11 @@
           "kind": "md"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/PLUGIN.md",
           "name": "PLUGIN.md",
           "kind": "md"
@@ -1135,9 +1180,19 @@
           "kind": "toml"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/indicator/led/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/AI-CONTEXT.md",
           "name": "AI-CONTEXT.md",
           "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/PLUGIN.md",
@@ -1150,9 +1205,19 @@
           "kind": "toml"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/adxl355/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/AI-CONTEXT.md",
           "name": "AI-CONTEXT.md",
           "kind": "md"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/PLUGIN.md",
@@ -1163,6 +1228,11 @@
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/plugin.toml",
           "name": "plugin.toml",
           "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/battery-adc/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/plugins/sensor/lis2dh/AI-CONTEXT.md",
@@ -1200,6 +1270,11 @@
           "kind": "md"
         },
         {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
+        },
+        {
           "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/PLUGIN.md",
           "name": "PLUGIN.md",
           "kind": "md"
@@ -1208,6 +1283,11 @@
           "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/plugin.toml",
           "name": "plugin.toml",
           "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/rocker-sensor/plugins/storage/sd-card/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
         },
         {
           "path": "catalogue/ensembles/rocker-sensor/sentants/Accelerometer/AI-CONTEXT.md",

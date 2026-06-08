@@ -38,6 +38,8 @@ members = [
   "catalogue/ensembles/rocker-sensor/plugins/comms/reset-tcp",
   "catalogue/ensembles/rocker-sensor/plugins/comms/log-tcp",
   "catalogue/ensembles/rocker-sensor/plugins/comms/data-tcp",
+  # Phase 3 transient-networking hardware-test ensemble plugins.
+  "catalogue/ensembles/transient-test/plugins/sensor/simulated",
   # Workstation orchestrator binary (Phase 1.6+).
   "orchestrator",
 ]
