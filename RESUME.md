@@ -37,11 +37,17 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
      shapes) + static-mount builder (ServeDir + SPA fallback; nest for sub-path
      prefixes, fallback_service for root). 7 module tests; orchestrator suite
      110/110. NOT yet wired into main.rs's router (no test-ux ensemble.yaml yet).
-   - ⏭ **Slice 2:** the `/r2` raw-R2-WIRE frame channel (WS handler distinct from
-     the JSON management bridge) + Ed25519 auth vs apiary TG (with `trusted_local`
-     v0.1 mode) + replay-state-on-connect + subscription fan-out. Build against
-     the in-process engine bus; attach the WS↔TCP mesh leg to core's **D3a** when
-     its surface lands (seam noted in the design).
+   - ✅ **Slice 2a (auth core):** `web.rs::verify_ws_auth` — per-message **Ed25519**
+     verify vs the apiary TG (R2-WEB §4.2), `device_id`=DEV_PK, 60 s replay window,
+     membership behind an `is_live_member` closure. **Ed25519 FROM THE START — NO
+     trusted_local** (Roy's Q1 decision; §10.2-conformant). 6 tests; suite 116/116.
+   - ⏭ **Slice 2b:** the `/r2` raw-R2-WIRE frame-channel WS handler (distinct from
+     the JSON management bridge — Q2 approved: keep both) wrapping `verify_ws_auth`;
+     wire `is_live_member` to `substrate/tg_state` + roster; the browser-identity
+     **enrolment** path (mint/enrol a DEV_PK via software-ed25519 so the wasm-hive
+     is a provisioned TG member); replay-state-on-connect + subscription fan-out.
+     Build against the in-process engine bus; attach the WS↔TCP mesh leg to core's
+     **D3a** when its surface lands (seam noted in the design).
    - ⏭ **Slice 3:** wire the registration set into main.rs (mount each hosted
      ensemble's bundle@prefix + its `/r2` channel), arriving with the D5 test-ux
      ensemble.yaml. Bundle MUST set `<base href="<prefix>/">` (trailing-slash
@@ -88,9 +94,13 @@ no_std yet). So:
   contract), and D4 plugin placement.
 - **core** — D3a (std/alloc ASYNC r2-discovery udp_lan/tcp) Linux-verifiable
   NOW → gives the orchestrator/wasm-hive a REAL transport soon. D3b (no_std SYNC
-  R2-TRANSPORT SX1262) → the D4d lora plugin trait must be SYNC embedded-hal to
-  match it (propose the trait to supervisor → core when reaching D4d). Owns
-  `r2-core/platforms/unoq/` (Uno-Q+LoRa, the later heterogeneous board class).
+  R2-TRANSPORT SX1262) → the D4d lora trait must be SYNC embedded-hal to match
+  it (propose to supervisor → core when reaching D4d). **Keep it CHIP-AGNOSTIC:**
+  Roy has an **LR2021** kit (Semtech 4th-gen, different chip; no_std `lr2021`
+  crate exists — github TheClams/lr2021, async/embassy). The trait must serve
+  SX1262 AND LR2021 (radio-HAL seam; async driver wraps under sync `poll_recv`) —
+  don't bake SX1262 specifics in. Roy deciding LR2021 = hive's LoRa radio vs a
+  standalone node. Owns `r2-core/platforms/unoq/` (Uno-Q+LoRa, later board class).
   r2-def web_template test fixed (68565d8) — re-sync vendored r2-def at a clean
   point to green the workspace-wide `cargo test`.
 - **specs** — R2-WEB v0.3 (read in-place). r2-web plugin template DOESN'T EXIST

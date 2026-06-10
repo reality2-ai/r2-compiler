@@ -18,6 +18,7 @@
 use std::path::{Path, PathBuf};
 
 use axum::Router;
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::Deserialize;
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -161,6 +162,98 @@ pub fn registration_router(reg: &R2WebRegistration, ensemble_dir: &Path) -> Rout
     }
 }
 
+// ── /r2 WebSocket auth (R2-WEB v0.3 §4.2/§4.4) ───────────────────────────
+//
+// Roy's decision (Q1): per-message **Ed25519** auth from day one — NO
+// trusted_local/anonymous mode (keeps us §10.2-conformant). Every /r2 message
+// is a signed envelope; the browser wasm-hive must be a provisioned, non-revoked
+// member of the apiary TrustGroup (its `device_id` IS its Ed25519 DEV_PK).
+
+/// A signed WebSocket message envelope (R2-WEB §4.2).
+#[derive(Debug, Clone, Deserialize)]
+pub struct WsAuthEnvelope {
+    /// 64-hex = 32-byte Ed25519 public key (DEV_PK).
+    pub device_id: String,
+    /// Unix seconds (decimal) — checked against the replay window.
+    pub timestamp: i64,
+    /// 128-hex = 64-byte Ed25519 signature.
+    pub signature: String,
+    /// The actual message as a JSON string (signed, not interpreted here).
+    pub payload: String,
+}
+
+/// Why a WS message failed authentication. All causes → silently drop the
+/// message (R2-WEB §4.2: never close the socket on a single failure).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthError {
+    /// Envelope not valid JSON / signature not 64 bytes hex.
+    Malformed,
+    /// `device_id` is not 32-byte hex / not a valid Ed25519 point.
+    BadDeviceId,
+    /// `device_id` is not a provisioned, non-revoked TG member.
+    NotMember,
+    /// `timestamp` outside the replay window.
+    Expired,
+    /// Ed25519 signature did not verify against `device_id`.
+    BadSignature,
+}
+
+/// Replay window (R2-WEB §4.2): timestamp must be within this of server time.
+pub const REPLAY_WINDOW_SECS: i64 = 60;
+
+/// Verify a signed `/r2` envelope per R2-WEB §4.2. On success returns the
+/// authenticated `DEV_PK`. `is_live_member` answers "is this DEV_PK a
+/// provisioned, non-revoked member of the active apiary TG?" (wired to
+/// `substrate/tg_state` + the roster at the call site; abstracted here so the
+/// crypto + framing logic is unit-testable in isolation).
+///
+/// The signed bytes are `"<device_id>:<timestamp>:<payload>"` (lowercase-hex
+/// device_id, decimal timestamp, payload JSON string) — R2-WEB §4.2.
+pub fn verify_ws_auth(
+    raw: &str,
+    now_unix: i64,
+    replay_window_secs: i64,
+    is_live_member: impl Fn(&[u8; 32]) -> bool,
+) -> Result<[u8; 32], AuthError> {
+    let env: WsAuthEnvelope = serde_json::from_str(raw).map_err(|_| AuthError::Malformed)?;
+
+    let pk_bytes = decode_hex_32(&env.device_id).ok_or(AuthError::BadDeviceId)?;
+    let vk = VerifyingKey::from_bytes(&pk_bytes).map_err(|_| AuthError::BadDeviceId)?;
+
+    // Membership first: an unknown/revoked device must not even reach crypto.
+    if !is_live_member(&pk_bytes) {
+        return Err(AuthError::NotMember);
+    }
+    // Replay window.
+    if (now_unix - env.timestamp).abs() > replay_window_secs {
+        return Err(AuthError::Expired);
+    }
+    // Signature over device_id:timestamp:payload.
+    let sig_bytes = decode_hex_64(&env.signature).ok_or(AuthError::Malformed)?;
+    let signed = format!("{}:{}:{}", env.device_id, env.timestamp, env.payload);
+    vk.verify(signed.as_bytes(), &Signature::from_bytes(&sig_bytes))
+        .map_err(|_| AuthError::BadSignature)?;
+    Ok(pk_bytes)
+}
+
+fn decode_hex_32(s: &str) -> Option<[u8; 32]> {
+    let v = hex::decode(s).ok()?;
+    (v.len() == 32).then(|| {
+        let mut a = [0u8; 32];
+        a.copy_from_slice(&v);
+        a
+    })
+}
+
+fn decode_hex_64(s: &str) -> Option<[u8; 64]> {
+    let v = hex::decode(s).ok()?;
+    (v.len() == 64).then(|| {
+        let mut a = [0u8; 64];
+        a.copy_from_slice(&v);
+        a
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,5 +365,112 @@ ensemble:
         let mut root = r.clone();
         root.route_prefix = "/".into();
         let _ = registration_router(&root, Path::new("/tmp/ensemble"));
+    }
+
+    // ── /r2 Ed25519 auth ──────────────────────────────────────────────
+    use ed25519_dalek::{Signer, SigningKey};
+
+    fn test_key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; 32])
+    }
+
+    fn signed_envelope(sk: &SigningKey, timestamp: i64, payload: &str) -> String {
+        let device_id = hex::encode(sk.verifying_key().to_bytes());
+        let signed = format!("{device_id}:{timestamp}:{payload}");
+        let signature = hex::encode(sk.sign(signed.as_bytes()).to_bytes());
+        serde_json::json!({
+            "device_id": device_id,
+            "timestamp": timestamp,
+            "signature": signature,
+            "payload": payload,
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn valid_signed_envelope_authenticates() {
+        let sk = test_key(0x11);
+        let pk = sk.verifying_key().to_bytes();
+        let env = signed_envelope(&sk, 1_000_000, r#"{"type":"authenticate"}"#);
+        let got = verify_ws_auth(&env, 1_000_000, REPLAY_WINDOW_SECS, |p| p == &pk).unwrap();
+        assert_eq!(got, pk);
+        // small clock skew within the window still passes
+        assert!(verify_ws_auth(&env, 1_000_030, REPLAY_WINDOW_SECS, |p| p == &pk).is_ok());
+    }
+
+    #[test]
+    fn expired_timestamp_rejected() {
+        let sk = test_key(0x22);
+        let pk = sk.verifying_key().to_bytes();
+        let env = signed_envelope(&sk, 1_000_000, "{}");
+        let r = verify_ws_auth(&env, 1_000_000 + 120, REPLAY_WINDOW_SECS, |p| p == &pk);
+        assert_eq!(r, Err(AuthError::Expired));
+    }
+
+    #[test]
+    fn tampered_payload_fails_signature() {
+        let sk = test_key(0x33);
+        let pk = sk.verifying_key().to_bytes();
+        // Sign payload A, then swap in payload B keeping the signature.
+        let device_id = hex::encode(pk);
+        let signed = format!("{device_id}:1000000:A");
+        let signature = hex::encode(sk.sign(signed.as_bytes()).to_bytes());
+        let tampered = serde_json::json!({
+            "device_id": device_id, "timestamp": 1_000_000,
+            "signature": signature, "payload": "B",
+        })
+        .to_string();
+        assert_eq!(
+            verify_ws_auth(&tampered, 1_000_000, REPLAY_WINDOW_SECS, |p| p == &pk),
+            Err(AuthError::BadSignature)
+        );
+    }
+
+    #[test]
+    fn non_member_rejected_before_crypto() {
+        let sk = test_key(0x44);
+        let env = signed_envelope(&sk, 1_000_000, "{}");
+        // is_live_member says no → NotMember (even though the sig is valid).
+        assert_eq!(
+            verify_ws_auth(&env, 1_000_000, REPLAY_WINDOW_SECS, |_| false),
+            Err(AuthError::NotMember)
+        );
+    }
+
+    #[test]
+    fn malformed_and_bad_device_id() {
+        assert_eq!(
+            verify_ws_auth("not json", 0, REPLAY_WINDOW_SECS, |_| true),
+            Err(AuthError::Malformed)
+        );
+        // valid JSON envelope but device_id is not 32-byte hex
+        let bad = serde_json::json!({
+            "device_id": "xyz", "timestamp": 0, "signature": "00", "payload": "{}",
+        })
+        .to_string();
+        assert_eq!(
+            verify_ws_auth(&bad, 0, REPLAY_WINDOW_SECS, |_| true),
+            Err(AuthError::BadDeviceId)
+        );
+    }
+
+    #[test]
+    fn wrong_key_signature_rejected() {
+        // Envelope signed by a different key than its device_id claims.
+        let real = test_key(0x55);
+        let pk = real.verifying_key().to_bytes();
+        let device_id = hex::encode(pk);
+        let imposter = test_key(0x56);
+        let signed = format!("{device_id}:1000000:{{}}");
+        let signature = hex::encode(imposter.sign(signed.as_bytes()).to_bytes());
+        let env = serde_json::json!({
+            "device_id": device_id, "timestamp": 1_000_000,
+            "signature": signature, "payload": "{}",
+        })
+        .to_string();
+        assert_eq!(
+            verify_ws_auth(&env, 1_000_000, REPLAY_WINDOW_SECS, |p| p == &pk),
+            Err(AuthError::BadSignature)
+        );
     }
 }
