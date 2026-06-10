@@ -114,3 +114,35 @@ WASM-hive = R2-WEB §8.4; bootstrap+mesh-proxy hybrid = §8.5.
 3. D3a async TCP transport surface from core — needed for the mesh leg; building
    host-against-engine-bus first per the seam note above. Confirm that's the
    right order.
+
+---
+
+## Addendum — specs conformance call 2 (2026-06-11)
+
+Refines §3 (the `/r2` channel) per specs' R2-WEB v0.3 conformance ruling:
+
+- **Two DISTINCT WS paths, never multiplexed on one socket:**
+  - `/ws` — the **§4 JSON device channel**. Per-message **Ed25519** envelope
+    auth (R2-WEB §4.2) = `verify_ws_auth` (slice 2a). For thin JS clients.
+  - `/r2/wire` — the **raw-R2-WIRE node channel** (the browser wasm-hive). The
+    frames carry their **own native R2-WIRE / R2-TRUST (TG-scoped) auth** — NOT
+    the JSON Ed25519 envelope. This is the wasm-hive's primary path.
+- **Both channels MUST authenticate** (no §10.2 bypass): `/ws` via §4.2
+  Ed25519; `/r2/wire` via native frame auth.
+- The **raw-R2-WIRE-over-WS channel is a current SPEC GAP** (§4's contract is
+  JSON-only). Build it now **CONFORMANT-PENDING-SPEC**; specs will author
+  **R2-WEB §4.6 "Raw R2-WIRE frame channel"** on Roy's go-ahead. Mark the code +
+  registration accordingly.
+- Target is `registrations.r2-web` (route_prefix/static_bundle/graphql/
+  subscriptions) — **not** a bare `plugins[] plugin_type:web` entry
+  (R2-ENSEMBLE §2.1.2). Already aligned.
+- The canonical web-template YAML + the `csp` field are pending specs/core + Roy.
+
+**Pre-existing gap to flag:** the orchestrator's current `/r2` JSON **management
+bridge** (catalogue/stack webapp) does not authenticate. It's a distinct path
+(satisfies condition 1) but for full §10.2 conformance it needs §4.2 Ed25519
+too — tracked as a follow-up, separate from the proof-surface channels above.
+
+**Net for slice 2b-ii:** build the `/r2/wire` raw-frame WS handler
+(conformant-pending-spec, native frame auth) AND keep `verify_ws_auth` as the
+`/ws` JSON channel gate. Distinct axum routes; distinct auth per channel.
