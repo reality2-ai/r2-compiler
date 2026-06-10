@@ -236,6 +236,22 @@ pub fn verify_ws_auth(
     Ok(pk_bytes)
 }
 
+/// Membership predicate for [`verify_ws_auth`], backed by the active apiary's
+/// roster: a `DEV_PK` is a **live member** iff a roster row has
+/// `device_pk == hex(pk)`, `cert_status == "valid"`, and a `state` that is
+/// neither `revoked` nor `retired`. This is the "provisioned, non-revoked
+/// apiary-TG member" check R2-WEB §4.2 requires (the browser wasm-hive must be
+/// enrolled — slice 2b's enrolment path adds it as such a row).
+pub fn roster_is_live_member(apiary_dir: &std::path::Path, pk: &[u8; 32]) -> bool {
+    let want = hex::encode(pk);
+    crate::roster::load(apiary_dir).devices.iter().any(|d| {
+        d.device_pk.as_deref() == Some(want.as_str())
+            && d.cert_status == "valid"
+            && d.state != "revoked"
+            && d.state != "retired"
+    })
+}
+
 fn decode_hex_32(s: &str) -> Option<[u8; 32]> {
     let v = hex::decode(s).ok()?;
     (v.len() == 32).then(|| {
@@ -471,6 +487,57 @@ ensemble:
         assert_eq!(
             verify_ws_auth(&env, 1_000_000, REPLAY_WINDOW_SECS, |p| p == &pk),
             Err(AuthError::BadSignature)
+        );
+    }
+
+    fn seed_roster(dir: &std::path::Path, rows: &[([u8; 32], &str, &str)]) {
+        use crate::roster;
+        let mut r = roster::Roster::default();
+        for (pk, cert_status, state) in rows {
+            let mut row = roster::new_placeholder(
+                "sensor", "e", "esp32-s3-xiao", "a", "2026-01-01T00:00:00Z");
+            row.device_pk = Some(hex::encode(pk));
+            row.cert_status = (*cert_status).into();
+            row.state = (*state).into();
+            r.devices.push(row);
+        }
+        roster::save(dir, &r).unwrap();
+    }
+
+    #[test]
+    fn roster_membership_gates_by_cert_and_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let live = test_key(0x77).verifying_key().to_bytes();
+        let revoked = test_key(0x78).verifying_key().to_bytes();
+        let unknown = test_key(0x79).verifying_key().to_bytes();
+        seed_roster(dir.path(), &[
+            (live, "valid", "reachable"),
+            (revoked, "revoked", "revoked"),
+        ]);
+        assert!(roster_is_live_member(dir.path(), &live));
+        assert!(!roster_is_live_member(dir.path(), &revoked));
+        assert!(!roster_is_live_member(dir.path(), &unknown));
+    }
+
+    #[test]
+    fn verify_ws_auth_backed_by_roster() {
+        let dir = tempfile::tempdir().unwrap();
+        let sk = test_key(0x7A);
+        let pk = sk.verifying_key().to_bytes();
+        seed_roster(dir.path(), &[(pk, "valid", "reachable")]);
+        let env = signed_envelope(&sk, 1_000_000, "{}");
+        // Authenticates against real roster state.
+        let got = verify_ws_auth(&env, 1_000_000, REPLAY_WINDOW_SECS, |p| {
+            roster_is_live_member(dir.path(), p)
+        })
+        .unwrap();
+        assert_eq!(got, pk);
+        // A valid signature from a non-enrolled key is refused (NotMember).
+        let stranger = test_key(0x7B);
+        let env2 = signed_envelope(&stranger, 1_000_000, "{}");
+        assert_eq!(
+            verify_ws_auth(&env2, 1_000_000, REPLAY_WINDOW_SECS, |p| roster_is_live_member(dir.path(), p)),
+            Err(AuthError::NotMember)
         );
     }
 }

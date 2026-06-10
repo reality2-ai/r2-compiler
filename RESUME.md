@@ -41,13 +41,18 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
      verify vs the apiary TG (R2-WEB §4.2), `device_id`=DEV_PK, 60 s replay window,
      membership behind an `is_live_member` closure. **Ed25519 FROM THE START — NO
      trusted_local** (Roy's Q1 decision; §10.2-conformant). 6 tests; suite 116/116.
-   - ⏭ **Slice 2b:** the `/r2` raw-R2-WIRE frame-channel WS handler (distinct from
-     the JSON management bridge — Q2 approved: keep both) wrapping `verify_ws_auth`;
-     wire `is_live_member` to `substrate/tg_state` + roster; the browser-identity
-     **enrolment** path (mint/enrol a DEV_PK via software-ed25519 so the wasm-hive
-     is a provisioned TG member); replay-state-on-connect + subscription fan-out.
-     Build against the in-process engine bus; attach the WS↔TCP mesh leg to core's
-     **D3a** when its surface lands (seam noted in the design).
+   - ✅ **Slice 2b-i (membership wiring):** `web.rs::roster_is_live_member` —
+     backs `verify_ws_auth` with real apiary state (DEV_PK present + cert_status
+     valid + state not revoked/retired). End-to-end test: valid sig from a
+     non-enrolled key → `NotMember` (§10.2 gate proven). web module 15 tests;
+     suite 118/118.
+   - ⏭ **Slice 2b-ii:** the `/r2` raw-R2-WIRE frame-channel **WS handler** (axum
+     upgrade; distinct from the JSON management bridge — Q2 keep both) wrapping
+     `verify_ws_auth` + `roster_is_live_member`; replay-state-on-connect +
+     subscription fan-out; against the in-process engine bus (mesh leg → core
+     **D3a** later). [the async piece]
+   - ⏭ **Slice 2b-iii:** browser-identity **enrolment** (mint/enrol a DEV_PK via
+     software-ed25519 so the wasm-hive is a provisioned TG member it can auth as).
    - ⏭ **Slice 3:** wire the registration set into main.rs (mount each hosted
      ensemble's bundle@prefix + its `/r2` channel), arriving with the D5 test-ux
      ensemble.yaml. Bundle MUST set `<base href="<prefix>/">` (trailing-slash
