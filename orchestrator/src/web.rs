@@ -463,6 +463,27 @@ ensemble:
         let _ = registration_router(&root, Path::new("/tmp/ensemble"));
     }
 
+    #[test]
+    fn parses_the_real_transient_test_ensemble() {
+        // The actual proof-surface ensemble (not a fixture) must parse +
+        // produce a usable WireChannel — regression-guards slice 1 + 2b-ii
+        // against the committed catalogue artifact.
+        const ENSEMBLE: &str =
+            include_str!("../../catalogue/ensembles/transient-test/ensemble.yaml");
+        let reg = parse_r2web(ENSEMBLE).expect("transient-test has registrations.r2-web");
+        assert_eq!(reg.route_prefix, "/proof");
+        assert_eq!(reg.static_bundle, "./web/");
+        assert!(reg.diagnostics);
+        assert_eq!(reg.channels.len(), 1);
+        assert_eq!(reg.channels[0].target_sentant.as_deref(), Some("TestCoordinator"));
+        assert_eq!(reg.subscriptions.len(), 6);
+        // and it drives a WireChannel
+        let ch = WireChannel::new(&reg.channels[0], &reg.subscriptions);
+        assert_eq!(ch.name(), "r2");
+        let delivered = r2_fnv::fnv1a_32(b"r2.tn.delivered");
+        assert_eq!(ch.outbound_for(delivered, b"x"), Some(b"x".to_vec()));
+    }
+
     // ── /r2 Ed25519 auth ──────────────────────────────────────────────
     use ed25519_dalek::{Signer, SigningKey};
 

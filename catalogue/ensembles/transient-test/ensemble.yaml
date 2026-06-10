@@ -1,0 +1,82 @@
+# transient-test — Phase 3 Transient-Networking proof-surface ensemble.
+#
+# PHASE3-TESTING-SUBSTRATE-PLAN.md Parts C+D. This ensemble is BOTH the
+# hardware-test process (D5: orchestrated inject-here/expect-there across the
+# DFR1195 suite + laptop) AND the proof-surface UX (Part C): it carries an
+# `registrations.r2-web` block the orchestrator hosts, serving the two views
+# (live test process + campaign coverage grid) into a browser wasm-hive.
+#
+# Placement (hive's routing-only-MCU ruling): the engine + this ensemble run on
+# the FULL hives (laptop / wasm-hive / cloud). DFR1195 nodes participate as
+# routing endpoints — they originate/forward/receive FRAMES (inject via the IO18
+# button, show delivery on the LCD); they do NOT host this ensemble.
+#
+# Canonical model: R2-ENSEMBLE / R2-SENTANT / R2-WEB v0.3 (registrations.r2-web,
+# §4.6 raw-wire channel CONFORMANT-PENDING-SPEC).
+
+ensemble:
+  name: transient-test
+  description: >
+    Phase-3 transient-networking test process + proof-surface UX. The
+    TestCoordinator injects a tracked event at an origin node and records, per
+    node, sent/received + delivery state (delivered / dropped / deduped) and the
+    partition/heal timeline; the proof UX renders that live plus the campaign
+    coverage grid. Runs on the full hives; DFR1195s are routing endpoints.
+  version: "0.1.0"
+  class: ai.reality2.composer.transient-test
+  ensemble_version: "0.1"
+
+  # Full hive (engine + ensemble hosting); the browser participates as a wasm
+  # hive. NOT a DFR1195 compile target (the MCU is routing-only near-term).
+  compile_target: [linux]
+
+  sentants:
+    - name: TestCoordinator
+      description: >
+        Drives a test run: injects a tracked (origin, msg_id) event, collects
+        per-node delivery reports, adjudicates delivered/dropped/deduped, and
+        steps the partition/heal timeline. Target sentant of the /r2/wire
+        channel. The inject-here/expect-there FSM automations (D5 semantics)
+        are authored next — this is the declaration + capability surface.
+      class: ai.reality2.composer.sentant.test-coordinator
+      plugins:
+        - name: sensor/simulated
+
+  plugins:
+    - name: sensor/simulated
+      description: "Deterministic synthetic triaxial source — the test data feed (D4a)."
+      kind: catalogue
+      compile_target: [linux, esp32-s3]
+
+  # Proof-surface UX hosted by the orchestrator (Part C). Two distinct WS
+  # channels per specs conformance call 2 (never multiplexed):
+  #   /ws       — §4 JSON device channel (per-message Ed25519).
+  #   /r2/wire  — raw-R2-WIRE node channel for the browser wasm-hive (native
+  #               frame auth; CONFORMANT-PENDING-SPEC R2-WEB §4.6).
+  registrations:
+    r2-web:
+      route_prefix: /proof
+      static_bundle: ./web/
+      channels:
+        - { name: r2, target_sentant: TestCoordinator, max_frame_bytes: 65536 }
+      subscriptions:
+        - { name: injected,  event: r2.tn.injected }
+        - { name: delivered, event: r2.tn.delivered }
+        - { name: dropped,   event: r2.tn.dropped }
+        - { name: hop,       event: r2.tn.hop }
+        - { name: partition, event: r2.tn.partition }
+        - { name: heal,      event: r2.tn.heal }
+      diagnostics: true
+
+  capabilities:
+    emits:
+      - r2.tn.injected
+      - r2.tn.delivered
+      - r2.tn.dropped
+      - r2.tn.hop
+      - r2.tn.partition
+      - r2.tn.heal
+    consumes:
+      - r2.tn.inject
+      - r2.tn.partition.cmd
+      - r2.tn.heal.cmd

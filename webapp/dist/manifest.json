@@ -1632,11 +1632,40 @@
           "kind": "yaml"
         }
       ]
+    },
+    {
+      "kind": "ensemble",
+      "slug": "transient-test",
+      "path": "catalogue/ensembles/transient-test",
+      "name": "transient-test",
+      "class": "ai.reality2.composer.transient-test",
+      "version": "0.1.0",
+      "description": "Phase-3 transient-networking test process + proof-surface UX. The TestCoordinator injects a tracked event at an origin node and records, per node, sent/received + delivery state (delivered / dropped / deduped) and the partition/heal timeline; the proof UX renders that live plus the campaign coverage grid. Runs on the full hives; DFR1195s are routing endpoints.",
+      "compile_target": "[linux]",
+      "plugins": [],
+      "sentants": [],
+      "files": [
+        {
+          "path": "catalogue/ensembles/transient-test/ensemble.yaml",
+          "name": "ensemble.yaml",
+          "kind": "yaml"
+        },
+        {
+          "path": "catalogue/ensembles/transient-test/plugins/sensor/simulated/Cargo.toml",
+          "name": "Cargo.toml",
+          "kind": "toml"
+        },
+        {
+          "path": "catalogue/ensembles/transient-test/plugins/sensor/simulated/src/lib.rs",
+          "name": "lib.rs",
+          "kind": "rs"
+        }
+      ]
     }
   ],
   "stats": {
     "boards": 4,
-    "ensembles": 1,
+    "ensembles": 2,
     "plugins": 8,
     "sentants": 15
   }

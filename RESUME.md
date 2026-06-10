@@ -77,7 +77,15 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
    LoRa = core's no_std SX1262 sync transport (D3b). composer's remaining
    Part-D = **(a)** the **D5 test ensemble + semantics** (what to inject / what
    "delivered" looks like) on the FULL hives, DFR1195s as routing endpoints
-   (inject via button-frame, show via LCD); **(b)** feed a SYNC embedded-hal
+   (inject via button-frame, show via LCD). ✅ ensemble SKELETON authored:
+   `catalogue/ensembles/transient-test/ensemble.yaml` (class
+   `ai.reality2.composer.transient-test`; TestCoordinator sentant decl +
+   sim-sensor plugin + the `registrations.r2-web` proof-surface block:
+   route_prefix `/proof`, `/r2/wire` channel → TestCoordinator, 6 `r2.tn.*`
+   subscriptions). Parser-validated (web.rs include_str! test); catalogue index
+   = 2 ensembles. ⏭ remaining: the **TestCoordinator FSM** (inject-here/
+   expect-there semantics — delivered/dropped/deduped/partition-heal), and the
+   proof-surface web bundle (Part C ii); **(b)** feed a SYNC embedded-hal
    SX1262 trait proposal INTO core D3b (not a parallel composer trait); **(c)**
    ✅ OTA reply-status contract delivered — `specifications/OTA-REPLY-STATUS-CONTRACT.md`
    (status 0x00 OK / 0x01 ERR + CODE-in-msg vocabulary; DFR1195 = 4 MB → TOO_BIG
