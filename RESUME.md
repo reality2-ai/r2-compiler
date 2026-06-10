@@ -30,13 +30,24 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
   triaxial source; the test data feed). `catalogue/ensembles/transient-test/`.
 
 ## Resume here — next steps (confirmed sequence)
-1. **Part C (i): orchestrator r2-web host** ← NEXT. Read ensemble
-   `registrations.r2-web` → mount `static_bundle@route_prefix` → wire
-   `subscriptions` to `/r2`. Full-hive territory — unaffected by the MCU
-   routing-only constraint below. Start by reading **R2-WEB v0.3 in-place** at
-   `r2-specifications/specs/r2-core/R2-WEB.md` (NO vendoring) + workshop's
-   `docs/own-hive-web-ui-recipe.md` (two hives / one /r2 channel), then post a
-   design before building.
+1. **Part C (i): orchestrator r2-web host** ← IN PROGRESS. Design posted +
+   approved-by-default (`specifications/PART-C-I-R2WEB-HOST-DESIGN.md`).
+   - ✅ **Slice 1 (foundation):** `orchestrator/src/web.rs` — `registrations.r2-web`
+     parser (serde_yaml; handles both notekeeper-graphql + workshop-channels
+     shapes) + static-mount builder (ServeDir + SPA fallback; nest for sub-path
+     prefixes, fallback_service for root). 7 module tests; orchestrator suite
+     110/110. NOT yet wired into main.rs's router (no test-ux ensemble.yaml yet).
+   - ⏭ **Slice 2:** the `/r2` raw-R2-WIRE frame channel (WS handler distinct from
+     the JSON management bridge) + Ed25519 auth vs apiary TG (with `trusted_local`
+     v0.1 mode) + replay-state-on-connect + subscription fan-out. Build against
+     the in-process engine bus; attach the WS↔TCP mesh leg to core's **D3a** when
+     its surface lands (seam noted in the design).
+   - ⏭ **Slice 3:** wire the registration set into main.rs (mount each hosted
+     ensemble's bundle@prefix + its `/r2` channel), arriving with the D5 test-ux
+     ensemble.yaml. Bundle MUST set `<base href="<prefix>/">` (trailing-slash
+     papercut is a bundle concern, not routing — axum can't nest + redirect the
+     same prefix).
+   Built to **R2-WEB v0.3** (read in-place) + workshop two-hive recipe.
 2. **Part C (ii): browser wasm-hive** — a FULL R2 hive via `crates/r2-wasm`
    (retire the toy `webapp/crate` wasm), **TCP-only transport** via a WS↔TCP
    bridge to `r2-transport/tcp.rs`; pluggable. AUTH = **Ed25519, not HMAC**

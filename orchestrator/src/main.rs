@@ -19,6 +19,7 @@ mod hive;
 mod roster;
 mod sentants;
 mod substrate;  // R2 stack components per R2-HIVE §2.1 (TG-agnostic substrate roles)
+mod web;        // r2-web host capability (Part C(i)): registrations.r2-web → static serving + /r2 frame channel
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
