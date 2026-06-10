@@ -46,11 +46,20 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
      valid + state not revoked/retired). End-to-end test: valid sig from a
      non-enrolled key → `NotMember` (§10.2 gate proven). web module 15 tests;
      suite 118/118.
-   - ⏭ **Slice 2b-ii:** the `/r2` raw-R2-WIRE frame-channel **WS handler** (axum
-     upgrade; distinct from the JSON management bridge — Q2 keep both) wrapping
-     `verify_ws_auth` + `roster_is_live_member`; replay-state-on-connect +
-     subscription fan-out; against the in-process engine bus (mesh leg → core
-     **D3a** later). [the async piece]
+   - ✅ **Slice 2b-ii (channel routing logic):** `web.rs::WireChannel` — the
+     `/r2/wire` raw-R2-WIRE channel's routing: frame-size gate (`max_frame_bytes`),
+     inbound → `Inject{target_sentant}` / `RejectOversize`, outbound subscription
+     matching (FNV-1a-32 of event names). Auth-agnostic by design. web module
+     19 tests; suite 122/122. **Channels per specs call 2:** `/ws` = JSON device
+     channel (Ed25519 `verify_ws_auth`); `/r2/wire` = raw-WIRE node channel
+     (native frame auth), DISTINCT paths, never multiplexed; `/r2/wire` is
+     CONFORMANT-PENDING-SPEC (R2-WEB §4.6 forthcoming).
+   - ⏭ **Slice 2b-ii-rest (async glue + GATED):** the axum `/r2/wire` WS handler
+     (upgrade + send/recv loop wiring `WireChannel` to the engine-bus
+     broadcast/mpsc) + replay-state-on-connect; the `/ws` JSON handler reusing
+     `verify_ws_auth`. The LIVE `/r2/wire` route is **gated on native
+     R2-WIRE/R2-TRUST frame auth** (core territory — do NOT expose unauthenticated
+     per §10.2). Mesh leg → core **D3a** later.
    - ⏭ **Slice 2b-iii:** browser-identity **enrolment** (mint/enrol a DEV_PK via
      software-ed25519 so the wasm-hive is a provisioned TG member it can auth as).
    - ⏭ **Slice 3:** wire the registration set into main.rs (mount each hosted

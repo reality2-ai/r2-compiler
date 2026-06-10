@@ -270,6 +270,86 @@ fn decode_hex_64(s: &str) -> Option<[u8; 64]> {
     })
 }
 
+// ── /r2/wire raw-R2-WIRE node channel (R2-WEB §4.6, CONFORMANT-PENDING-SPEC) ──
+//
+// The wasm-hive's primary channel: opaque R2-WIRE frames in/out (workshop
+// two-hive recipe). This is the channel **routing logic** — frame-size gate,
+// subscription matching, inbound target. It is deliberately auth-agnostic:
+// the LIVE axum `/r2/wire` route is GATED on native R2-WIRE/R2-TRUST frame auth
+// (core territory; depends on r2-wire/r2-trust frame verification) so we never
+// expose an unauthenticated channel (R2-WEB §10.2). The async WS glue to the
+// engine bus + the frame codec/auth attach when core's frame-auth API and
+// R2-WEB §4.6 ("Raw R2-WIRE frame channel") land.
+
+/// What to do with an inbound browser frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InboundAction {
+    /// Forward the frame to the channel's target sentant on the engine bus.
+    Inject {
+        /// The channel's `target_sentant` (None = broadcast to subscribers).
+        target: Option<String>,
+        /// The opaque frame bytes.
+        frame: Vec<u8>,
+    },
+    /// Frame exceeded `max_frame_bytes` — dropped.
+    RejectOversize {
+        /// Received length.
+        len: usize,
+        /// Configured cap.
+        max: usize,
+    },
+}
+
+/// Routing logic for one raw-R2-WIRE `/r2/wire` channel binding (from a
+/// registration's `channels[]` + its `subscriptions[]`).
+pub struct WireChannel {
+    name: String,
+    target_sentant: Option<String>,
+    max_frame_bytes: usize,
+    /// FNV-1a-32 hashes of the subscribed event names (the canonical R2 event
+    /// hash — works for any name, not just composer's registry set).
+    subscribed_hashes: Vec<u32>,
+}
+
+impl WireChannel {
+    /// Build from a registration `Channel` + the registration's subscriptions.
+    pub fn new(ch: &Channel, subscriptions: &[Subscription]) -> Self {
+        Self {
+            name: ch.name.clone(),
+            target_sentant: ch.target_sentant.clone(),
+            max_frame_bytes: ch.max_frame_bytes,
+            subscribed_hashes: subscriptions
+                .iter()
+                .map(|s| r2_fnv::fnv1a_32(s.event.as_bytes()))
+                .collect(),
+        }
+    }
+
+    /// Channel name (e.g. `r2`).
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Decide what to do with an inbound browser frame: size-gate, then inject
+    /// to the target sentant.
+    pub fn on_inbound(&self, frame: &[u8]) -> InboundAction {
+        if frame.len() > self.max_frame_bytes {
+            InboundAction::RejectOversize { len: frame.len(), max: self.max_frame_bytes }
+        } else {
+            InboundAction::Inject { target: self.target_sentant.clone(), frame: frame.to_vec() }
+        }
+    }
+
+    /// If this channel subscribes to `event_hash`, the (opaque) payload to push
+    /// to the browser; else `None`. Wrapping into a proper R2-WIRE frame is the
+    /// codec step attached with §4.6.
+    pub fn outbound_for(&self, event_hash: u32, payload: &[u8]) -> Option<Vec<u8>> {
+        self.subscribed_hashes
+            .contains(&event_hash)
+            .then(|| payload.to_vec())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -539,5 +619,49 @@ ensemble:
             verify_ws_auth(&env2, 1_000_000, REPLAY_WINDOW_SECS, |p| roster_is_live_member(dir.path(), p)),
             Err(AuthError::NotMember)
         );
+    }
+
+    // ── /r2/wire channel routing logic ────────────────────────────────
+
+    fn proof_channel() -> WireChannel {
+        let reg = parse_r2web(PROOF).unwrap();
+        WireChannel::new(&reg.channels[0], &reg.subscriptions)
+    }
+
+    #[test]
+    fn wire_channel_built_from_registration() {
+        let ch = proof_channel();
+        assert_eq!(ch.name(), "r2");
+    }
+
+    #[test]
+    fn inbound_within_limit_injects_to_target() {
+        let ch = proof_channel(); // target_sentant = TestCoordinator, max 65536
+        match ch.on_inbound(&[0u8; 100]) {
+            InboundAction::Inject { target, frame } => {
+                assert_eq!(target.as_deref(), Some("TestCoordinator"));
+                assert_eq!(frame.len(), 100);
+            }
+            other => panic!("expected Inject, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn inbound_oversize_rejected() {
+        let ch = proof_channel();
+        let big = vec![0u8; 65536 + 1];
+        assert_eq!(
+            ch.on_inbound(&big),
+            InboundAction::RejectOversize { len: 65537, max: 65536 }
+        );
+    }
+
+    #[test]
+    fn outbound_only_for_subscribed_events() {
+        let ch = proof_channel(); // subscribes to "r2.tn.delivered"
+        let subscribed = r2_fnv::fnv1a_32(b"r2.tn.delivered");
+        let other = r2_fnv::fnv1a_32(b"r2.tn.dropped");
+        assert_eq!(ch.outbound_for(subscribed, b"payload"), Some(b"payload".to_vec()));
+        assert_eq!(ch.outbound_for(other, b"payload"), None);
     }
 }
