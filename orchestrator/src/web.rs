@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use axum::Router;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use r2_trust::GroupHmac;
-use r2_wire::{decode_compact, verify_compact};
+use r2_wire::{decode_extended, verify_extended};
 use serde::Deserialize;
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -370,16 +370,27 @@ pub enum FrameAuthError {
     BadHmac,
 }
 
-/// Verify + decode one raw R2-WIRE **compact** frame against the apiary
+/// Verify + decode one raw R2-WIRE **extended** frame against the apiary
 /// TrustGroup's group-HMAC (the `/r2/wire` channel's native frame auth —
-/// R2-WEB §4.6, CONFORMANT-PENDING-SPEC). This **consumes** `r2-wire`
-/// (`decode_compact`/`verify_compact`) + `r2-trust` (`GroupHmac`) — it does
-/// **not** reimplement frame crypto. The `hmac` is constructed from the active
-/// apiary TG's derived group-HMAC key at the call site (the WS handler), so an
-/// unauthenticated frame can never be injected (R2-WEB §10.2).
+/// R2-WEB §4.6, CONFORMANT-PENDING-SPEC). The WS/TCP path carries the
+/// **extended** format (32-byte tag); the compact 8-byte-tag path is only for
+/// un-transcoded BLE/LoRa frames and is not handled here.
+///
+/// This **consumes** `r2-wire` (`decode_extended`/`verify_extended`) +
+/// `r2-trust` (`GroupHmac`) — it does **not** reimplement frame crypto.
+/// `verify_extended` recomputes the §10.2 authenticated envelope
+/// (`type ‖ event_hash ‖ target ‖ payload`; TTL/K/msg_id/route are mutable and
+/// deliberately NOT authenticated) and compares the tag.
+///
+/// The `hmac` is built at the call site (the WS handler) from the active apiary
+/// TG's group-HMAC key — derive via `r2_trust::derive_group_keys(&tg_signing_key)
+/// .hk` (the keyholder substrate holds the TG Ed25519 key); keep HK volatile,
+/// never persist (R2-TRUST §3.3). composer is an **endpoint/host** on
+/// `/r2/wire`, so verifying here is correct (pure relays forward opaquely);
+/// an unauthenticated frame can never be injected (R2-WEB §10.2).
 pub fn verify_wire_frame(frame: &[u8], hmac: &GroupHmac) -> Result<WireFrame, FrameAuthError> {
-    let msg = decode_compact(frame).map_err(|_| FrameAuthError::Malformed)?;
-    if !verify_compact(&msg, hmac) {
+    let msg = decode_extended(frame).map_err(|_| FrameAuthError::Malformed)?;
+    if !verify_extended(&msg, hmac) {
         return Err(FrameAuthError::BadHmac);
     }
     Ok(WireFrame {
@@ -725,14 +736,14 @@ ensemble:
     }
 
     // ── /r2/wire native frame auth (consumes r2-wire + r2-trust) ──────
-    use r2_wire::types::{CompactHeader, CompactMessage};
-    use r2_wire::{encode_compact, sign_compact, Flags, MsgType};
+    use r2_wire::types::{ExtendedHeader, ExtendedMessage};
+    use r2_wire::{encode_extended, sign_extended, Flags, MsgType};
 
-    /// Build the bytes of a group-HMAC-signed compact R2-WIRE frame, mirroring
-    /// r2-wire's own sign→encode flow.
+    /// Build the bytes of a group-HMAC-signed EXTENDED R2-WIRE frame (the
+    /// `/r2/wire` TCP format), mirroring r2-wire's own sign→encode flow.
     fn signed_wire_frame(hmac: &GroupHmac, event_hash: u32, payload: &[u8]) -> Vec<u8> {
-        let mut msg = CompactMessage {
-            header: CompactHeader {
+        let mut msg = ExtendedMessage {
+            header: ExtendedHeader {
                 version: 0,
                 msg_type: MsgType::Event,
                 flags: Flags::default(),
@@ -740,17 +751,19 @@ ensemble:
                 k: 0,
                 msg_id: 7,
                 event_hash,
-                target: 0,
+                payload_len: payload.len() as u32,
+                target_group: 0,
+                target_hive: 0,
             },
             route: None,
             payload,
             hmac_tag: None,
         };
-        let (flags, tag) = sign_compact(&msg, hmac);
+        let (flags, tag) = sign_extended(&msg, hmac);
         msg.header.flags = flags;
         msg.hmac_tag = Some(tag);
         let mut buf = [0u8; 512];
-        let len = encode_compact(&msg, &mut buf).unwrap();
+        let len = encode_extended(&msg, &mut buf).unwrap();
         buf[..len].to_vec()
     }
 
@@ -775,17 +788,18 @@ ensemble:
     fn wire_frame_unsigned_rejected() {
         // No HMAC tag (has_hmac=false) → must not pass (no §10.2 bypass).
         let hmac = GroupHmac::new([0x07; 32]);
-        let msg = CompactMessage {
-            header: CompactHeader {
-                version: 0, msg_type: MsgType::Event,
-                flags: Flags::default(), ttl: 1, k: 0, msg_id: 1, event_hash: 9, target: 0,
+        let msg = ExtendedMessage {
+            header: ExtendedHeader {
+                version: 0, msg_type: MsgType::Event, flags: Flags::default(),
+                ttl: 1, k: 0, msg_id: 1, event_hash: 9, payload_len: 1,
+                target_group: 0, target_hive: 0,
             },
             route: None,
             payload: b"x",
             hmac_tag: None,
         };
         let mut buf = [0u8; 128];
-        let len = encode_compact(&msg, &mut buf).unwrap();
+        let len = encode_extended(&msg, &mut buf).unwrap();
         assert_eq!(verify_wire_frame(&buf[..len], &hmac), Err(FrameAuthError::BadHmac));
     }
 
