@@ -54,12 +54,20 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
      channel (Ed25519 `verify_ws_auth`); `/r2/wire` = raw-WIRE node channel
      (native frame auth), DISTINCT paths, never multiplexed; `/r2/wire` is
      CONFORMANT-PENDING-SPEC (R2-WEB §4.6 forthcoming).
-   - ⏭ **Slice 2b-ii-rest (async glue + GATED):** the axum `/r2/wire` WS handler
-     (upgrade + send/recv loop wiring `WireChannel` to the engine-bus
-     broadcast/mpsc) + replay-state-on-connect; the `/ws` JSON handler reusing
-     `verify_ws_auth`. The LIVE `/r2/wire` route is **gated on native
-     R2-WIRE/R2-TRUST frame auth** (core territory — do NOT expose unauthenticated
-     per §10.2). Mesh leg → core **D3a** later.
+   - ✅ **Slice 2b-ii (frame auth):** `web.rs::verify_wire_frame` — native
+     R2-WIRE/R2-TRUST frame auth for `/r2/wire`, **consuming** `r2_wire`
+     (`decode_compact`/`verify_compact`) + `r2_trust::GroupHmac` (NOT
+     reimplemented; §4.6 greenlit, conformant-pending-authoring). 4 tests
+     (valid / wrong-group-key / unsigned / malformed). web module **24 tests**;
+     suite **127/127**. Both channel auths now exist: `/ws` = `verify_ws_auth`
+     (Ed25519), `/r2/wire` = `verify_wire_frame` (group-HMAC).
+   - ⏭ **Slice 2b-ii-rest (async glue — the integration piece):** the axum WS
+     handlers — `/r2/wire` (upgrade + recv→`verify_wire_frame`→`WireChannel.on_inbound`
+     →engine-bus inject; bus events→`WireChannel.outbound_for`→send) +
+     replay-on-connect; `/ws` (JSON, `verify_ws_auth`). Needs: derive the
+     `GroupHmac` (group `hk`) from the active apiary TG (`substrate/tg_state` +
+     r2-trust key derivation); wire to `hive.rs`'s bus broadcast/mpsc. Mesh leg →
+     core **D3a** later.
    - ⏭ **Slice 2b-iii:** browser-identity **enrolment** (mint/enrol a DEV_PK via
      software-ed25519 so the wasm-hive is a provisioned TG member it can auth as).
    - ⏭ **Slice 3:** wire the registration set into main.rs (mount each hosted
