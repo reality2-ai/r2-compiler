@@ -2,7 +2,7 @@
 
 Owned by the composer worker (I keep this current). Master fleet save (read-only
 reference): `claude-fleet/fleet-context/FLEET-CONTEXT-SAVE.md`.
-Last updated: 2026-06-09.
+Last updated: 2026-06-12.
 
 **Role:** the **dynamic fleet tool** — creates/manages a fleet of devices with
 plugins + sentants (ensembles) + OTA + the proof UX. It **orchestrates hives; it
@@ -99,11 +99,13 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
    structured `AssertFail` (mirrors r2-harness assert.rs). Hardware test = the
    catalogue's `{topology,timeline,expect}` block verbatim → sim+hardware share
    one frame, coverage grid 1:1. 6 tests; suite 133/133. (Ref:
-   R2-TRANSIENT-NETWORKING.md §6; catalogue json = 52 records.) ⏭ remaining: the
-   **TestCoordinator Sentant FSM** wrapping the core (drive timeline = inject
-   frames; ingest per-node delivery reports off `/r2/wire`; emit `r2.tn.*`), and
-   the proof-surface web bundle (Part C ii) — NEXT per supervisor: this, then
-   C(ii); **(b)** feed a SYNC embedded-hal
+   R2-TRANSIENT-NETWORKING.md §6; catalogue json = 52 records.) ✅ **TestCoordinator Sentant FSM** wrapping the core — handles r2.tn.inject
+   {origin,msg_id}→track+emit injected (Running); r2.tn.report {node,origin,msg_id}
+   →ledger.record+emit delivered{copies}; r2.tn.assert {kind,...}→adjudicate via
+   the A6 asserts+emit result{ok,detail}. r2.tn.* routed by canonical FNV (raw
+   /r2/wire channel; no registry entry). 10 tests; suite 137/137. ⏭ remaining:
+   register in hive.rs (run live) + wire report-ingest/frame-inject to /r2/wire
+   (needs the C(i) WS handler); then the proof-surface web bundle (Part C ii); **(b)** feed a SYNC embedded-hal
    SX1262 trait proposal INTO core D3b (not a parallel composer trait); **(c)**
    ✅ OTA reply-status contract delivered — `specifications/OTA-REPLY-STATUS-CONTRACT.md`
    (status 0x00 OK / 0x01 ERR + CODE-in-msg vocabulary; DFR1195 = 4 MB → TOO_BIG
