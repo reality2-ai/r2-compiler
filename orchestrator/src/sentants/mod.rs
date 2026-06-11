@@ -10,6 +10,7 @@ pub mod builder;
 pub mod deploy;
 pub mod provision;
 pub mod roster;
+pub mod test_coordinator;   // Phase 3 D5 — transient-networking test adjudication
 
 pub use author::AuthorSentant;
 pub use builder::BuilderSentant;
