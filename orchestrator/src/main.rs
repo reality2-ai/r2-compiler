@@ -149,6 +149,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(redirect_to_webapp))
         .route("/health", get(health_handler))
         .route("/r2", get(websocket_handler))
+        .route("/r2/wire", get(wire_ws_handler))
         .nest_service(
             "/webapp",
             ServeDir::new(&webapp_root).append_index_html_on_directories(true),
@@ -199,6 +200,45 @@ async fn websocket_handler(
         state.apiary_state,
         state.repo_root,
     ))
+}
+
+/// `/r2/wire` — the raw-R2-WIRE node channel for the browser wasm-hive
+/// (R2-WEB §4.6, CONFORMANT-PENDING-SPEC). Distinct from the `/r2` JSON
+/// management channel (never multiplexed). Builds the channel from the
+/// transient-test proof-surface registration + the apiary group-HMAC, then
+/// runs the frame bridge. Refuses (closes) if no apiary/TG key is available —
+/// no unauthenticated channel (R2-WEB §10.2).
+async fn wire_ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| async move {
+        let ens = state
+            .repo_root
+            .join("catalogue/ensembles/transient-test/ensemble.yaml");
+        let Some(reg) = std::fs::read_to_string(&ens).ok().and_then(|s| web::parse_r2web(&s)) else {
+            warn!("/r2/wire: no transient-test r2-web registration — closing");
+            return;
+        };
+        let Some(ch_cfg) = reg.channels.first() else {
+            warn!("/r2/wire: registration has no channel — closing");
+            return;
+        };
+        let channel = web::WireChannel::new(ch_cfg, &reg.subscriptions);
+
+        let Some(apiary_dir) = state.apiary_path.as_ref() else {
+            warn!("/r2/wire: no apiary open — refusing (frame auth needs the TG)");
+            return;
+        };
+        let config_root = crate::substrate::KeyholderPlugin::default_config_root();
+        let Some(hmac) = web::derive_apiary_group_hmac(apiary_dir, &config_root) else {
+            warn!("/r2/wire: apiary TG group-HMAC unavailable — refusing");
+            return;
+        };
+        info!("/r2/wire client connected (channel {})", channel.name());
+        web::wire_socket_loop(socket, state.engine, channel, hmac).await;
+        info!("/r2/wire client disconnected");
+    })
 }
 
 async fn handle_socket(

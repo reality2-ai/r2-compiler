@@ -61,13 +61,18 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
      (valid / wrong-group-key / unsigned / malformed). web module **24 tests**;
      suite **127/127**. Both channel auths now exist: `/ws` = `verify_ws_auth`
      (Ed25519), `/r2/wire` = `verify_wire_frame` (group-HMAC).
-   - ⏭ **Slice 2b-ii-rest (async glue — the integration piece):** the axum WS
-     handlers — `/r2/wire` (upgrade + recv→`verify_wire_frame`→`WireChannel.on_inbound`
-     →engine-bus inject; bus events→`WireChannel.outbound_for`→send) +
-     replay-on-connect; `/ws` (JSON, `verify_ws_auth`). Needs: derive the
-     `GroupHmac` (group `hk`) from the active apiary TG (`substrate/tg_state` +
-     r2-trust key derivation); wire to `hive.rs`'s bus broadcast/mpsc. Mesh leg →
-     core **D3a** later.
+   - ✅ **Slice 2b-ii-rest (async /r2/wire WS handler):** `web::wire_socket_loop`
+     + the `/r2/wire` route (main.rs). Inbound: size-gate → `verify_wire_frame`
+     (apiary group-HMAC) → inject `QueuedEvent` (src 0xFF) via `engine.inbound_tx`;
+     bad-auth dropped silently (§4.2). Outbound: bus events → `WireChannel.outbound_for`
+     → `encode_signed_wire_frame` → binary. GroupHmac via `derive_apiary_group_hmac`
+     (TG SK → `derive_group_keys().hk`, volatile). REFUSES if no apiary/TG key
+     (no §10.2 bypass). Route live-verified (400 upgrade-required, not 404);
+     encode↔verify round-trip tested. web module 25 tests; suite 139/139. ⏭
+     happy-path live round-trip (signed frame→inject→TestCoordinator→signed reply)
+     awaits a TG-keyed apiary + a frame-signing client (the wasm-hive, Part C ii);
+     `/ws` JSON handler + replay-on-connect deferred (the wasm-hive uses /r2/wire);
+     mesh leg → core **D3a**.
    - ⏭ **Slice 2b-iii:** browser-identity **enrolment** (mint/enrol a DEV_PK via
      software-ed25519 so the wasm-hive is a provisioned TG member it can auth as).
    - ⏭ **Slice 3:** wire the registration set into main.rs (mount each hosted

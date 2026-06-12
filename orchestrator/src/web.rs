@@ -17,12 +17,16 @@
 
 use std::path::{Path, PathBuf};
 
+use axum::extract::ws::{Message, WebSocket};
 use axum::Router;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use r2_engine::queue::QueuedEvent;
 use r2_trust::GroupHmac;
 use r2_wire::{decode_extended, verify_extended};
 use serde::Deserialize;
 use tower_http::services::{ServeDir, ServeFile};
+
+use crate::hive::EngineHandle;
 
 /// A parsed `registrations.r2-web` block from an ensemble.yaml.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -349,6 +353,121 @@ impl WireChannel {
         self.subscribed_hashes
             .contains(&event_hash)
             .then(|| payload.to_vec())
+    }
+
+    /// Inbound frame-size cap (bytes).
+    pub fn max_frame_bytes(&self) -> usize {
+        self.max_frame_bytes
+    }
+}
+
+/// Encode + group-HMAC-sign an outbound R2-WIRE **extended** frame for the
+/// `/r2/wire` channel (the inverse of [`verify_wire_frame`]). Returns the
+/// frame bytes, or `None` if encoding fails.
+pub fn encode_signed_wire_frame(event_hash: u32, payload: &[u8], hmac: &GroupHmac) -> Option<Vec<u8>> {
+    use r2_wire::types::{ExtendedHeader, ExtendedMessage};
+    use r2_wire::{encode_extended, sign_extended, Flags, MsgType};
+
+    let mut msg = ExtendedMessage {
+        header: ExtendedHeader {
+            version: 0,
+            msg_type: MsgType::Event,
+            flags: Flags::default(),
+            ttl: 1,
+            k: 0,
+            msg_id: 0,
+            event_hash,
+            payload_len: payload.len() as u32,
+            target_group: 0,
+            target_hive: 0,
+        },
+        route: None,
+        payload,
+        hmac_tag: None,
+    };
+    let (flags, tag) = sign_extended(&msg, hmac);
+    msg.header.flags = flags;
+    msg.hmac_tag = Some(tag);
+    let mut buf = vec![0u8; payload.len() + 64];
+    let len = encode_extended(&msg, &mut buf).ok()?;
+    buf.truncate(len);
+    Some(buf)
+}
+
+/// Derive the active apiary TG's group-HMAC from the off-tree TG signing key
+/// (`<config_root>/apiaries/<name>/tg_signer/tg_priv.bin` — the keyholder
+/// substrate's key path). `None` if no key is present (→ the `/r2/wire` route
+/// refuses connections rather than bypass §10.2). The HK is volatile — never
+/// persisted or logged (R2-TRUST §3.3).
+pub fn derive_apiary_group_hmac(apiary_dir: &Path, config_root: &Path) -> Option<GroupHmac> {
+    let apiary_name = apiary_dir.file_name()?.to_str()?;
+    let priv_path = config_root
+        .join("apiaries")
+        .join(apiary_name)
+        .join("tg_signer/tg_priv.bin");
+    let seed = std::fs::read(&priv_path).ok()?;
+    if seed.len() != 32 {
+        return None;
+    }
+    let mut s = [0u8; 32];
+    s.copy_from_slice(&seed);
+    let sk = ed25519_dalek::SigningKey::from_bytes(&s);
+    let keys = r2_trust::derive_group_keys(&sk).ok()?;
+    Some(GroupHmac::new(keys.hk))
+}
+
+/// The `/r2/wire` raw-R2-WIRE WebSocket loop (R2-WEB §4.6,
+/// CONFORMANT-PENDING-SPEC). Bridges the browser wasm-hive ↔ the engine bus:
+/// - **inbound:** each binary frame is size-gated, then `verify_wire_frame`d
+///   against the apiary group-HMAC; verified frames are injected into the
+///   engine as a `QueuedEvent` (source `0xFF` = external). Bad-auth frames are
+///   dropped silently (R2-WEB §4.2 — never close on one bad frame).
+/// - **outbound:** engine events whose hash the channel subscribes to are
+///   encoded + signed and pushed as binary frames.
+///
+/// (Mesh leg — forwarding to/from the wider TCP mesh — attaches to core's D3a
+/// transport later; this is the in-process engine-bus path.)
+pub async fn wire_socket_loop(
+    mut socket: WebSocket,
+    engine: EngineHandle,
+    channel: WireChannel,
+    hmac: GroupHmac,
+) {
+    let mut outbound_rx = engine.subscribe_outbound();
+    let max = channel.max_frame_bytes();
+    loop {
+        tokio::select! {
+            ws_msg = socket.recv() => {
+                match ws_msg {
+                    Some(Ok(Message::Binary(bytes))) => {
+                        if bytes.len() > max {
+                            continue; // oversize — drop
+                        }
+                        if let Ok(f) = verify_wire_frame(&bytes, &hmac) {
+                            let q = QueuedEvent::new(f.event_hash, 0xFF, false, 0, &f.payload);
+                            let _ = engine.inbound_tx.try_send(q);
+                        }
+                        // unverified frames are dropped silently (§4.2)
+                    }
+                    Some(Ok(Message::Ping(p))) => {
+                        if socket.send(Message::Pong(p)).await.is_err() { break; }
+                    }
+                    Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                    _ => {}
+                }
+            }
+            engine_msg = outbound_rx.recv() => {
+                if let Ok(q) = engine_msg {
+                    if let Some(payload) = channel.outbound_for(q.hash, q.payload()) {
+                        if let Some(frame) = encode_signed_wire_frame(q.hash, &payload, &hmac) {
+                            if socket.send(Message::Binary(frame.into())).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -808,5 +927,22 @@ ensemble:
         let hmac = GroupHmac::new([0u8; 32]);
         assert_eq!(verify_wire_frame(&[0xFF, 0xFF, 0xFF], &hmac), Err(FrameAuthError::Malformed));
         assert_eq!(verify_wire_frame(&[], &hmac), Err(FrameAuthError::Malformed));
+    }
+
+    #[test]
+    fn outbound_encode_roundtrips_through_verify() {
+        // encode_signed_wire_frame (orchestrator→browser) must produce a frame
+        // that verify_wire_frame (browser→orchestrator) accepts under the same
+        // group key, recovering the event_hash + payload.
+        let hmac = GroupHmac::new([0xC3; 32]);
+        let frame = encode_signed_wire_frame(0xFEED_BEEF, b"snapshot", &hmac).unwrap();
+        let got = verify_wire_frame(&frame, &hmac).unwrap();
+        assert_eq!(got.event_hash, 0xFEED_BEEF);
+        assert_eq!(got.payload, b"snapshot");
+        // a different group key rejects it
+        assert_eq!(
+            verify_wire_frame(&frame, &GroupHmac::new([0xC4; 32])),
+            Err(FrameAuthError::BadHmac)
+        );
     }
 }
