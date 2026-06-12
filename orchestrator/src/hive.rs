@@ -34,6 +34,7 @@ use crate::substrate::{
     OtaPushPlugin, OtaPushSlot, ProvisionHandshakePlugin, ProvisionHandshakeSlot,
     ProvisionPlugin, ProvisionSlot,
 };
+use crate::sentants::test_coordinator::TestCoordinator;
 use crate::sentants::{
     AuthorSentant, BuilderSentant, DeploySentant, ProvisionSentant, RosterCtx, RosterSentant,
 };
@@ -221,6 +222,13 @@ pub fn spawn(apiary_path: Option<PathBuf>, repo_root: PathBuf) -> EngineHandle {
             roster_ctx_provision_sentant,
         )));
         info!("engine: registered Provision sentant (id={provision_sid})");
+
+        // TestCoordinator (Phase 3 D5) — transient-networking test adjudicator.
+        // Self-contained (its own ledger); subscribes to r2.tn.inject/report/assert
+        // (fnv-routed) so it's drivable now via the /r2 JSON bridge, ahead of the
+        // raw /r2/wire frame channel.
+        let tc_sid = bus.register_sentant(Box::new(TestCoordinator::new()));
+        info!("engine: registered TestCoordinator sentant (id={tc_sid})");
 
         bus.init_all();
         info!("engine: bus initialised");
