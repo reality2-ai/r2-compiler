@@ -1,8 +1,8 @@
 [package]
 name = "r2-def"
 version = "0.1.0"
-edition.workspace = true
-license.workspace = true
+edition = "2021"
+license = "PolyForm-Noncommercial-1.0.0"
 description = "R2-DEF: parser for sentant, swarm, and ensemble definition files (YAML / JSON / TOML)"
 repository = "https://github.com/reality2-ai/r2-core"
 keywords = ["r2", "mesh", "sentant", "ensemble", "yaml"]

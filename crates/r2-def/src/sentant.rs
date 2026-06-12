@@ -149,6 +149,46 @@ impl SentantDef {
                 )));
             }
         }
+
+        // Action-level static checks (R2-DEF §3.2 / §3.3.1). These are INTRA-definition
+        // static rules per the conformance adjudication — distinct from §8.2 RUNTIME
+        // plugin-availability resolution (which stays out of scope).
+        const VALID_COMMANDS: [&str; 4] = ["send", "set", "debug", "test"];
+        let declared: std::collections::HashSet<&str> =
+            self.plugins.iter().map(|p| p.name.as_str()).collect();
+        for automation in &self.automations {
+            for t in &automation.transitions {
+                for action in &t.actions {
+                    let plugin = action.get("plugin").and_then(|v| v.as_str());
+                    if let Some(p) = plugin {
+                        // E_DEF_PLUGIN_REF: a plugin action MUST reference a declared plugin.
+                        if !declared.contains(p) {
+                            return Err(crate::DefError::Validation(format!(
+                                "action references undeclared plugin '{p}' (E_DEF_PLUGIN_REF)"
+                            )));
+                        }
+                        continue; // plugin-defined command; not a builtin
+                    }
+                    if let Some(cmd) = action.get("command").and_then(|v| v.as_str()) {
+                        // E_DEF_ACTION_COMMAND: non-plugin command MUST be a known builtin.
+                        if !VALID_COMMANDS.contains(&cmd) {
+                            return Err(crate::DefError::Validation(format!(
+                                "unknown action command '{cmd}' (E_DEF_ACTION_COMMAND)"
+                            )));
+                        }
+                        // E_DEF_ACTION_FIELD: `send` requires an `event` parameter (§3.3.1).
+                        if cmd == "send"
+                            && action.get("parameters").and_then(|m| m.get("event")).is_none()
+                        {
+                            return Err(crate::DefError::Validation(
+                                "send action missing required 'event' parameter (E_DEF_ACTION_FIELD)"
+                                    .into(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }

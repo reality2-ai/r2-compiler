@@ -30,3 +30,7 @@ r2-plugin-crypto-software-ed25519 = "r2-core/plugins/crypto/software-ed25519"
 
 [ensembles]
 rocker-sensor = "r2-workshop/ensemble/sensor.yaml"
+
+# Re-sync override (manual, targeted): r2-def re-vendored 2026-06-12 from
+# r2-core d6f2a6a (web_registration model). Other crates remain at the [sources]
+# r2-core commit above. See _SYNC.md "Re-sync log".

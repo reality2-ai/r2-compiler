@@ -45,3 +45,16 @@ The orchestrator uses Linux/host async transports (axum + tokio); it does NOT ne
 ## v0.1 status
 
 **Not yet populated.** The directory shell exists; vendoring will happen as part of the orchestrator scaffolding phase.
+
+## Re-sync log
+
+- **2026-06-12 — `r2-def` only → r2-core `d6f2a6a` (≥ a257ac9).** Targeted re-sync
+  (rsync of `crates/r2-def` alone, not a full re-vendor) to pick up the canonical
+  web-UI registration model (`EnsembleScore::web_registration() -> WebPluginManifest`,
+  `registrations.r2-web { mount, bundle }`) + the resilient `web_template` test
+  (which had been failing-to-compile and breaking workspace-wide `cargo test`).
+  The orchestrator does **not** depend on `r2-def` (only r2-engine/fnv/wire/trust),
+  so blast radius = r2-def's own build/tests; verified `cargo test` fully green
+  (orchestrator suite 140/140, r2-def tests pass). The **other** vendored crates
+  remain at the original `54d2e1c` pin — a full re-vendor (r2-core has moved far
+  since) is a separate, coordinated operation, not done here.

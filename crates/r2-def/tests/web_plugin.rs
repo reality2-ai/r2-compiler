@@ -99,3 +99,26 @@ fn web_plugin_unsafe_eval_rejected() {
     let err = p.as_web().expect_err("rejected");
     assert!(err.to_string().contains("unsafe-eval"));
 }
+
+// ── Registration model (CANONICAL; R2-ENSEMBLE §2.1.2 / R2-DEF §7.4) ─────────
+
+#[test]
+fn registration_subscriptions_parse_canon_shape() {
+    // Canon shape per the R2-DEF §7.4 example: subscriptions: [{name, event}].
+    let yaml = "ensemble:\n  name: subbed\n  description: d\n  version: \"1.0.0\"\n  ensemble_version: \"0.1\"\n  sentants:\n    - name: s\n      description: d\n      automations:\n        - name: a\n          description: d\n          transitions:\n            - event: e\n              actions:\n                - command: send\n                  parameters:\n                    event: x\n  registrations:\n    r2-web:\n      route_prefix: /notes\n      static_bundle: ./ui/\n      subscriptions:\n        - name: noteStream\n          event: note.changed\n";
+    let score = r2_def::parse_ensemble_yaml(yaml).expect("parse");
+    let web = score.web_registration().expect("valid").expect("registered");
+    assert_eq!(web.mount.as_deref(), Some("/notes"));
+    assert_eq!(web.subscriptions.len(), 1);
+    assert_eq!(web.subscriptions[0].name, "noteStream");
+    assert_eq!(web.subscriptions[0].event, "note.changed");
+    assert!(web.channels.is_empty(), "channels are legacy-path only");
+}
+
+#[test]
+fn registration_subscription_missing_event_rejected() {
+    let yaml = "ensemble:\n  name: bad\n  description: d\n  version: \"1.0.0\"\n  ensemble_version: \"0.1\"\n  sentants:\n    - name: s\n      description: d\n      automations:\n        - name: a\n          description: d\n          transitions:\n            - event: e\n              actions:\n                - command: send\n                  parameters:\n                    event: x\n  registrations:\n    r2-web:\n      static_bundle: ./ui/\n      subscriptions:\n        - name: noEvent\n";
+    let score = r2_def::parse_ensemble_yaml(yaml).expect("parse");
+    let err = score.web_registration().expect_err("subscription without event rejected");
+    assert!(err.to_string().contains("event"));
+}

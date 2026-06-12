@@ -43,7 +43,9 @@ pub use ensemble::{
     CapabilityAggregate, EnsembleFile, EnsembleScore, SentantEntry, Signature,
     TrustGroupConstraints,
 };
-pub use plugin::{PluginDef, PluginRef, WebChannelDef, WebCspOverride, WebPluginManifest};
+pub use plugin::{
+    PluginDef, PluginRef, WebChannelDef, WebCspOverride, WebPluginManifest, WebSubscriptionDef,
+};
 pub use sentant::{Automation, SentantDef, SentantFile, StoragePolicy, SwarmDef, SwarmFile, Transition};
 
 #[cfg(feature = "yaml")]

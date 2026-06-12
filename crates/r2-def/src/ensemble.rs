@@ -114,6 +114,21 @@ pub struct Signature {
 }
 
 impl EnsembleScore {
+    /// Typed view of this ensemble's R2-WEB registration, if any — the CANONICAL
+    /// web-UI model (R2-ENSEMBLE §2.1.2 / R2-DEF §7.4): a registration with the
+    /// hive-shared R2-WEB singleton, not an ensemble-owned `plugins:` entry.
+    /// Returns `Ok(None)` when no `registrations.r2-web` key is present.
+    pub fn web_registration(
+        &self,
+    ) -> Result<Option<crate::plugin::WebPluginManifest>, crate::DefError> {
+        match self.registrations.get("r2-web") {
+            None => Ok(None),
+            Some(payload) => {
+                crate::plugin::WebPluginManifest::from_registration(&self.name, payload).map(Some)
+            }
+        }
+    }
+
     /// Light structural validation per R2-DEF §7.10. Heavier rules
     /// (signature verification, registration conflicts, compile-target
     /// loadability) are runtime concerns.

@@ -132,6 +132,7 @@ impl PluginDef {
             bundle,
             mount,
             channels,
+            subscriptions: Vec::new(), // registration-model field; legacy path doesn't carry it
             graphql_schema,
             csp,
         }))
@@ -149,18 +150,142 @@ pub struct WebPluginManifest {
     pub name: String,
     /// Bundle directory path, relative to the score file. Required.
     pub bundle: String,
-    /// Optional URL mount path. Default (when `None`) is
-    /// `/ensemble/<ensemble_name>` per §13.2.
+    /// URL mount path. Registration model: `route_prefix`, default `"/"`
+    /// (R2-DEF §7.4). Legacy owned-plugin view: optional `mount`.
     pub mount: Option<String>,
-    /// WebSocket channel descriptors (§13.6). May be empty.
+    /// LEGACY owned-plugin channel descriptors (non-canonical shape; see
+    /// [`WebChannelDef`]). Always empty on the registration path.
     pub channels: Vec<WebChannelDef>,
+    /// CANONICAL registration-model subscriptions (`{name, event}` per
+    /// R2-DEF §7.4). Always empty on the legacy owned-plugin path.
+    pub subscriptions: Vec<WebSubscriptionDef>,
     /// Optional GraphQL schema path (v0.2; v0.1 hives ignore with a warning).
     pub graphql_schema: Option<String>,
     /// Optional CSP overrides (§13.9).
     pub csp: Option<WebCspOverride>,
 }
 
-/// One WebSocket channel descriptor on a web plugin (R2-PLUGIN §13.2 / §13.6).
+impl WebPluginManifest {
+    /// Build a typed web manifest from an ensemble's `registrations.r2-web`
+    /// payload — the CANONICAL model per R2-ENSEMBLE §2.1.2 / R2-DEF §7.4: a web
+    /// UI is a registration with the hive-shared R2-WEB singleton, NOT an
+    /// ensemble-owned `plugins:` entry.
+    ///
+    /// Field mapping (specs-confirmed):
+    /// - `route_prefix` → `mount` (DEFAULT `"/"` when absent)
+    /// - `static_bundle` → `bundle` (required)
+    /// - `subscriptions` → `channels` (default empty)
+    /// - `graphql` → `graphql_schema` (optional)
+    /// - `csp`: parked OUT of canon (no home in R2-WEB §3 / R2-DEF §7.4) — always
+    ///   `None` here; never required.
+    ///
+    /// The registration model has no plugin name — the R2-WEB singleton
+    /// namespaces by ENSEMBLE name, so `name` is set to `ensemble_name`.
+    pub fn from_registration(
+        ensemble_name: &str,
+        payload: &serde_yaml::Value,
+    ) -> Result<WebPluginManifest, DefError> {
+        let map = payload.as_mapping().ok_or_else(|| {
+            DefError::Validation(format!(
+                "ensemble {ensemble_name:?}: registrations.r2-web must be a mapping (R2-DEF §7.4)"
+            ))
+        })?;
+        let get = |k: &str| map.get(serde_yaml::Value::String(k.into()));
+
+        let bundle = get("static_bundle")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                DefError::Validation(format!(
+                    "ensemble {ensemble_name:?}: registrations.r2-web requires `static_bundle` (R2-DEF §7.4)"
+                ))
+            })?;
+
+        let mount = match get("route_prefix") {
+            None => "/".to_string(), // default mount (R2-DEF §7.4)
+            Some(v) => {
+                let s = v.as_str().ok_or_else(|| {
+                    DefError::Validation(format!(
+                        "ensemble {ensemble_name:?}: `route_prefix` must be a string"
+                    ))
+                })?;
+                if !s.starts_with('/') {
+                    return Err(DefError::Validation(format!(
+                        "ensemble {ensemble_name:?}: `route_prefix` must start with '/' (R2-DEF §7.4)"
+                    )));
+                }
+                s.to_string()
+            }
+        };
+
+        // Canon shape (R2-DEF §7.4 example — the payload's only canon today):
+        // subscriptions: [{name, event}].
+        let subscriptions = match get("subscriptions") {
+            None => Vec::new(),
+            Some(v) => {
+                let seq = v.as_sequence().ok_or_else(|| {
+                    DefError::Validation(format!(
+                        "ensemble {ensemble_name:?}: `subscriptions` must be a sequence"
+                    ))
+                })?;
+                let mut out = Vec::with_capacity(seq.len());
+                for (i, item) in seq.iter().enumerate() {
+                    let m = item.as_mapping().ok_or_else(|| {
+                        DefError::Validation(format!(
+                            "ensemble {ensemble_name:?}: subscriptions[{i}] must be a mapping"
+                        ))
+                    })?;
+                    let field = |k: &str| {
+                        m.get(serde_yaml::Value::String(k.into()))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .ok_or_else(|| {
+                                DefError::Validation(format!(
+                                    "ensemble {ensemble_name:?}: subscriptions[{i}] requires `{k}` (R2-DEF §7.4)"
+                                ))
+                            })
+                    };
+                    out.push(WebSubscriptionDef { name: field("name")?, event: field("event")? });
+                }
+                out
+            }
+        };
+
+        let graphql_schema = get("graphql")
+            .and_then(|v| v.as_mapping())
+            .and_then(|m| m.get(serde_yaml::Value::String("schema".into())))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        Ok(WebPluginManifest {
+            name: ensemble_name.to_string(),
+            bundle,
+            mount: Some(mount),
+            channels: Vec::new(), // legacy owned-plugin view only — not part of the registration model
+            subscriptions,
+            graphql_schema,
+            csp: None, // parked out of canon — never read from the registration
+        })
+    }
+}
+
+/// One WebSocket event subscription in an `r2-web` registration payload —
+/// the CANONICAL shape per the R2-DEF §7.4 example: `{name, event}`.
+/// (R2-DEF §7.4's "defined normatively in R2-WEB §3" is a dangling ref —
+/// the §7.4 example is the payload's only canon today; fix queued with specs.)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebSubscriptionDef {
+    /// Channel name exposed to the browser (e.g. `noteStream`).
+    pub name: String,
+    /// Event name this subscription forwards (e.g. `note.changed`).
+    pub event: String,
+}
+
+/// One WebSocket channel descriptor on a LEGACY owned web plugin
+/// (`plugins:` entry). NON-CANONICAL: this shape has no definition anywhere in
+/// the spec corpus (the canonical web-UI surface is the `registrations.r2-web`
+/// model, whose subscriptions are [`WebSubscriptionDef`]). Retained for the
+/// legacy `plugins[]` view only.
 #[derive(Debug, Clone)]
 pub struct WebChannelDef {
     /// URL-safe channel name (`[a-zA-Z0-9._-]+`).

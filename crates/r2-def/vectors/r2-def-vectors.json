@@ -1,0 +1,147 @@
+{
+  "spec": "R2-DEF",
+  "version": "0.3",
+  "description": "Conformance vectors for R2-DEF sentant/swarm definition loading and load-time validation (R2-DEF §2.1 required fields, §8.1 validation rules). Definitions are shown as JSON (a valid R2-DEF convention, §11.2); YAML and TOML definitions parse to the same model and MUST yield the same accept/reject outcome. Each vector is a definition plus the expected load-time outcome: 'accept' (loads), or 'reject' with the §8.1 error code.",
+  "notes": [
+    "A sentant definition is the object under the top-level `sentant` key. A swarm definition is under `swarm`.",
+    "REQUIRED fields (§2.1): `name` (non-empty string), `description` (non-empty string), `automations` (>= 1 entry). `class`, `data`, `storage`, `plugins` are recommended/optional.",
+    "Load-time validation (§8.1) is the conformance surface here; the §8.2 runtime checks (template/target/plugin/capability resolution) are not load-time and are out of scope for these vectors."
+  ],
+  "valid": {
+    "description": "MUST load successfully (accept).",
+    "vectors": [
+      {
+        "id": "DEF-VALID-MINIMAL",
+        "description": "Minimal sentant: name + description + one automation with one transition + one valid action.",
+        "definition": {
+          "sentant": {
+            "name": "Minimal",
+            "description": "A minimal valid sentant.",
+            "automations": [
+              {
+                "name": "a1",
+                "description": "single automation",
+                "transitions": [
+                  { "event": "ping", "actions": [ { "command": "send", "parameters": { "event": "pong" } } ] }
+                ]
+              }
+            ]
+          }
+        },
+        "expect": "accept"
+      },
+      {
+        "id": "DEF-VALID-OPTIONAL-FIELDS",
+        "description": "Sentant with optional class, data, storage (§2.2/§2.3).",
+        "definition": {
+          "sentant": {
+            "name": "Thermostat",
+            "class": "nz.co.reality2.thermostat",
+            "description": "A thermostat sentant.",
+            "storage": "durable-state",
+            "data": { "threshold": 2.5, "alert_sent": false },
+            "automations": [
+              {
+                "name": "control",
+                "description": "control loop",
+                "transitions": [
+                  { "from": "start", "event": "init", "to": "idle" },
+                  { "event": "set_point", "actions": [ { "command": "set", "parameters": { "key": "threshold", "value": "{{params.value}}" } } ] }
+                ]
+              }
+            ]
+          }
+        },
+        "expect": "accept"
+      },
+      {
+        "id": "DEF-VALID-ZENQUOTE",
+        "description": "R2-DEF §9.1 Zen Quote example (plugin declared + referenced).",
+        "definition": {
+          "sentant": {
+            "name": "Zen Quote",
+            "description": "Get a quote for the day",
+            "plugins": [ { "name": "io.zenquotes.api" } ],
+            "automations": [
+              {
+                "name": "Zen Quote",
+                "description": "Get quote",
+                "transitions": [
+                  { "public": true, "event": "Get Zenquote", "actions": [ { "plugin": "io.zenquotes.api", "command": "fetch" } ] },
+                  { "event": "io.zenquotes.api", "actions": [
+                    { "command": "set", "parameters": { "key": "quote", "value": "{{params.data.q}}" } },
+                    { "command": "set", "parameters": { "key": "author", "value": "{{params.data.a}}" } },
+                    { "command": "send", "parameters": { "event": "Zenquote Response" } }
+                  ] }
+                ]
+              }
+            ]
+          }
+        },
+        "expect": "accept"
+      }
+    ]
+  },
+  "invalid": {
+    "description": "MUST be rejected at load time (§8.1) with the listed error code. One vector per rule.",
+    "vectors": [
+      {
+        "id": "DEF-ERR-NAME-MISSING",
+        "definition": { "sentant": { "description": "no name", "automations": [ { "name": "a", "description": "d", "transitions": [ { "event": "e", "actions": [ { "command": "send", "parameters": { "event": "x" } } ] } ] } ] } },
+        "expect": "reject",
+        "error": "E_DEF_NAME_MISSING"
+      },
+      {
+        "id": "DEF-ERR-DESC-MISSING",
+        "definition": { "sentant": { "name": "NoDesc", "automations": [ { "name": "a", "description": "d", "transitions": [ { "event": "e", "actions": [ { "command": "send", "parameters": { "event": "x" } } ] } ] } ] } },
+        "expect": "reject",
+        "error": "E_DEF_DESC_MISSING"
+      },
+      {
+        "id": "DEF-ERR-AUTOMATIONS-EMPTY",
+        "definition": { "sentant": { "name": "NoAuto", "description": "no automations", "automations": [] } },
+        "expect": "reject",
+        "error": "E_DEF_AUTOMATIONS_EMPTY"
+      },
+      {
+        "id": "DEF-ERR-AUTOMATION-DUP",
+        "definition": { "sentant": { "name": "DupAuto", "description": "duplicate automation names", "automations": [
+          { "name": "same", "description": "1", "transitions": [ { "event": "e", "actions": [ { "command": "send", "parameters": { "event": "x" } } ] } ] },
+          { "name": "same", "description": "2", "transitions": [ { "event": "f", "actions": [ { "command": "send", "parameters": { "event": "y" } } ] } ] }
+        ] } },
+        "expect": "reject",
+        "error": "E_DEF_AUTOMATION_DUP"
+      },
+      {
+        "id": "DEF-ERR-PLUGIN-DUP",
+        "definition": { "sentant": { "name": "DupPlugin", "description": "duplicate plugin names", "plugins": [ { "name": "p" }, { "name": "p" } ], "automations": [ { "name": "a", "description": "d", "transitions": [ { "event": "e", "actions": [ { "command": "send", "parameters": { "event": "x" } } ] } ] } ] } },
+        "expect": "reject",
+        "error": "E_DEF_PLUGIN_DUP"
+      },
+      {
+        "id": "DEF-ERR-PLUGIN-REF",
+        "definition": { "sentant": { "name": "BadRef", "description": "action references undeclared plugin", "plugins": [ { "name": "declared" } ], "automations": [ { "name": "a", "description": "d", "transitions": [ { "event": "e", "actions": [ { "plugin": "undeclared", "command": "fetch" } ] } ] } ] } },
+        "expect": "reject",
+        "error": "E_DEF_PLUGIN_REF"
+      },
+      {
+        "id": "DEF-ERR-ACTION-COMMAND",
+        "definition": { "sentant": { "name": "BadCmd", "description": "invalid action command", "automations": [ { "name": "a", "description": "d", "transitions": [ { "event": "e", "actions": [ { "command": "not_a_real_command" } ] } ] } ] } },
+        "expect": "reject",
+        "error": "E_DEF_ACTION_COMMAND"
+      },
+      {
+        "id": "DEF-ERR-ACTION-FIELD",
+        "definition": { "sentant": { "name": "MissingField", "description": "send action missing required event parameter", "automations": [ { "name": "a", "description": "d", "transitions": [ { "event": "e", "actions": [ { "command": "send", "parameters": {} } ] } ] } ] } },
+        "expect": "reject",
+        "error": "E_DEF_ACTION_FIELD"
+      },
+      {
+        "id": "DEF-ERR-SWARM-EMPTY",
+        "definition": { "swarm": { "name": "EmptySwarm", "description": "swarm with no sentants", "sentants": [] } },
+        "expect": "reject",
+        "error": "E_DEF_SWARM_EMPTY"
+      }
+    ]
+  }
+}
