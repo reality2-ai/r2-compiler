@@ -23,7 +23,8 @@
 //! ```text
 //!   [status: u8][msg_len: u16 LE][msg: utf-8]
 //!   status 0x00 = OK   (msg is literally "OK"; the sha is NOT echoed)
-//!   status 0x01 = error (msg is a plain reason, e.g. "SHA-256 mismatch")
+//!   status 0x01 = error (msg = "<CODE> <detail>", a CODE token from the
+//!                 OTA reply-status contract — see classify_device_error)
 //! ```
 //! There is no `REBOOTING` frame: on success the device logs locally
 //! and `esp_restart()`s ~2 s later, so the connection just drops. The
@@ -47,9 +48,11 @@
 //! - `r2.composer.deploy.device.done` — `{batch_id, slot_id,
 //!   artefact_sha256, duration_ms}`.
 //! - `r2.composer.deploy.device.error` — `{batch_id, slot_id,
-//!   error_kind, message}`. `error_kind` ∈ {`unreachable`,
-//!   `sha-mismatch`, `device-error`, `send-failed`, `reboot-timeout`,
-//!   `response-malformed`, `artefact-missing`}.
+//!   error_kind, message}`. `error_kind` ∈ {`unreachable`, `send-failed`,
+//!   `reboot-timeout`, `response-malformed`, `artefact-missing`} for
+//!   transport-side failures, plus the device-reported CODEs mapped by
+//!   `classify_device_error`: `sha-mismatch`, `too-big`, `bad-magic`,
+//!   `write-fail`, `no-slot`, `preamble`, `short`, `device-error`.
 //!
 //! ## Out of scope for F5 (deferred to F5b)
 //!
@@ -382,9 +385,26 @@ fn run_push(params: OtaPushParams, tx: mpsc::Sender<WorkerMsg>) {
         });
         let _ = tx.send(WorkerMsg::Done { artefact_sha256: sha_hex, duration_ms });
     } else {
-        let error_kind = if msg.contains("SHA-256 mismatch") { "sha-mismatch" } else { "device-error" };
+        let error_kind = classify_device_error(&msg);
         append_deploy_log(&params, 1, "error", &sha_hex, duration_ms);
         let _ = tx.send(WorkerMsg::Error { error_kind: error_kind.into(), message: msg });
+    }
+}
+
+/// Map a device error reply's leading CODE token to a kebab `error_kind`, per
+/// the OTA reply-status contract (`specifications/OTA-REPLY-STATUS-CONTRACT.md`)
+/// — the vocabulary hive's no_std embassy-net receiver emits. Unknown codes
+/// fall back to `device-error`.
+fn classify_device_error(msg: &str) -> &'static str {
+    match msg.split_whitespace().next().unwrap_or("") {
+        "SHA_MISMATCH" => "sha-mismatch",
+        "TOO_BIG" => "too-big",
+        "BAD_MAGIC" => "bad-magic",
+        "WRITE_FAIL" => "write-fail",
+        "NO_SLOT" => "no-slot",
+        "PREAMBLE" => "preamble",
+        "SHORT" => "short",
+        _ => "device-error",
     }
 }
 
@@ -544,10 +564,12 @@ mod tests {
     }
 
     #[test]
-    fn device_error_maps_to_sha_mismatch() {
+    fn device_error_code_maps_to_kind() {
+        // hive's receiver emits the CODE vocabulary (OTA-REPLY-STATUS-CONTRACT):
+        // status 0x01 + "SHA_MISMATCH <detail>" → error_kind "sha-mismatch".
         let (_dir, fw_path) = write_fw(&[0u8; 1024]);
         let capture: Capture = Arc::new(Mutex::new(None));
-        let port = spawn_device(0x01, "SHA-256 mismatch", capture);
+        let port = spawn_device(0x01, "SHA_MISMATCH computed!=preamble", capture);
 
         let slot = Arc::new(Mutex::new(Some(params_for(port, &fw_path))));
         let mut p = OtaPushPlugin::new(0, slot);
@@ -557,7 +579,20 @@ mod tests {
         let (_, err_payload) = events.iter().find(|(h, _)| *h == p.hash_error).expect("error event");
         let v: serde_json::Value = serde_json::from_slice(err_payload).unwrap();
         assert_eq!(v["error_kind"], "sha-mismatch");
-        assert_eq!(v["message"], "SHA-256 mismatch");
+        assert_eq!(v["message"], "SHA_MISMATCH computed!=preamble");
+    }
+
+    #[test]
+    fn classify_device_error_vocabulary() {
+        assert_eq!(classify_device_error("SHA_MISMATCH x"), "sha-mismatch");
+        assert_eq!(classify_device_error("TOO_BIG 1500000>1500000"), "too-big");
+        assert_eq!(classify_device_error("BAD_MAGIC"), "bad-magic");
+        assert_eq!(classify_device_error("WRITE_FAIL errno=5"), "write-fail");
+        assert_eq!(classify_device_error("NO_SLOT"), "no-slot");
+        assert_eq!(classify_device_error("PREAMBLE short read"), "preamble");
+        assert_eq!(classify_device_error("SHORT"), "short");
+        assert_eq!(classify_device_error("weird"), "device-error");
+        assert_eq!(classify_device_error(""), "device-error");
     }
 
     #[test]
