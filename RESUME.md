@@ -109,8 +109,13 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
    SX1262 trait proposal INTO core D3b (not a parallel composer trait); **(c)**
    ✅ OTA reply-status contract delivered — `specifications/OTA-REPLY-STATUS-CONTRACT.md`
    (status 0x00 OK / 0x01 ERR + CODE-in-msg vocabulary; DFR1195 = 4 MB → TOO_BIG
-   bound; folds into SPEC-APIARY-FLASH §6 at merge). Also: peer-ask workshop for
-   reusable no_std ST7735 code to point hive at.
+   bound; folds into SPEC-APIARY-FLASH §6 at merge). ✅ **OTA loop CLOSED
+   cross-repo**: hive built the no_std embassy-net receiver to this contract
+   (CODE set + framing + bound-check all verified to match my F5 push wire
+   byte-for-byte); push side now classifies the CODEs (`ota_push::classify_device_error`
+   → kebab error_kind). One open confirm with hive: reply len is u16 LE (my parser
+   assumes u16). Workshop: no reusable ST7735 driver ("yes to semantics") — for
+   hive's D4c firmware display.
 4. **Part C (iii/iv)** — `TestCoordinator` sentant + `test-ux` ensemble (two
    views) → coverage grid reading specs' published
    `testing/test-vectors/r2-transient-networking-conjectures.json` (fields:
