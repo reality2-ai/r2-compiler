@@ -113,9 +113,10 @@ is NOT the hive.** North-star: ONE hive codebase everywhere (core's no_std crate
    cross-repo**: hive built the no_std embassy-net receiver to this contract
    (CODE set + framing + bound-check all verified to match my F5 push wire
    byte-for-byte); push side now classifies the CODEs (`ota_push::classify_device_error`
-   → kebab error_kind). One open confirm with hive: reply len is u16 LE (my parser
-   assumes u16). Workshop: no reusable ST7735 driver ("yes to semantics") — for
-   hive's D4c firmware display.
+   → kebab error_kind). Reply framing `[status u8][msg_len u16 LE][msg]`
+   confirmed byte-exact by hive — **OTA loop fully closed, no open items**.
+   Workshop: no reusable ST7735 driver ("yes to semantics") — for hive's D4c
+   firmware display.
 4. **Part C (iii/iv)** — `TestCoordinator` sentant + `test-ux` ensemble (two
    views) → coverage grid reading specs' published
    `testing/test-vectors/r2-transient-networking-conjectures.json` (fields:
