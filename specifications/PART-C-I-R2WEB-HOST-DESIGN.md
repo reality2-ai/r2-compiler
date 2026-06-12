@@ -146,3 +146,28 @@ too — tracked as a follow-up, separate from the proof-surface channels above.
 **Net for slice 2b-ii:** build the `/r2/wire` raw-frame WS handler
 (conformant-pending-spec, native frame auth) AND keep `verify_ws_auth` as the
 `/ws` JSON channel gate. Distinct axum routes; distinct auth per channel.
+
+---
+
+## Addendum — transport model clarification + canonical registration (2026-06-12)
+
+**Transport model (corrects §3/§4's "WS↔TCP bridge to r2-transport/tcp.rs"):**
+the orchestrator **terminates the browser's `/r2/wire` WebSocket itself**
+(R2-WEB §4.6) and injects verified frames into the **in-process engine bus**
+(`engine.inbound_tx`). It does **not** open a per-browser raw TCP socket, and it
+does **not** need a raw-TCP `r2-discovery` binding (which isn't in the ratified
+API — would need a specs §4.5 addition). Outward meshing to other hives is the
+orchestrator's **own** transport concern, served by the ratified transports:
+**udp_lan (functional now, core 17e7a93)** and **WebSocketTransport (next)**. So:
+browser→orchestrator = WS terminated in-process; orchestrator→mesh = ratified
+transports. (Implemented exactly this way in `web::wire_socket_loop`.)
+
+**Canonical registration model (core 375a83f + r2-def a257ac9):** the canonical
+shape is `registrations.r2-web { mount (default '/'), bundle (e.g. ./ui/),
+channels, graphql }`, exposed via `EnsembleScore::web_registration() ->
+WebPluginManifest`. This crate's slice-1 parser currently uses
+`route_prefix`/`static_bundle` (the notekeeper + workshop field names).
+**Alignment action:** re-sync vendored r2-def, switch to the canonical
+`mount`/`bundle` field names (consume `web_registration()` where practical), and
+update `catalogue/ensembles/transient-test/ensemble.yaml` to match — to stay on
+canon and avoid drift.
