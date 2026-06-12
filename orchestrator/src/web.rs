@@ -29,12 +29,20 @@ use tower_http::services::{ServeDir, ServeFile};
 use crate::hive::EngineHandle;
 
 /// A parsed `registrations.r2-web` block from an ensemble.yaml.
+///
+/// Field names follow the **canonical** registration model (core 375a83f /
+/// r2-def `web_registration()`): `mount` (default `/`) + `bundle`. The earlier
+/// notekeeper/workshop names `route_prefix` + `static_bundle` are accepted as
+/// aliases during the transition.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct R2WebRegistration {
-    /// Path prefix the bundle mounts at (e.g. `/proof`). Normalised via
-    /// [`Self::mount_prefix`].
+    /// Path prefix the bundle mounts at (canonical `mount`, default `/`; e.g.
+    /// `/proof`). Normalised via [`Self::mount_prefix`].
+    #[serde(rename = "mount", alias = "route_prefix", default = "default_mount")]
     pub route_prefix: String,
-    /// Bundle directory, relative to the ensemble dir (e.g. `./web/`).
+    /// Bundle directory, relative to the ensemble dir (canonical `bundle`;
+    /// e.g. `./ui/`).
+    #[serde(rename = "bundle", alias = "static_bundle")]
     pub static_bundle: String,
     /// Raw-R2-WIRE frame channels (workshop recipe). Empty for a
     /// notekeeper-style GraphQL registration.
@@ -69,6 +77,11 @@ pub struct Channel {
 
 fn default_max_frame_bytes() -> usize {
     65536
+}
+
+/// Canonical default mount point when `mount` is omitted (R2-WEB / r2-def).
+fn default_mount() -> String {
+    "/".to_string()
 }
 
 /// An event → browser subscription.
@@ -599,6 +612,18 @@ ensemble:
     }
 
     #[test]
+    fn parses_canonical_mount_bundle_shape() {
+        // The canonical r2-def shape: `mount` (default '/') + `bundle`.
+        let canon = "ensemble:\n  registrations:\n    r2-web:\n      mount: /dash\n      bundle: ./ui/\n";
+        let r = parse_r2web(canon).unwrap();
+        assert_eq!(r.route_prefix, "/dash");
+        assert_eq!(r.static_bundle, "./ui/");
+        // mount defaults to '/' when omitted
+        let dflt = "ensemble:\n  registrations:\n    r2-web:\n      bundle: ./ui/\n";
+        assert_eq!(parse_r2web(dflt).unwrap().route_prefix, "/");
+    }
+
+    #[test]
     fn headless_ensemble_has_no_registration() {
         assert!(parse_r2web(HEADLESS).is_none());
     }
@@ -639,8 +664,8 @@ ensemble:
         const ENSEMBLE: &str =
             include_str!("../../catalogue/ensembles/transient-test/ensemble.yaml");
         let reg = parse_r2web(ENSEMBLE).expect("transient-test has registrations.r2-web");
-        assert_eq!(reg.route_prefix, "/proof");
-        assert_eq!(reg.static_bundle, "./web/");
+        assert_eq!(reg.route_prefix, "/proof"); // canonical `mount`
+        assert_eq!(reg.static_bundle, "./ui/"); // canonical `bundle`
         assert!(reg.diagnostics);
         assert_eq!(reg.channels.len(), 1);
         assert_eq!(reg.channels[0].target_sentant.as_deref(), Some("TestCoordinator"));

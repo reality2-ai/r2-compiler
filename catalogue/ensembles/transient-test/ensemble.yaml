@@ -55,8 +55,8 @@ ensemble:
   #               frame auth; CONFORMANT-PENDING-SPEC R2-WEB §4.6).
   registrations:
     r2-web:
-      route_prefix: /proof
-      static_bundle: ./web/
+      mount: /proof              # canonical field (was route_prefix)
+      bundle: ./ui/              # canonical field (was static_bundle)
       channels:
         - { name: r2, target_sentant: TestCoordinator, max_frame_bytes: 65536 }
       subscriptions:
